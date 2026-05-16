@@ -134,9 +134,15 @@ namespace InnerG.Api.Services.Implementations
 
         private async Task<AppUser?> FindUserAsync(string account)
         {
-            var userByEmail = await _userManager.FindByEmailAsync(account);
+            var userByEmail = await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Email == account);
+            
             if (userByEmail != null) return userByEmail;
-            return await _userManager.FindByNameAsync(account);
+            
+            return await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.UserName == account);
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -168,11 +174,15 @@ namespace InnerG.Api.Services.Implementations
                 throw new UnauthorizedException("Google account has no email");
 
             var providerKey = payload.Id;
-            var user = await _userManager.FindByLoginAsync(GoogleProvider, providerKey);
+            var user = await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => _context.UserLogins.Any(l => l.LoginProvider == GoogleProvider && l.ProviderKey == providerKey && l.UserId == u.Id));
 
             if (user == null)
             {
-                user = await _userManager.FindByEmailAsync(payload.Email);
+                user = await _userManager.Users
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(u => u.Email == payload.Email);
                 if (user == null)
                 {
                     var defaultCompany = await _context.Companies.FirstOrDefaultAsync() 
@@ -307,6 +317,7 @@ namespace InnerG.Api.Services.Implementations
         {
             var session = await _context.UserSessions
                 .Include(x => x.User)
+                .IgnoreQueryFilters() // Important to find user session even if context is empty
                 .FirstOrDefaultAsync(x => x.TokenHash == refreshToken);
 
             if (session == null)
@@ -348,7 +359,10 @@ namespace InnerG.Api.Services.Implementations
 
         public async Task<UserInfoResponse> GetCurrentUserInfoAsync(string userId)
         {
-            var user = await _userManager.FindByIdAsync(userId);
+            var userGuid = Guid.Parse(userId);
+            var user = await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Id == userGuid);
             if (user == null)
                 throw new NotFoundException("User not found");
 

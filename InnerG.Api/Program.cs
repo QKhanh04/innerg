@@ -193,7 +193,7 @@ if (app.Environment.IsDevelopment())
 
 using (var scope = app.Services.CreateScope())
 {
-    await RoleSeeder.SeedAsync(scope.ServiceProvider);
+    await DataSeeder.SeedAsync(scope.ServiceProvider);
 }
 
 app.UseHttpsRedirection();
