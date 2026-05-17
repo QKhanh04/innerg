@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #13ecb6;
+  --color-deep-blue: #0a192f;
+  --color-bg-light: #f6f8f8;
+  
+  --font-family-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-slideOut {
+  animation: slideOut 0.3s ease-in forwards;
+}
