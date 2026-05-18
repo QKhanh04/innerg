@@ -3,6 +3,7 @@ using System;
 using InnerG.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace InnerG.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260514164220_AddGamificationAndResources")]
+    partial class AddGamificationAndResources
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -216,50 +219,6 @@ namespace InnerG.Api.Migrations
                     b.ToTable("AuditLogs");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.Badge", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ConditionType")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ConditionValue")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<string>("IconUrl")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsSystem")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("Badges");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.Company", b =>
                 {
                     b.Property<Guid>("Id")
@@ -292,55 +251,6 @@ namespace InnerG.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Companies");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.CompanySubscription", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CancelledAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CurrentPeriodEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("CurrentPeriodStart")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("SubscriptionPlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("TrialEndsAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SubscriptionPlanId");
-
-                    b.HasIndex("CompanyId", "Status");
-
-                    b.ToTable("CompanySubscriptions");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Department", b =>
@@ -447,6 +357,12 @@ namespace InnerG.Api.Migrations
                     b.Property<string>("Comment")
                         .HasColumnType("text");
 
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ContentRating")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -456,243 +372,27 @@ namespace InnerG.Api.Migrations
                     b.Property<bool>("IsAnonymous")
                         .HasColumnType("boolean");
 
-                    b.Property<int>("OverallRating")
+                    b.Property<int>("TrainerRating")
                         .HasColumnType("integer");
-
-                    b.Property<Guid?>("RevieweeTrainerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("RevieweeUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReviewerRole")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("ReviewerUserId")
-                        .HasColumnType("uuid");
 
                     b.Property<Guid>("TrainingEventId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("TrainingSessionId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("RevieweeTrainerId");
+                    b.HasIndex("UserId");
 
-                    b.HasIndex("RevieweeUserId");
-
-                    b.HasIndex("ReviewerUserId");
-
-                    b.HasIndex("TrainingEventId");
-
-                    b.HasIndex("TrainingSessionId", "ReviewerUserId", "RevieweeUserId", "RevieweeTrainerId")
+                    b.HasIndex("TrainingEventId", "UserId")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Feedbacks");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.FeedbackCriteria", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("AppliesTo")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsSystem")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.ToTable("FeedbackCriteria");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.FeedbackResponse", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CriteriaId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("FeedbackId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Score")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CriteriaId");
-
-                    b.HasIndex("FeedbackId");
-
-                    b.ToTable("FeedbackResponses");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.InnerGPointsLedger", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Amount")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("AppliedRuleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("BalanceAfter")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Note")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("ReferenceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReferenceType")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppliedRuleId");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("InnerGPointsLedger");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.LeaderboardSnapshot", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("AvgRating")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DepartmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("PeriodType")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("PeriodValue")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int?>("RankInDepartment")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RankOverall")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SessionsTaught")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("SnapshotAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("TotalLearners")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalPointsEarned")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("LeaderboardSnapshots");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.LearningWishlist", b =>
@@ -785,154 +485,6 @@ namespace InnerG.Api.Migrations
                     b.ToTable("MeetingRooms");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.Notification", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Channel")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("ReferenceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ReferenceType")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("SentAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Notifications");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.NotificationPreference", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("ChannelEmail")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("ChannelPush")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("NotificationType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("NotificationPreferences");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.PointRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ConditionOperator")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ConditionType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ConditionValue")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("PointsValue")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RuleType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.ToTable("PointRules");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.Resource", b =>
                 {
                     b.Property<Guid>("Id")
@@ -983,36 +535,6 @@ namespace InnerG.Api.Migrations
                     b.HasIndex("TrainingEventId");
 
                     b.ToTable("Resources");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.ResourceDepartmentAccess", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("DepartmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ResourceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.HasIndex("ResourceId");
-
-                    b.ToTable("ResourceDepartmentAccess");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Reward", b =>
@@ -1208,45 +730,6 @@ namespace InnerG.Api.Migrations
                     b.ToTable("SkillAssessments");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.SubscriptionPlan", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("BillingCycle")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("MaxUsers")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("PricePerUser")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("StorageQuotaGb")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("SubscriptionPlans");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.Trainer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1302,65 +785,6 @@ namespace InnerG.Api.Migrations
                         .HasFilter("\"UserId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("Trainers");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.TrainerInvitation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DeclineReason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("InvitedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("InvitedTrainerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("InvitedUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("InviterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Message")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RespondedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("TrainingEventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("InvitedTrainerId");
-
-                    b.HasIndex("InvitedUserId");
-
-                    b.HasIndex("InviterId");
-
-                    b.HasIndex("TrainingEventId");
-
-                    b.ToTable("TrainerInvitations");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainerSkill", b =>
@@ -1549,93 +973,6 @@ namespace InnerG.Api.Migrations
                     b.ToTable("TrainingSessions");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.UserBadge", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AwardedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("BadgeId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BadgeId");
-
-                    b.HasIndex("UserId", "BadgeId")
-                        .IsUnique();
-
-                    b.ToTable("UserBadges");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.UserIntegration", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AccessTokenEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("CalendarId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastSyncedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("RefreshTokenEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Scope")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("TokenExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "Provider")
-                        .IsUnique();
-
-                    b.ToTable("UserIntegrations");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.UserReward", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1786,36 +1123,6 @@ namespace InnerG.Api.Migrations
                     b.ToTable("UserSkills");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.WishlistVote", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("WishlistId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("WishlistId");
-
-                    b.ToTable("WishlistVotes");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -1947,34 +1254,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.Badge", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId");
-
-                    b.Navigation("Company");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.CompanySubscription", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("InnerG.Api.Models.SubscriptionPlan", "SubscriptionPlan")
-                        .WithMany("Subscriptions")
-                        .HasForeignKey("SubscriptionPlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-
-                    b.Navigation("SubscriptionPlan");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.Department", b =>
                 {
                     b.HasOne("InnerG.Api.Models.AppUser", "Manager")
@@ -2013,115 +1292,19 @@ namespace InnerG.Api.Migrations
 
             modelBuilder.Entity("InnerG.Api.Models.Feedback", b =>
                 {
-                    b.HasOne("InnerG.Api.Models.Trainer", "RevieweeTrainer")
-                        .WithMany()
-                        .HasForeignKey("RevieweeTrainerId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "RevieweeUser")
-                        .WithMany()
-                        .HasForeignKey("RevieweeUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "Reviewer")
-                        .WithMany("Feedbacks")
-                        .HasForeignKey("ReviewerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("InnerG.Api.Models.TrainingEvent", "TrainingEvent")
                         .WithMany()
                         .HasForeignKey("TrainingEventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("InnerG.Api.Models.TrainingSession", "TrainingSession")
-                        .WithMany()
-                        .HasForeignKey("TrainingSessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RevieweeTrainer");
-
-                    b.Navigation("RevieweeUser");
-
-                    b.Navigation("Reviewer");
-
-                    b.Navigation("TrainingEvent");
-
-                    b.Navigation("TrainingSession");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.FeedbackCriteria", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId");
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
-                    b.Navigation("Company");
-
-                    b.Navigation("CreatedByUser");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.FeedbackResponse", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.FeedbackCriteria", "Criteria")
-                        .WithMany()
-                        .HasForeignKey("CriteriaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("InnerG.Api.Models.Feedback", "Feedback")
-                        .WithMany("Responses")
-                        .HasForeignKey("FeedbackId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Criteria");
-
-                    b.Navigation("Feedback");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.InnerGPointsLedger", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.PointRule", "AppliedRule")
-                        .WithMany()
-                        .HasForeignKey("AppliedRuleId");
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId");
-
                     b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany("PointsLedger")
+                        .WithMany("Feedbacks")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("AppliedRule");
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.LeaderboardSnapshot", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentId");
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Department");
+                    b.Navigation("TrainingEvent");
 
                     b.Navigation("User");
                 });
@@ -2143,39 +1326,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.Notification", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany("Notifications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.NotificationPreference", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany("NotificationPreferences")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.PointRule", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.AppUser", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("CreatedByUser");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.Resource", b =>
                 {
                     b.HasOne("InnerG.Api.Models.TrainingEvent", "TrainingEvent")
@@ -2185,25 +1335,6 @@ namespace InnerG.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("TrainingEvent");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.ResourceDepartmentAccess", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("InnerG.Api.Models.Resource", "Resource")
-                        .WithMany()
-                        .HasForeignKey("ResourceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Department");
-
-                    b.Navigation("Resource");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.SessionAttendance", b =>
@@ -2275,39 +1406,6 @@ namespace InnerG.Api.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.TrainerInvitation", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Trainer", "InvitedTrainer")
-                        .WithMany()
-                        .HasForeignKey("InvitedTrainerId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "InvitedUser")
-                        .WithMany()
-                        .HasForeignKey("InvitedUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "Inviter")
-                        .WithMany()
-                        .HasForeignKey("InviterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("InnerG.Api.Models.TrainingEvent", "TrainingEvent")
-                        .WithMany()
-                        .HasForeignKey("TrainingEventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("InvitedTrainer");
-
-                    b.Navigation("InvitedUser");
-
-                    b.Navigation("Inviter");
-
-                    b.Navigation("TrainingEvent");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainerSkill", b =>
@@ -2385,36 +1483,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("TrainingEvent");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.UserBadge", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.Badge", "Badge")
-                        .WithMany("UserBadges")
-                        .HasForeignKey("BadgeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany("Badges")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Badge");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.UserIntegration", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany("Integrations")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.UserReward", b =>
                 {
                     b.HasOne("InnerG.Api.Models.Reward", "Reward")
@@ -2469,25 +1537,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("User");
 
                     b.Navigation("VerifiedByUser");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.WishlistVote", b =>
-                {
-                    b.HasOne("InnerG.Api.Models.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("InnerG.Api.Models.LearningWishlist", "Wishlist")
-                        .WithMany()
-                        .HasForeignKey("WishlistId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-
-                    b.Navigation("Wishlist");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -2551,19 +1600,9 @@ namespace InnerG.Api.Migrations
 
                     b.Navigation("AuditLogs");
 
-                    b.Navigation("Badges");
-
                     b.Navigation("Enrollments");
 
                     b.Navigation("Feedbacks");
-
-                    b.Navigation("Integrations");
-
-                    b.Navigation("NotificationPreferences");
-
-                    b.Navigation("Notifications");
-
-                    b.Navigation("PointsLedger");
 
                     b.Navigation("Redemptions");
 
@@ -2576,11 +1615,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("Wishlists");
                 });
 
-            modelBuilder.Entity("InnerG.Api.Models.Badge", b =>
-                {
-                    b.Navigation("UserBadges");
-                });
-
             modelBuilder.Entity("InnerG.Api.Models.Company", b =>
                 {
                     b.Navigation("Users");
@@ -2591,11 +1625,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("SubDepartments");
 
                     b.Navigation("Users");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.Feedback", b =>
-                {
-                    b.Navigation("Responses");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.MeetingRoom", b =>
@@ -2613,11 +1642,6 @@ namespace InnerG.Api.Migrations
                     b.Navigation("TrainerSkills");
 
                     b.Navigation("UserSkills");
-                });
-
-            modelBuilder.Entity("InnerG.Api.Models.SubscriptionPlan", b =>
-                {
-                    b.Navigation("Subscriptions");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Trainer", b =>

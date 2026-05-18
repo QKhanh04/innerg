@@ -97,6 +97,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(dbConnection)
 );
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+
 /* =========================
    CORS
    ========================= */
@@ -114,7 +118,7 @@ builder.Services.AddCors(options =>
    IDENTITY
    ========================= */
 
-builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
+builder.Services.AddIdentity<AppUser, AppRole>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
@@ -167,9 +171,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
 
-builder.Services.AddHostedService<RefreshTokenCleanupService>();
+builder.Services.AddHostedService<UserSessionCleanupService>();
 
 /* =========================
    BUILD APP
@@ -189,7 +193,7 @@ if (app.Environment.IsDevelopment())
 
 using (var scope = app.Services.CreateScope())
 {
-    await RoleSeeder.SeedAsync(scope.ServiceProvider);
+    await DataSeeder.SeedAsync(scope.ServiceProvider);
 }
 
 app.UseHttpsRedirection();
