@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { useApiForm } from '../../hooks/useApiForm';
-import { toastService } from '../../services/toastService';
+import { useAuth } from '../../../hooks/useAuth';
+import { useApiForm } from '../../../hooks/useApiForm';
+import { toastService } from '../../../services/toastService';
 const Register = () => {
   const navigate = useNavigate();
   const { register } = useAuth();

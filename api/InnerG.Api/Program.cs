@@ -15,6 +15,8 @@ using InnerG.Api.Exceptions;
 using InnerG.Api.Exceptions.Handlers;
 using InnerG.Api.Models;
 using InnerG.Api.Repositories.Backgrounds;
+using InnerG.Api.Repositories.Interfaces;
+using InnerG.Api.Repositories.Implementations;
 using InnerG.Api.Services.Backgrounds;
 using InnerG.Api.Services.Implementations;
 using InnerG.Api.Services.Interfaces;
@@ -172,6 +174,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddHostedService<UserSessionCleanupService>();
 

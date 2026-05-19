@@ -11,6 +11,12 @@ namespace InnerG.Api.Data.Configurations
             builder.Property(x => x.Status)
                    .HasConversion<string>();
 
+            builder.Property(x => x.Category)
+                   .HasMaxLength(100);
+
+            builder.Property(x => x.Description)
+                   .HasMaxLength(1500);
+
             builder.HasOne(x => x.User)
                    .WithMany(u => u.Wishlists)
                    .HasForeignKey(x => x.UserId)

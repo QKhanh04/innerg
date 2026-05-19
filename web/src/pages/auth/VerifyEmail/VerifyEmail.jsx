@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-
-import { getErrorMessage } from '../../utils/errorHandler';
+import { useAuth } from '../../../hooks/useAuth';
+import { getErrorMessage } from '../../../utils/errorHandler';
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();

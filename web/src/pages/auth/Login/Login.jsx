@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import GoogleLoginButton from '../../components/login/GoogleLoginButton';
-import { useApiForm } from '../../hooks/useApiForm';
+import { useAuth } from '../../../hooks/useAuth';
+import GoogleLoginButton from '../../../components/login/GoogleLoginButton';
+import { useApiForm } from '../../../hooks/useApiForm';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();

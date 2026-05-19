@@ -9,6 +9,8 @@ import Login from '../pages/auth/Login/Login';
 import Register from '../pages/auth/Register/Register';
 import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
+import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
+import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 
 const AppRoutes = () => (
     <Routes>
@@ -32,6 +34,18 @@ const AppRoutes = () => (
             <Route path="/dashboard" element={
                 <ProtectedRoute allowedRoles={['mentee']}>
                     <Dashboard />
+                </ProtectedRoute>
+            } />
+            
+            <Route path="/wishlist" element={
+                <ProtectedRoute allowedRoles={['mentee', 'hr']}>
+                    <LearningWishlist />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/resources" element={
+                <ProtectedRoute allowedRoles={['mentee', 'mentor', 'hr', 'admin']}>
+                    <ResourceHub />
                 </ProtectedRoute>
             } />
             {/* You can add more protected routes here for other roles */}

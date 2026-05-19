@@ -25,6 +25,8 @@ namespace InnerG.Api.Models
         
         public Guid? SkillId { get; set; } // Optional: link to existing skill
         public string? SkillNameCustom { get; set; }
+        public string? Category { get; set; }
+        public string? Description { get; set; }
         public string? Reason { get; set; }
         
         public WishlistUrgency Urgency { get; set; } = WishlistUrgency.Medium;
