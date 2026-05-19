@@ -8,8 +8,8 @@ namespace InnerG.Api.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<AuditLog> builder)
         {
-            builder.Property(x => x.OldValues).HasColumnType("text");
-            builder.Property(x => x.NewValues).HasColumnType("text");
+            builder.Property(x => x.OldValueJson).HasColumnType("jsonb");
+            builder.Property(x => x.NewValueJson).HasColumnType("jsonb");
 
             builder.HasOne(x => x.User)
                    .WithMany(u => u.AuditLogs)

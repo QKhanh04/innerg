@@ -49,7 +49,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("AspNetRoles", (string)null);
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.AppUser", b =>
@@ -89,13 +89,15 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
                     b.Property<string>("JobTitle")
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
@@ -118,7 +120,8 @@ namespace InnerG.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("PhoneInternal")
-                        .HasColumnType("text");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text");
@@ -130,7 +133,8 @@ namespace InnerG.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("SsoProvider")
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("SsoUid")
                         .HasColumnType("text");
@@ -140,6 +144,10 @@ namespace InnerG.Api.Migrations
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -152,7 +160,10 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("CompanyId");
 
-                    b.HasIndex("DepartmentId");
+                    b.HasIndex("DepartmentId")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -161,7 +172,12 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("AspNetUsers", (string)null);
+                    b.HasIndex("SsoUid");
+
+                    b.HasIndex("CompanyId", "Email")
+                        .IsUnique();
+
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.AuditLog", b =>
@@ -183,22 +199,21 @@ namespace InnerG.Api.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid?>("EntityId")
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("EntityName")
+                    b.Property<string>("EntityType")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("IpAddress")
                         .HasColumnType("text");
 
-                    b.Property<string>("NewValues")
-                        .HasColumnType("text");
+                    b.Property<string>("NewValueJson")
+                        .HasColumnType("jsonb");
 
-                    b.Property<string>("OldValues")
-                        .HasColumnType("text");
+                    b.Property<string>("OldValueJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -225,8 +240,9 @@ namespace InnerG.Api.Migrations
                     b.Property<Guid?>("CompanyId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("ConditionType")
-                        .HasColumnType("integer");
+                    b.Property<string>("ConditionType")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<int?>("ConditionValue")
                         .HasColumnType("integer");
@@ -323,7 +339,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("SubscriptionPlanId")
                         .HasColumnType("uuid");
@@ -416,7 +432,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("TrainingEventId")
                         .HasColumnType("uuid");
@@ -467,7 +483,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("ReviewerRole")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("ReviewerUserId")
                         .HasColumnType("uuid");
@@ -504,8 +520,9 @@ namespace InnerG.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int>("AppliesTo")
-                        .HasColumnType("integer");
+                    b.Property<string>("AppliesTo")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid?>("CompanyId")
                         .HasColumnType("uuid");
@@ -615,7 +632,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -655,8 +672,9 @@ namespace InnerG.Api.Migrations
                     b.Property<Guid?>("DepartmentId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("PeriodType")
-                        .HasColumnType("integer");
+                    b.Property<string>("PeriodType")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("PeriodValue")
                         .IsRequired()
@@ -701,6 +719,9 @@ namespace InnerG.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AssignedTrainerId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
@@ -710,22 +731,37 @@ namespace InnerG.Api.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Description")
+                    b.Property<string>("Reason")
                         .HasColumnType("text");
+
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("ResultingTrainingEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("SkillId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
+                    b.Property<string>("SkillNameCustom")
                         .HasColumnType("text");
 
-                    b.Property<string>("Title")
+                    b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Urgency")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -760,21 +796,17 @@ namespace InnerG.Api.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Facilities")
-                        .HasColumnType("text");
+                    b.Property<string>("FacilitiesJson")
+                        .HasColumnType("jsonb");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Location")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Notes")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -795,8 +827,9 @@ namespace InnerG.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("Channel")
-                        .HasColumnType("integer");
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -885,11 +918,11 @@ namespace InnerG.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("ConditionOperator")
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("ConditionType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("ConditionValue")
                         .HasColumnType("text");
@@ -921,7 +954,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("RuleType")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -969,7 +1002,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1052,7 +1085,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1089,7 +1122,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("TrainingSessionId")
                         .HasColumnType("uuid");
@@ -1182,8 +1215,9 @@ namespace InnerG.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("Proficiency")
-                        .HasColumnType("integer");
+                    b.Property<string>("Proficiency")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<decimal?>("Score")
                         .HasColumnType("numeric");
@@ -1214,8 +1248,9 @@ namespace InnerG.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int>("BillingCycle")
-                        .HasColumnType("integer");
+                    b.Property<string>("BillingCycle")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1284,8 +1319,9 @@ namespace InnerG.Api.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
-                    b.Property<int>("TrainerType")
-                        .HasColumnType("integer");
+                    b.Property<string>("TrainerType")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1342,7 +1378,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("TrainingEventId")
                         .HasColumnType("uuid");
@@ -1375,8 +1411,9 @@ namespace InnerG.Api.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("Proficiency")
-                        .HasColumnType("integer");
+                    b.Property<string>("Proficiency")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("SkillId")
                         .HasColumnType("uuid");
@@ -1442,7 +1479,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1454,7 +1491,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1610,7 +1647,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Provider")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("RefreshTokenEncrypted")
                         .IsRequired()
@@ -1668,7 +1705,7 @@ namespace InnerG.Api.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1752,14 +1789,16 @@ namespace InnerG.Api.Migrations
                     b.Property<bool>("IsMentorSkill")
                         .HasColumnType("boolean");
 
-                    b.Property<int>("Proficiency")
-                        .HasColumnType("integer");
+                    b.Property<string>("Proficiency")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<Guid>("SkillId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Source")
-                        .HasColumnType("integer");
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1837,7 +1876,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetRoleClaims", (string)null);
+                    b.ToTable("RoleClaims", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
@@ -1861,7 +1900,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserClaims", (string)null);
+                    b.ToTable("UserClaims", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
@@ -1882,7 +1921,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AspNetUserLogins", (string)null);
+                    b.ToTable("UserLogins", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
@@ -1897,7 +1936,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("AspNetUserRoles", (string)null);
+                    b.ToTable("UserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
@@ -1916,7 +1955,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
-                    b.ToTable("AspNetUserTokens", (string)null);
+                    b.ToTable("UserTokens", (string)null);
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.AppUser", b =>
