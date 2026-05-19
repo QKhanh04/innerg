@@ -7,10 +7,12 @@ namespace InnerG.Api.Models
     public class MeetingRoom : TenantEntity
     {
         public string Name { get; set; } = string.Empty;
-        public string Location { get; set; } = string.Empty; // Building, Floor, etc.
+        public string? Location { get; set; } // Building, Floor, etc.
         public int Capacity { get; set; }
-        public string? Facilities { get; set; } // Projector, Whiteboard, etc.
-        public string? Notes { get; set; }
+        
+        [System.ComponentModel.DataAnnotations.Schema.Column(TypeName = "jsonb")]
+        public string? FacilitiesJson { get; set; } // ["projector","whiteboard","ac"]
+        
         public bool IsActive { get; set; } = true;
 
         // Navigation properties

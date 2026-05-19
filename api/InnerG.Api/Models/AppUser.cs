@@ -22,6 +22,8 @@ namespace InnerG.Api.Models
         // Gamification cache
         public int TotalInnerGPoints { get; set; }
         
+        public string? TwoFactorSecret { get; set; } // Encrypted TOTP secret
+
         public bool IsActive { get; set; } = true;
         public DateTime? LastLoginAt { get; set; }
 

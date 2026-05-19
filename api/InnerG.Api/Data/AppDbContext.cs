@@ -63,10 +63,19 @@ namespace InnerG.Api.Data
         {
             base.OnModelCreating(builder);
 
+            // Rename Identity Tables to match Schema
+            builder.Entity<AppUser>().ToTable("Users");
+            builder.Entity<AppRole>().ToTable("Roles");
+            builder.Entity<IdentityUserRole<Guid>>().ToTable("UserRoles");
+            builder.Entity<IdentityUserClaim<Guid>>().ToTable("UserClaims");
+            builder.Entity<IdentityUserLogin<Guid>>().ToTable("UserLogins");
+            builder.Entity<IdentityUserToken<Guid>>().ToTable("UserTokens");
+            builder.Entity<IdentityRoleClaim<Guid>>().ToTable("RoleClaims");
+
             // Apply Configurations
             builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-            // Global Query Filters
+            // Global configurations
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
                 // Soft Delete Filter
@@ -79,6 +88,22 @@ namespace InnerG.Api.Data
                 if (typeof(IMultiTenant).IsAssignableFrom(entityType.ClrType))
                 {
                     builder.Entity(entityType.ClrType).HasQueryFilter(GetTenantFilter(entityType.ClrType));
+                }
+
+                // Global Enum to String Conversion
+                foreach (var property in entityType.GetProperties())
+                {
+                    var type = property.ClrType;
+                    var isNullable = Nullable.GetUnderlyingType(type) != null;
+                    var enumType = isNullable ? Nullable.GetUnderlyingType(type) : type;
+
+                    if (enumType != null && enumType.IsEnum)
+                    {
+                        property.SetColumnType("varchar(50)");
+                        var converterType = typeof(Microsoft.EntityFrameworkCore.Storage.ValueConversion.EnumToStringConverter<>).MakeGenericType(enumType);
+                        var converter = (Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter)Activator.CreateInstance(converterType)!;
+                        property.SetValueConverter(converter);
+                    }
                 }
             }
         }
