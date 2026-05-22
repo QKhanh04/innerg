@@ -145,7 +145,7 @@ namespace InnerG.Api.Data
 
             return await base.SaveChangesAsync(cancellationToken);
         }
-
+        //sdf
         private LambdaExpression GetSoftDeleteFilter(Type type)
         {
             var parameter = Expression.Parameter(type, "it");
@@ -166,3 +166,4 @@ namespace InnerG.Api.Data
         }
     }
 }
+
