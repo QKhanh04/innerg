@@ -55,11 +55,11 @@ namespace InnerG.Api.Services.Implementations
 
         public async Task<RegisterResponse> RegisterAsync(RegisterRequest register)
         {
-            var existingUsername = await _userManager.FindByNameAsync(register.UserName);
+            var existingUsername = await FindUserByUserNameIgnoringFiltersAsync(register.UserName);
             if (existingUsername != null)
                 throw new ConflictException("Username already exists");
 
-            var existingEmail = await _userManager.FindByEmailAsync(register.Email);
+            var existingEmail = await FindUserByEmailIgnoringFiltersAsync(register.Email);
 
             if (existingEmail == null)
             {
@@ -110,7 +110,7 @@ namespace InnerG.Api.Services.Implementations
 
         private async Task AddPasswordToExistingUserAsync(AppUser user, RegisterRequest register)
         {
-            var usernameOwner = await _userManager.FindByNameAsync(register.UserName);
+            var usernameOwner = await FindUserByUserNameIgnoringFiltersAsync(register.UserName);
             if (usernameOwner != null && usernameOwner.Id != user.Id)
                 throw new ConflictException("Username already exists");
 
@@ -143,6 +143,32 @@ namespace InnerG.Api.Services.Implementations
             return await _userManager.Users
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.UserName == account);
+        }
+
+        private async Task<AppUser?> FindUserByEmailIgnoringFiltersAsync(string email)
+        {
+            return await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Email == email);
+        }
+
+        private async Task<AppUser?> FindUserByUserNameIgnoringFiltersAsync(string userName)
+        {
+            return await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.UserName == userName);
+        }
+
+        private async Task<AppUser?> FindUserByIdIgnoringFiltersAsync(string userId)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+            {
+                return null;
+            }
+
+            return await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Id == userGuid);
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -380,7 +406,7 @@ namespace InnerG.Api.Services.Implementations
         {
             var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var confirmBaseUrl = _configuration["Frontend:ConfirmEmailUrl"] ?? throw new ConfigurationException("Frontend:ConfirmEmailUrl");
-            var confirmLink = $"{confirmBaseUrl}?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+            var confirmLink = $"{confirmBaseUrl}?userId={user.Id}&token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(user.Email ?? string.Empty)}";
 
             await _emailService.SendEmailConfirmationAsync(
                 user.Email!,
@@ -389,9 +415,34 @@ namespace InnerG.Api.Services.Implementations
             );
         }
 
+        public async Task ForgotPasswordAsync(string email)
+        {
+            var user = await FindUserByEmailIgnoringFiltersAsync(email);
+            if (user == null)
+                return;
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var resetBaseUrl = _configuration["Frontend:ResetPasswordUrl"] ?? throw new ConfigurationException("Frontend:ResetPasswordUrl");
+            var resetLink = $"{resetBaseUrl}?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+
+            await _emailService.SendPasswordResetAsync(
+                user.Email!,
+                "Reset your password",
+                $"<h3>Password reset request</h3><p>Click the link below to reset your password:</p><a href=\"{resetLink}\">Reset Password</a>"
+            );
+        }
+
+        public async Task ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            var user = await FindUserByIdIgnoringFiltersAsync(request.UserId) ?? throw new NotFoundException("User not found");
+            var resetResult = await _userManager.ResetPasswordAsync(user, request.Token, request.Password);
+            if (!resetResult.Succeeded)
+                throw IdentityErrorMapper.ToValidationException(resetResult);
+        }
+
         public async Task ConfirmEmailAsync(string userId, string token)
         {
-            var user = await _userManager.FindByIdAsync(userId) ?? throw new NotFoundException("User not found");
+            var user = await FindUserByIdIgnoringFiltersAsync(userId) ?? throw new NotFoundException("User not found");
             var result = await _userManager.ConfirmEmailAsync(user, Uri.UnescapeDataString(token));
             if (!result.Succeeded)
                 throw new BadRequestException("Invalid or expired confirmation token");
@@ -399,7 +450,7 @@ namespace InnerG.Api.Services.Implementations
 
         public async Task ResendConfirmEmailAsync(string email)
         {
-            var user = await _userManager.FindByEmailAsync(email) ?? throw new NotFoundException("User not found");
+            var user = await FindUserByEmailIgnoringFiltersAsync(email) ?? throw new NotFoundException("User not found");
             if (user.EmailConfirmed)
                 throw new BadRequestException("Email already confirmed");
             await SendConfirmEmailAsync(user);

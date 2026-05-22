@@ -20,8 +20,8 @@ namespace InnerG.Api.Services.Interfaces
         Task<UserInfoResponse> GetCurrentUserInfoAsync(string userId);
         Task ConfirmEmailAsync(string userId, string token);
         Task ResendConfirmEmailAsync(string email);
-        // Task ForgotPasswordAsync(string email);
-        // Task ResetPasswordAsync(ResetPasswordRequest request);
+        Task ForgotPasswordAsync(string email);
+        Task ResetPasswordAsync(ResetPasswordRequest request);
         Task<AuthResponse> LoginWithGoogleAsync(string idToken);
         Task<GoogleUserInfo> VerifyGoogleTokenAsync(string idToken);
     }

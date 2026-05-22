@@ -5,7 +5,7 @@ import { useApiForm } from '../../../hooks/useApiForm';
 import { toastService } from '../../../services/toastService';
 const Register = () => {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, resendVerificationEmail } = useAuth();
   const [formData, setFormData] = useState({
     userName: '',
     email: '',
@@ -15,6 +15,7 @@ const Register = () => {
 
   const { submit, errors, setErrors, isLoading } = useApiForm();
   const [requiresVerification, setRequiresVerification] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
 
 
   const handleChange = (e) => {
@@ -60,7 +61,7 @@ const Register = () => {
       action: () => register(formData),
       successMessage: "Registration successful!",
       onSuccess: (data) => {
-        if (data.requiresEmailVerification) {
+        if (data.requiresEmailConfirmation) {
           setRequiresVerification(true);
         } else {
           toastService.success("Registration successful! Please log in.");
@@ -79,6 +80,20 @@ const Register = () => {
     return () => clearTimeout(timer);
 
   }, [requiresVerification, navigate])
+
+  const handleResendVerification = async () => {
+    if (isResendingVerification) {
+      return;
+    }
+
+    setIsResendingVerification(true);
+    try {
+      await resendVerificationEmail(formData.email);
+      toastService.success('Verification email sent again.');
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
 
 
   if (requiresVerification) {
@@ -110,6 +125,15 @@ const Register = () => {
               Redirecting to login page...
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={isResendingVerification}
+            className="mt-6 w-full rounded-lg border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isResendingVerification ? 'Resending...' : 'Resend verification email'}
+          </button>
         </div>
       </div>
     );

@@ -13,7 +13,7 @@ const Login = () => {
     password: '',
   });
 
-  const { submit, errors, globalError, setErrors, isLoading } = useApiForm();
+  const { submit, errors, setErrors, isLoading } = useApiForm();
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
@@ -159,12 +159,12 @@ const Login = () => {
                   <label className="text-slate-900 text-sm font-semibold leading-normal">
                     Password
                   </label>
-                  <a
-                    href="#"
+                  <Link
+                    to="/forgot-password"
                     className="text-primary text-sm font-semibold hover:underline"
                   >
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">

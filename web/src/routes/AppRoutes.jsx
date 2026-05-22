@@ -8,6 +8,8 @@ import AppLayout from '../layouts/AppLayout';
 import Login from '../pages/auth/Login/Login';
 import Register from '../pages/auth/Register/Register';
 import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
+import ForgotPassword from '../pages/auth/ForgotPassword/ForgotPassword';
+import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
@@ -28,6 +30,12 @@ const AppRoutes = () => (
         } />
 
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={
+            <PublicRoute>
+                <ForgotPassword />
+            </PublicRoute>
+        } />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Private Routes with AppLayout Wrapper */}
         <Route element={<AppLayout />}>

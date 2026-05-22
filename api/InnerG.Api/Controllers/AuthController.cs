@@ -130,6 +130,21 @@ namespace InnerG.Api.Controllers
             return Ok(new { message = "Confirmation email resent" });
         }
 
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPasswordAsync([FromBody] ForgotPasswordRequest request)
+        {
+            ValidationHelper.FromModelState(ModelState);
+            await _authService.ForgotPasswordAsync(request.Email);
+            return Ok(new { message = "If that email is registered, a password reset link has been sent." });
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPasswordAsync([FromBody] ResetPasswordRequest request)
+        {
+            ValidationHelper.FromModelState(ModelState);
+            await _authService.ResetPasswordAsync(request);
+            return Ok(new { message = "Password has been reset successfully." });
+        }
 
         [Authorize]
         [HttpGet("users/{userId}")]
@@ -169,11 +184,12 @@ namespace InnerG.Api.Controllers
 
         private void SetRefreshTokenCookie(string refreshToken)
         {
+            var isHttps = Request.IsHttps;
             var options = new CookieOptions
             {
                 HttpOnly = true,
-                SameSite = SameSiteMode.None,
-                Secure = true,        // true khi dùng HTTPS
+                SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
+                Secure = isHttps,
                 Expires = DateTime.UtcNow.AddDays(7),
                 Path = "/api/auth"
             };
@@ -183,10 +199,11 @@ namespace InnerG.Api.Controllers
 
         private void DeleteRefreshTokenCookie()
         {
+            var isHttps = Request.IsHttps;
             var options = new CookieOptions
             {
-                SameSite = SameSiteMode.None,
-                Secure = true,
+                SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
+                Secure = isHttps,
                 Path = "/api/auth"
             };
             Response.Cookies.Delete("refresh_token", options);

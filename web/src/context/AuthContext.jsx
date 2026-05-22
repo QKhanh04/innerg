@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useRef } from 'react';
 import authService from '../services/authService';
 import { useCallback } from 'react';
+import { buildAuthUser } from '../utils/auth';
 
 export const AuthContext = createContext(null);
 
@@ -17,6 +18,10 @@ export const AuthProvider = ({ children }) => {
   const setAccessToken = useCallback((token) => {
     accessTokenRef.current = token;
   }, []);
+  const setAuthenticatedUser = useCallback((data) => {
+    setAccessToken(data?.token ?? null);
+    setUser(data?.token ? buildAuthUser(data) : null);
+  }, [setAccessToken]);
 
   // Initialize auth state on mount
   useEffect(() => {
@@ -35,46 +40,32 @@ export const AuthProvider = ({ children }) => {
         const data = await authService.refreshToken();
         
         if (data && data.token) {
-          setAccessToken(data.token);
-          setUser({
-            userName: data.userName,
-            email: data.email,
-          });
+          setAuthenticatedUser(data);
         }
-      } catch (error) {
+      } catch {
         // No valid refresh token - user needs to login
         // This is normal for first visit or expired session
         console.log(' No valid refresh token - user not authenticated');
-        setAccessToken(null);
-        setUser(null);
+        setAuthenticatedUser(null);
       } finally {
         setLoading(false);
       }
     };
 
     initAuth();
-  }, []);
+  }, [setAuthenticatedUser]);
 
   const login = async (credentials) => {
     const data = await authService.login(credentials);
     
-    // Store token in memory
-    setAccessToken(data.token);
-    setUser({
-      userName: data.userName,
-      email: data.email,
-    });
+    setAuthenticatedUser(data);
     
     return data;
   };
 
   const loginWithGoogle = async (idToken) => {
     const data = await authService.loginWithGoogle(idToken);
-    setAccessToken(data.token);
-    setUser({
-      userName: data.userName,
-      email: data.email,
-    });
+    setAuthenticatedUser(data);
     return data;
   };
 
@@ -87,8 +78,7 @@ export const AuthProvider = ({ children }) => {
       await authService.logout();
     } finally {
       // Clear token from memory
-      setAccessToken(null);
-      setUser(null);
+      setAuthenticatedUser(null);
     }
   };
 
@@ -100,20 +90,23 @@ export const AuthProvider = ({ children }) => {
     return await authService.resendVerificationEmail(email);
   };
 
+  const forgotPassword = async (email) => {
+    return await authService.forgotPassword(email);
+  };
+
+  const resetPassword = async (data) => {
+    return await authService.resetPassword(data);
+  };
+
   const refreshAccessToken = async () => {
 
     try {
       const data = await authService.refreshToken();
-      setAccessToken(data.token);
-      setUser({
-        userName: data.userName,
-        email: data.email,
-      });
+      setAuthenticatedUser(data);
       return data.token;
     } catch (error) {
       // Refresh failed - logout user
-      setAccessToken(null);
-      setUser(null);
+      setAuthenticatedUser(null);
       throw error;
     }
   };
@@ -127,6 +120,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     verifyEmail,
     resendVerificationEmail,
+    forgotPassword,
+    resetPassword,
     isAuthenticated: !!user,
     getAccessToken,
     refreshAccessToken,

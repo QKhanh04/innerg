@@ -45,10 +45,20 @@ const authService = {
     return response.data;
   },
 
+  async forgotPassword(email) {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  async resetPassword(data) {
+    const response = await api.post('/auth/reset-password', data);
+    return response.data;
+  },
+
   // Resend verification email
   async resendVerificationEmail(email) {
     const response = await api.post('/auth/resend-verification-email',
-      { email }
+      JSON.stringify(email)
     );
     return response.data;
   },

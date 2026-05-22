@@ -3,9 +3,13 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:7027/api';
 const PUBLIC_ENDPOINTS = [
     '/auth/login',
+    '/auth/google-login',
     '/auth/register',
     '/auth/refresh-token',
     '/auth/verify-email',
+    '/auth/resend-verification-email',
+    '/auth/forgot-password',
+    '/auth/reset-password',
   ];
 
   const isPublicEndpoint = (url) =>
