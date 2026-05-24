@@ -38,8 +38,60 @@ namespace InnerG.Api.Controllers
             var start = startDate ?? DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek + 1);
             var end = endDate ?? start.AddDays(7);
 
-            // Only aggregate Google Calendar external events, ignoring the local training sessions (Data seed)
+            // 1. Fetch Training Sessions where current user is the Trainer (Mentor role)
+            var teachingSessions = await _context.TrainingSessions
+                .IgnoreQueryFilters() // Respect multi-tenancy manually with companyId
+                .Where(s => s.CompanyId == companyId)
+                .Where(s => s.StartTime >= start && s.StartTime <= end)
+                .Where(s => s.TrainingEvent.Trainer.UserId == userId)
+                .Select(s => new CalendarEventDto
+                {
+                    Id = s.Id,
+                    Title = s.Title,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    Type = "TEACHING",
+                    TrainerName = s.TrainingEvent.Trainer.FullName,
+                    MeetingLink = s.MeetingLink,
+                    Notes = s.Notes,
+                    Location = s.MeetingRoom != null ? s.MeetingRoom.Name : "Online",
+                    IsOnline = string.IsNullOrEmpty(s.MeetingLink) ? false : true
+                })
+                .ToListAsync();
+
+            // 2. Fetch Training Sessions where current user is enrolled (Mentee role)
+            var enrolledSessions = await _context.TrainingSessions
+                .IgnoreQueryFilters()
+                .Where(s => s.CompanyId == companyId)
+                .Where(s => s.StartTime >= start && s.StartTime <= end)
+                .Where(s => s.TrainingEvent.Enrollments.Any(e => e.UserId == userId && e.Status == EnrollmentStatus.Confirmed))
+                .Select(s => new CalendarEventDto
+                {
+                    Id = s.Id,
+                    Title = s.Title,
+                    StartTime = s.StartTime,
+                    EndTime = s.EndTime,
+                    Type = s.StartTime < DateTime.UtcNow ? "COMPLETED" : "UPCOMING",
+                    TrainerName = s.TrainingEvent.Trainer.FullName,
+                    MeetingLink = s.MeetingLink,
+                    Notes = s.Notes,
+                    Location = s.MeetingRoom != null ? s.MeetingRoom.Name : "Online",
+                    IsOnline = string.IsNullOrEmpty(s.MeetingLink) ? false : true
+                })
+                .ToListAsync();
+
+            // Combine both lists
             var allEvents = new List<CalendarEventDto>();
+            allEvents.AddRange(teachingSessions);
+            
+            // Add enrolled sessions, ensuring no duplicates (if user is both teaching and attending - rare, but safe)
+            foreach (var s in enrolledSessions)
+            {
+                if (!allEvents.Any(e => e.Id == s.Id))
+                {
+                    allEvents.Add(s);
+                }
+            }
 
             // 3. Google Calendar Real Integration / Fetch
             var integration = await _context.UserIntegrations
