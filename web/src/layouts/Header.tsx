@@ -15,7 +15,7 @@ export function Header({ title }: HeaderProps) {
   const { user: authUser, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const displayName = authUser?.userName || roleUser.name;
+  const displayName = authUser?.fullName || authUser?.email || roleUser.name;
   const displaySubtitle = authUser?.email || roleUser.position;
 
   const handleLogout = async () => {

@@ -1,8 +1,9 @@
 import { useAuth } from '../hooks/useAuth';
 import { Navigate } from 'react-router-dom';
+import { getDefaultRouteForUser } from '../utils/authRoute';
 
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -14,7 +15,7 @@ const PublicRoute = ({ children }) => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getDefaultRouteForUser(user)} replace />;
   }
 
   return children;

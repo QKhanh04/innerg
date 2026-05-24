@@ -11,13 +11,13 @@ import {
   Zap,
   BarChart3,
   BookOpen,
-  GraduationCap,
-  Award
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useRole, Role } from '../lib/RoleContext';
 
 const navItems = [
+  { icon: ShieldCheck, label: 'Admin Dashboard', path: '/admin', roles: ['admin'] },
   { icon: LayoutDashboard, label: 'Home Feed', path: '/dashboard', roles: ['mentee'] },
   { icon: BarChart3, label: 'Analytics', path: '/analytics', roles: ['hr'] },
   { icon: LayoutDashboard, label: 'Mentor Dashboard', path: '/mentor', roles: ['mentor'] },
@@ -34,10 +34,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { role, setRole, user } = useRole();
 
-  // Filter items based on user's current role or "admin" who sees everything
-  const visibleNavItems = navItems.filter(item =>
-    role === 'admin' || item.roles.includes(role)
-  );
+  const visibleNavItems = navItems.filter((item) => item.roles.includes(role));
 
   const handleRoleChange = (newRole: Role) => {
     setRole(newRole);
@@ -51,9 +48,13 @@ export function Sidebar() {
         navigate('/analytics');
         break;
       case 'mentee':
-      case 'admin':
-      default:
         navigate('/dashboard');
+        break;
+      case 'admin':
+        navigate('/admin');
+        break;
+      default:
+        navigate('/resources');
         break;
     }
   };
