@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 export type Role = 'mentee' | 'mentor' | 'hr' | 'admin';
 
@@ -17,13 +18,25 @@ interface RoleContextType {
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
 
 export function RoleProvider({ children }: { children: React.ReactNode }) {
+  const { user: authUser } = useAuth();
   const [role, setRole] = useState<Role>('mentee');
 
-  const user = {
-    name: 'Nguyen Van A',
-    position: 'Product Designer',
-    avatar: 'https://i.pravatar.cc/150?u=a',
-  };
+  useEffect(() => {
+    const primaryRole = authUser?.uiRoles?.[0] as Role | undefined;
+    if (primaryRole) {
+      setRole(primaryRole);
+    }
+  }, [authUser]);
+
+  const user = useMemo(() => {
+    const primaryAppRole = authUser?.appRoles?.[0] || 'User';
+
+    return {
+      name: authUser?.userName || 'Nguyen Van A',
+      position: primaryAppRole,
+      avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(authUser?.email || authUser?.userName || 'innerg-user')}`,
+    };
+  }, [authUser]);
 
   return (
     <RoleContext.Provider value={{ role, setRole, user }}>

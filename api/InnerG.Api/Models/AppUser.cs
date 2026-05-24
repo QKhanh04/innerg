@@ -51,5 +51,6 @@ namespace InnerG.Api.Models
         public virtual ICollection<UserBadge> Badges { get; set; } = new List<UserBadge>();
         public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
         public virtual ICollection<NotificationPreference> NotificationPreferences { get; set; } = new List<NotificationPreference>();
+        public virtual ICollection<Invite> SentInvites { get; set; } = new List<Invite>();
     }
 }

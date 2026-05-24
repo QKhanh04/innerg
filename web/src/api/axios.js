@@ -3,13 +3,23 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL || 'https://localhost:7027/api';
 const PUBLIC_ENDPOINTS = [
     '/auth/login',
-    '/auth/register',
+    '/auth/google-login',
     '/auth/refresh-token',
     '/auth/verify-email',
+    '/auth/resend-verification-email',
+    '/auth/accept-invite',
+    '/auth/bootstrap-company',
+    '/auth/forgot-password',
+    '/auth/reset-password',
   ];
 
-  const isPublicEndpoint = (url) =>
-    PUBLIC_ENDPOINTS.some(endpoint => url.includes(endpoint));
+  const isPublicEndpoint = (url, method) => {
+    if (!url) return false;
+    if (method?.toLowerCase() === 'get' && url.includes('/auth/invites/')) {
+      return true;
+    }
+    return PUBLIC_ENDPOINTS.some(endpoint => url.includes(endpoint));
+  };
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL,
@@ -65,7 +75,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (isPublicEndpoint(originalRequest.url)) {
+    if (isPublicEndpoint(originalRequest?.url, originalRequest?.method)) {
       return Promise.reject(error);
     }
     // If error is not 401 or is a refresh-token request, reject immediately

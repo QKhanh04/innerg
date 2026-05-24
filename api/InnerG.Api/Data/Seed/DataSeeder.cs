@@ -17,7 +17,7 @@ namespace InnerG.Api.Data.Seed
             var roleManager = serviceProvider.GetRequiredService<RoleManager<AppRole>>();
 
             // 1. Seed Roles
-            string[] roles = { "SuperAdmin", "Admin", "HR", "Trainer", "User" };
+            string[] roles = { AuthRoles.SystemAdmin, AuthRoles.HR, AuthRoles.Mentor, AuthRoles.Mentee, "SuperAdmin", "Admin", "HRManager", "Trainer", "User" };
             foreach (var roleName in roles)
             {
                 if (!await roleManager.RoleExistsAsync(roleName))

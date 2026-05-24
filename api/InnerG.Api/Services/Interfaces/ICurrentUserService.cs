@@ -6,6 +6,7 @@ namespace InnerG.Api.Services.Interfaces
     {
         Guid UserId { get; }
         Guid CompanyId { get; }
+        bool IsSystemAdmin { get; }
         bool IsAuthenticated { get; }
     }
 }

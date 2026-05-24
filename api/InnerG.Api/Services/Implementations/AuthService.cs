@@ -1,20 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
-using System.Security.Claims;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
+using System.Text;
+using Google.Apis.Auth;
 using InnerG.Api.Data;
 using InnerG.Api.DTOs;
 using InnerG.Api.Exceptions;
 using InnerG.Api.Exceptions.Helpers;
 using InnerG.Api.Models;
 using InnerG.Api.Services.Interfaces;
-using Google.Apis.Auth;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using static InnerG.Api.DTOs.GoogleAuthDTO;
 
 namespace InnerG.Api.Services.Implementations
@@ -22,10 +17,8 @@ namespace InnerG.Api.Services.Implementations
     public class AuthService : IAuthService
     {
         private const string GoogleProvider = "Google";
-        private const string DefaultRole = "User";
 
         private readonly UserManager<AppUser> _userManager;
-        private readonly RoleManager<AppRole> _roleManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ITokenService _tokenService;
         private readonly IEmailService _emailService;
@@ -44,7 +37,6 @@ namespace InnerG.Api.Services.Implementations
             ILogger<AuthService> logger)
         {
             _userManager = userManager;
-            _roleManager = roleManager;
             _signInManager = signInManager;
             _tokenService = tokenService;
             _context = context;
@@ -53,182 +45,401 @@ namespace InnerG.Api.Services.Implementations
             _logger = logger;
         }
 
-        public async Task<RegisterResponse> RegisterAsync(RegisterRequest register)
+        public async Task<AuthResponse> BootstrapCompanyAsync(BootstrapCompanyRequest request)
         {
-            var existingUsername = await _userManager.FindByNameAsync(register.UserName);
-            if (existingUsername != null)
-                throw new ConflictException("Username already exists");
+            if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.DeletedAt == null))
+                throw new ConflictException("Bootstrap is only available before the first user is created");
 
-            var existingEmail = await _userManager.FindByEmailAsync(register.Email);
+            var domain = NormalizeDomain(request.EmailDomain);
+            var hrEmail = NormalizeEmail(request.HrEmail);
+            if (!EmailMatchesDomain(hrEmail, domain))
+                throw new BadRequestException("HR email must belong to the company domain");
 
-            if (existingEmail == null)
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var company = await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync();
+            if (company == null)
             {
-                await CreateNewUserAsync(register);
-                return new RegisterResponse { RequiresEmailConfirmation = true };
+                company = new Company();
+                _context.Companies.Add(company);
             }
 
-            if (await _userManager.HasPasswordAsync(existingEmail))
-                throw new ConflictException("Email already exists");
-
-            await AddPasswordToExistingUserAsync(existingEmail, register);
-            return new RegisterResponse { RequiresEmailConfirmation = false };
-        }
-
-        private async Task CreateNewUserAsync(RegisterRequest register)
-        {
-            // Note: In a real SaaS, we would need to know which Company the user is registering for.
-            // For now, we'll assume a default company or handle it via a specific invitation flow.
-            // For Phase 1, we'll just create a user with an empty CompanyId and let the seeder or admin fix it,
-            // or we pick the first company available.
-            var defaultCompany = await _context.Companies.FirstOrDefaultAsync() 
-                                ?? throw new BadRequestException("No company found in the system. Please contact admin.");
+            company.Name = request.CompanyName.Trim();
+            company.Domain = domain;
+            company.Timezone = request.Timezone.Trim();
+            company.Language = request.Language.Trim();
+            company.IsActive = true;
+            company.DeletedAt = null;
+            await _context.SaveChangesAsync();
 
             var user = new AppUser
             {
-                UserName = register.UserName,
-                Email = register.Email,
-                EmailConfirmed = false,
-                CompanyId = defaultCompany.Id,
-                FullName = register.UserName // Placeholder
+                CompanyId = company.Id,
+                UserName = BuildUserName(hrEmail, company.Id),
+                Email = hrEmail,
+                FullName = request.HrFullName.Trim(),
+                EmailConfirmed = true,
+                IsActive = true
             };
 
-            var createResult = await _userManager.CreateAsync(user, register.Password);
+            var createResult = await _userManager.CreateAsync(user, request.HrPassword);
             if (!createResult.Succeeded)
                 throw IdentityErrorMapper.ToValidationException(createResult);
 
-            try
-            {
-                await EnsureDefaultRoleAsync(user);
-                await SendConfirmEmailAsync(user);
-            }
-            catch
-            {
-                await _userManager.DeleteAsync(user);
-                throw;
-            }
+            await AddRolesAsync(user, [AuthRoles.HR, AuthRoles.Mentee]);
+            await transaction.CommitAsync();
+
+            return await CreateSessionAsync(user);
         }
 
-        private async Task AddPasswordToExistingUserAsync(AppUser user, RegisterRequest register)
+        public async Task<CompanyOnboardingResponse> CreateCompanyAsync(CreateCompanyRequest request, string systemAdminUserId)
         {
-            var usernameOwner = await _userManager.FindByNameAsync(register.UserName);
-            if (usernameOwner != null && usernameOwner.Id != user.Id)
-                throw new ConflictException("Username already exists");
+            var domain = NormalizeDomain(request.EmailDomain);
+            var hrEmail = NormalizeEmail(request.HrEmail);
 
-            var addPasswordResult = await _userManager.AddPasswordAsync(user, register.Password);
-            if (!addPasswordResult.Succeeded)
-                throw IdentityErrorMapper.ToValidationException(addPasswordResult);
+            if (!Guid.TryParse(systemAdminUserId, out var inviterId))
+                throw new UnauthorizedException();
 
-            if (!string.Equals(user.UserName, register.UserName, StringComparison.OrdinalIgnoreCase))
+            if (!EmailMatchesDomain(hrEmail, domain))
+                throw new BadRequestException("HR email must belong to the company domain");
+
+            if (await _context.Companies.IgnoreQueryFilters().AnyAsync(x => x.Domain == domain && x.DeletedAt == null))
+                throw new ConflictException("Company domain already exists");
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var company = new Company
             {
-                user.UserName = register.UserName;
-                var updateResult = await _userManager.UpdateAsync(user);
-                if (!updateResult.Succeeded)
-                    throw IdentityErrorMapper.ToValidationException(updateResult);
-            }
+                Name = request.CompanyName.Trim(),
+                Domain = domain,
+                Timezone = request.Timezone.Trim(),
+                Language = request.Language.Trim(),
+                IsActive = true
+            };
 
-            if (!await _userManager.IsInRoleAsync(user, DefaultRole))
+            _context.Companies.Add(company);
+            await _context.SaveChangesAsync();
+
+            var invite = await CreateInviteAsync(
+                new CreateInviteRequest
+                {
+                    CompanyId = company.Id,
+                    Email = hrEmail,
+                    FullName = request.HrFullName,
+                    Roles = [AuthRoles.HR, AuthRoles.Mentee]
+                },
+                inviterId.ToString(),
+                currentCompanyId: null,
+                isSystemAdmin: true);
+
+            await transaction.CommitAsync();
+
+            return new CompanyOnboardingResponse
             {
-                await EnsureDefaultRoleAsync(user);
-            }
+                Company = ToCompanyResponse(company),
+                HrInvite = invite
+            };
         }
 
-        private async Task<AppUser?> FindUserAsync(string account)
+        public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
         {
-            var userByEmail = await _userManager.Users
+            var companyId = request.CompanyId ?? currentCompanyId
+                ?? throw new BadRequestException("CompanyId is required");
+
+            if (!Guid.TryParse(inviterUserId, out var inviterId))
+                throw new UnauthorizedException();
+
+            if (!isSystemAdmin && currentCompanyId != companyId)
+                throw new ForbiddenException("You cannot invite users outside your current company");
+
+            var company = await _context.Companies
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Email == account);
-            
-            if (userByEmail != null) return userByEmail;
-            
-            return await _userManager.Users
+                .FirstOrDefaultAsync(x => x.Id == companyId && x.IsActive && x.DeletedAt == null)
+                ?? throw new NotFoundException("Company not found");
+
+            if (request.DepartmentId.HasValue)
+            {
+                var departmentExists = await _context.Departments
+                    .IgnoreQueryFilters()
+                    .AnyAsync(x => x.Id == request.DepartmentId && x.CompanyId == companyId && x.DeletedAt == null);
+
+                if (!departmentExists)
+                    throw new BadRequestException("Department does not belong to this company");
+            }
+
+            var email = NormalizeEmail(request.Email);
+            if (!EmailMatchesDomain(email, company.Domain))
+                throw new BadRequestException("Invite email must belong to the company domain");
+
+            if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.Email == email && x.DeletedAt == null))
+                throw new ConflictException("User is already a member of this company");
+
+            var pendingInvite = await _context.Invites
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.UserName == account);
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Email == email && x.Status == InviteStatus.Pending);
+
+            if (pendingInvite != null && pendingInvite.ExpiresAt > DateTime.UtcNow)
+                throw new ConflictException("A pending invite already exists for this email");
+
+            if (pendingInvite != null && pendingInvite.ExpiresAt <= DateTime.UtcNow)
+                pendingInvite.Status = InviteStatus.Expired;
+
+            var roles = NormalizeCompanyRoles(request.Roles);
+            var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
+            var invite = new Invite
+            {
+                CompanyId = companyId,
+                InviterId = inviterId,
+                DepartmentId = request.DepartmentId,
+                Email = email,
+                FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
+                Position = string.IsNullOrWhiteSpace(request.Position) ? null : request.Position.Trim(),
+                RolesCsv = string.Join(",", roles),
+                TokenHash = HashToken(rawToken),
+                ExpiresAt = DateTime.UtcNow.AddDays(GetInviteExpiryDays())
+            };
+
+            _context.Invites.Add(invite);
+            await _context.SaveChangesAsync();
+
+            var inviteLink = BuildInviteLink(rawToken);
+            await _emailService.SendInviteAsync(
+                email,
+                $"You're invited to join {company.Name} on InnerG",
+                $"""
+                <h3>You're invited to InnerG</h3>
+                <p>{company.Name} has invited you to join its internal learning workspace.</p>
+                <p>Please click the link below to activate your account. This invite expires on {invite.ExpiresAt:yyyy-MM-dd HH:mm} UTC.</p>
+                <a href="{inviteLink}">Accept invite</a>
+                """);
+
+            return ToInviteResponse(invite, company, rawToken);
+        }
+
+        public async Task<BulkInviteResponse> CreateBulkInvitesAsync(BulkInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var response = new BulkInviteResponse();
+            for (var i = 0; i < request.Invites.Count; i++)
+            {
+                var inviteRequest = request.Invites[i];
+                try
+                {
+                    response.SuccessfulInvites.Add(await CreateInviteAsync(inviteRequest, inviterUserId, currentCompanyId, isSystemAdmin));
+                }
+                catch (AppException ex)
+                {
+                    response.Errors.Add(new BulkInviteError { Row = i + 1, Email = inviteRequest.Email, Error = ex.Message });
+                }
+            }
+
+            response.SuccessCount = response.SuccessfulInvites.Count;
+            response.ErrorCount = response.Errors.Count;
+            return response;
+        }
+
+        public async Task<InviteResponse> ResendInviteAsync(Guid inviteId, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var invite = await GetInviteForMutationAsync(inviteId, currentCompanyId, isSystemAdmin);
+            if (invite.Status == InviteStatus.Accepted)
+                throw new BadRequestException("Accepted invite cannot be resent");
+            if (invite.Status == InviteStatus.Revoked)
+                throw new BadRequestException("Revoked invite cannot be resent");
+            if (!Guid.TryParse(inviterUserId, out var actorId))
+                throw new UnauthorizedException();
+
+            var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
+            invite.InviterId = actorId;
+            invite.TokenHash = HashToken(rawToken);
+            invite.Status = InviteStatus.Pending;
+            invite.ExpiresAt = DateTime.UtcNow.AddDays(GetInviteExpiryDays());
+            invite.RevokedAt = null;
+            invite.AcceptedAt = null;
+            await _context.SaveChangesAsync();
+
+            var inviteLink = BuildInviteLink(rawToken);
+            await _emailService.SendInviteAsync(
+                invite.Email,
+                $"You're invited to join {invite.Company.Name} on InnerG",
+                $"""<h3>You're invited to InnerG</h3><p>Please click the link below to activate your account.</p><a href="{inviteLink}">Accept invite</a>""");
+
+            return ToInviteResponse(invite, invite.Company, rawToken);
+        }
+
+        public async Task RevokeInviteAsync(Guid inviteId, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var invite = await GetInviteForMutationAsync(inviteId, currentCompanyId, isSystemAdmin);
+            if (invite.Status != InviteStatus.Pending)
+                throw new BadRequestException("Only pending invites can be revoked");
+
+            invite.Status = InviteStatus.Revoked;
+            invite.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<InvitePreviewResponse> GetInviteAsync(string token)
+        {
+            var invite = await FindInviteByTokenAsync(token);
+            await ExpireInviteIfNeededAsync(invite);
+
+            return new InvitePreviewResponse
+            {
+                Email = invite.Email,
+                FullName = invite.FullName,
+                Position = invite.Position,
+                CompanyId = invite.CompanyId,
+                CompanyName = invite.Company.Name,
+                Status = invite.Status,
+                ExpiresAt = invite.ExpiresAt,
+                Roles = invite.Roles.ToList()
+            };
+        }
+
+        public async Task<AuthResponse> AcceptInviteAsync(AcceptInviteRequest request)
+        {
+            var invite = await FindInviteByTokenAsync(request.Token);
+            await ExpireInviteIfNeededAsync(invite);
+
+            if (invite.Status != InviteStatus.Pending)
+                throw new BadRequestException("Invite is not active");
+
+            if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == invite.CompanyId && x.Email == invite.Email && x.DeletedAt == null))
+                throw new ConflictException("User is already a member of this company");
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var user = new AppUser
+            {
+                CompanyId = invite.CompanyId,
+                DepartmentId = invite.DepartmentId,
+                UserName = BuildUserName(invite.Email, invite.CompanyId),
+                Email = invite.Email,
+                FullName = request.FullName.Trim(),
+                AvatarUrl = request.AvatarUrl,
+                JobTitle = invite.Position,
+                EmailConfirmed = true,
+                IsActive = true
+            };
+
+            var createResult = await _userManager.CreateAsync(user, request.Password);
+            if (!createResult.Succeeded)
+                throw IdentityErrorMapper.ToValidationException(createResult);
+
+            await AddRolesAsync(user, invite.Roles);
+            invite.Status = InviteStatus.Accepted;
+            invite.AcceptedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return await CreateSessionAsync(user);
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
         {
-            var user = await FindUserAsync(request.EmailOrUsername)
-                       ?? throw new UnauthorizedException("Invalid credentials");
-
-            if (!user.EmailConfirmed)
-                throw new UnauthorizedException("Email is not confirmed");
-
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, lockoutOnFailure: true);
-
-            if (result.IsLockedOut)
-                throw new UnauthorizedException("User account is locked");
-
-            if (!result.Succeeded)
+            var candidates = await FindLoginCandidatesAsync(request.EmailOrUsername, request.CompanyId);
+            if (!candidates.Any())
                 throw new UnauthorizedException("Invalid credentials");
 
-            return await GenerateAuthResponseAsync(user);
+            var validUsers = new List<AppUser>();
+            foreach (var candidate in candidates)
+            {
+                var result = await _signInManager.CheckPasswordSignInAsync(candidate, request.Password, lockoutOnFailure: true);
+                if (result.IsLockedOut)
+                    throw new UnauthorizedException("User account is locked");
+                if (result.Succeeded)
+                    validUsers.Add(candidate);
+            }
+
+            if (!validUsers.Any())
+                throw new UnauthorizedException("Invalid credentials");
+
+            if (validUsers.Any(x => x.TwoFactorEnabled) && string.IsNullOrWhiteSpace(request.TwoFactorCode))
+            {
+                foreach (var user in validUsers.Where(x => x.TwoFactorEnabled))
+                    await SendTwoFactorLoginCodeAsync(user);
+
+                return new AuthResponse
+                {
+                    UserId = validUsers[0].Id.ToString(),
+                    UserName = validUsers[0].UserName ?? string.Empty,
+                    FullName = validUsers[0].FullName,
+                    Email = validUsers[0].Email ?? string.Empty,
+                    RequiresTwoFactor = true,
+                    RequiresWorkspaceSelection = !request.CompanyId.HasValue && validUsers.Count > 1,
+                    Workspaces = await ToWorkspaceOptionsAsync(validUsers)
+                };
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.TwoFactorCode))
+            {
+                validUsers = (await Task.WhenAll(validUsers.Select(async user =>
+                    !user.TwoFactorEnabled || await _userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, request.TwoFactorCode)
+                        ? user
+                        : null))).Where(x => x != null).Cast<AppUser>().ToList();
+
+                if (!validUsers.Any())
+                    throw new UnauthorizedException("Invalid two-factor code");
+            }
+
+            if (request.CompanyId.HasValue || validUsers.Count == 1)
+                return await CreateSessionAsync(validUsers[0]);
+
+            return new AuthResponse
+            {
+                UserId = validUsers[0].Id.ToString(),
+                UserName = validUsers[0].UserName ?? string.Empty,
+                FullName = validUsers[0].FullName,
+                Email = validUsers[0].Email ?? string.Empty,
+                RequiresWorkspaceSelection = true,
+                Workspaces = await ToWorkspaceOptionsAsync(validUsers)
+            };
         }
 
-        public async Task<AuthResponse> LoginWithGoogleAsync(string idToken)
+        public async Task<AuthResponse> LoginWithGoogleAsync(string idToken, Guid? companyId)
         {
             var payload = await VerifyGoogleTokenAsync(idToken);
             if (payload.EmailVerified != true)
                 throw new UnauthorizedException("Google email is not verified");
 
-            if (string.IsNullOrWhiteSpace(payload.Email))
-                throw new UnauthorizedException("Google account has no email");
+            var email = NormalizeEmail(payload.Email);
+            var candidates = await FindLoginCandidatesAsync(email, companyId);
+            if (!candidates.Any())
+                throw new UnauthorizedException("Account has not accepted an invite");
 
-            var providerKey = payload.Id;
-            var user = await _userManager.Users
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => _context.UserLogins.Any(l => l.LoginProvider == GoogleProvider && l.ProviderKey == providerKey && l.UserId == u.Id));
-
-            if (user == null)
+            foreach (var user in candidates)
             {
-                user = await _userManager.Users
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(u => u.Email == payload.Email);
-                if (user == null)
+                if (string.IsNullOrWhiteSpace(user.SsoProvider))
                 {
-                    var defaultCompany = await _context.Companies.FirstOrDefaultAsync() 
-                                        ?? throw new BadRequestException("No company found in the system.");
-
-                    user = new AppUser
-                    {
-                        UserName = payload.Email,
-                        Email = payload.Email,
-                        EmailConfirmed = true,
-                        CompanyId = defaultCompany.Id,
-                        FullName = payload.Name ?? payload.Email
-                    };
-
-                    var result = await _userManager.CreateAsync(user);
-                    if (!result.Succeeded)
-                        throw IdentityErrorMapper.ToValidationException(result);
-
-                    await EnsureDefaultRoleAsync(user);
-                }
-
-                var existingLogins = await _userManager.GetLoginsAsync(user);
-                if (!existingLogins.Any(x => x.LoginProvider == GoogleProvider))
-                {
-                    var loginInfo = new UserLoginInfo(GoogleProvider, providerKey, GoogleProvider);
-                    var addLoginResult = await _userManager.AddLoginAsync(user, loginInfo);
-                    if (!addLoginResult.Succeeded)
-                        throw IdentityErrorMapper.ToValidationException(addLoginResult);
+                    user.SsoProvider = GoogleProvider;
+                    user.SsoUid = payload.Id;
                 }
             }
 
-            if (await _userManager.IsLockedOutAsync(user))
-                throw new UnauthorizedException("User account is locked");
+            if (companyId.HasValue || candidates.Count == 1)
+                return await CreateSessionAsync(candidates[0]);
 
-            return await GenerateAuthResponseAsync(user);
+            await _context.SaveChangesAsync();
+            return new AuthResponse
+            {
+                UserId = candidates[0].Id.ToString(),
+                UserName = candidates[0].UserName ?? string.Empty,
+                FullName = candidates[0].FullName,
+                Email = candidates[0].Email ?? string.Empty,
+                RequiresWorkspaceSelection = true,
+                Workspaces = await ToWorkspaceOptionsAsync(candidates)
+            };
         }
 
         public async Task<GoogleUserInfo> VerifyGoogleTokenAsync(string idToken)
         {
             try
             {
-                var settings = new GoogleJsonWebSignature.ValidationSettings()
+                var settings = new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = new List<string>() {
+                    Audience =
+                    [
                         _configuration["GOOGLE_CLIENT_ID"] ?? throw new ConfigurationException("GOOGLE_CLIENT_ID")
-                    }
+                    ]
                 };
                 var payload = await GoogleJsonWebSignature.ValidateAsync(idToken, settings);
                 return new GoogleUserInfo
@@ -248,42 +459,232 @@ namespace InnerG.Api.Services.Implementations
             }
         }
 
-        private async Task<AuthResponse> GenerateAuthResponseAsync(AppUser user)
+        public async Task LogoutAsync(string refreshToken)
         {
+            var tokenHash = HashToken(refreshToken);
+            var session = await _context.UserSessions.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.TokenHash == tokenHash);
+            if (session == null)
+                return;
+
+            session.IsActive = false;
+            session.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task LogoutAllAsync(string userId)
+        {
+            if (!Guid.TryParse(userId, out var id))
+                return;
+
+            await RevokeOldSessionsAsync(id);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
+        {
+            var tokenHash = HashToken(refreshToken);
+            var session = await _context.UserSessions
+                .IgnoreQueryFilters()
+                .Include(x => x.User)
+                .ThenInclude(x => x.Company)
+                .FirstOrDefaultAsync(x => x.TokenHash == tokenHash);
+
+            if (session == null || !session.IsActive || session.RevokedAt != null)
+                throw new UnauthorizedException("Invalid refresh token");
+            if (session.ExpiresAt <= DateTime.UtcNow)
+                throw new UnauthorizedException("Refresh token expired");
+
+            var user = session.User ?? throw new UnauthorizedException("User not found");
+            if (!user.IsActive || user.DeletedAt != null || await _userManager.IsLockedOutAsync(user))
+            {
+                _logger.LogWarning("User {Email} is inactive or locked out", user.Email);
+                throw new UnauthorizedException("User account is locked");
+            }
+
+            session.IsActive = false;
+            session.RevokedAt = DateTime.UtcNow;
+
+            return await CreateSessionAsync(user, revokeExisting: false);
+        }
+
+        public async Task ForgotPasswordAsync(ForgotPasswordRequest request)
+        {
+            var users = await FindLoginCandidatesAsync(request.Email, request.CompanyId);
+            if (!users.Any())
+                return;
+
+            foreach (var user in users)
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var resetLink = BuildResetPasswordLink(user.Id, token);
+                await _emailService.SendPasswordResetAsync(
+                    user.Email ?? request.Email,
+                    "Reset your InnerG password",
+                    $"""<h3>Reset your password</h3><p>Workspace: {user.Company.Name}</p><a href="{resetLink}">Reset password</a>""");
+            }
+        }
+
+        public async Task ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            if (!Guid.TryParse(request.UserId, out var userId))
+                throw new BadRequestException("Invalid user id");
+
+            var user = await _userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == userId)
+                ?? throw new BadRequestException("Invalid reset token");
+
+            var result = await _userManager.ResetPasswordAsync(user, request.Token, request.Password);
+            if (!result.Succeeded)
+                throw IdentityErrorMapper.ToValidationException(result);
+
+            await RevokeOldSessionsAsync(user.Id);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task SendTwoFactorEnableCodeAsync(string userId)
+        {
+            var user = await FindActiveUserByIdAsync(userId);
+            await SendTwoFactorLoginCodeAsync(user);
+        }
+
+        public async Task EnableTwoFactorAsync(string userId, TwoFactorVerifyRequest request)
+        {
+            var user = await FindActiveUserByIdAsync(userId);
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, request.Code);
+            if (!isValid)
+                throw new UnauthorizedException("Invalid two-factor code");
+            await _userManager.SetTwoFactorEnabledAsync(user, true);
+        }
+
+        public async Task DisableTwoFactorAsync(string userId, TwoFactorVerifyRequest request)
+        {
+            var user = await FindActiveUserByIdAsync(userId);
+            var isValid = await _userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, request.Code);
+            if (!isValid)
+                throw new UnauthorizedException("Invalid two-factor code");
+            await _userManager.SetTwoFactorEnabledAsync(user, false);
+        }
+
+        public async Task<IList<UserSessionResponse>> GetSessionsAsync(string userId)
+        {
+            var user = await FindActiveUserByIdAsync(userId);
+            return await _context.UserSessions
+                .IgnoreQueryFilters()
+                .Where(x => x.UserId == user.Id && x.DeletedAt == null)
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new UserSessionResponse
+                {
+                    Id = x.Id,
+                    DeviceInfo = x.DeviceInfo,
+                    IpAddress = x.IpAddress,
+                    IsActive = x.IsActive,
+                    ExpiresAt = x.ExpiresAt,
+                    CreatedAt = x.CreatedAt,
+                    RevokedAt = x.RevokedAt
+                })
+                .ToListAsync();
+        }
+
+        public async Task RevokeSessionAsync(string userId, Guid sessionId)
+        {
+            var user = await FindActiveUserByIdAsync(userId);
+            var session = await _context.UserSessions
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == sessionId && x.UserId == user.Id)
+                ?? throw new NotFoundException("Session not found");
+
+            session.IsActive = false;
+            session.RevokedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<UserInfoResponse> GetCurrentUserInfoAsync(string userId, Guid? companyId)
+        {
+            if (!Guid.TryParse(userId, out var id))
+                throw new NotFoundException("User not found");
+
+            var user = await _context.Users
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .FirstOrDefaultAsync(x => x.Id == id)
+                ?? throw new NotFoundException("User not found");
+
+            return new UserInfoResponse
+            {
+                UserName = user.UserName ?? string.Empty,
+                FullName = user.FullName,
+                Email = user.Email ?? string.Empty,
+                CompanyId = user.CompanyId,
+                CompanyName = user.Company.Name,
+                Roles = await _userManager.GetRolesAsync(user)
+            };
+        }
+
+        public Task ConfirmEmailAsync(string userId, string token)
+        {
+            throw new BadRequestException("Email confirmation is not used with invite-based registration");
+        }
+
+        public Task ResendConfirmEmailAsync(string email)
+        {
+            throw new BadRequestException("Email confirmation is not used with invite-based registration");
+        }
+
+        private async Task<List<AppUser>> FindLoginCandidatesAsync(string account, Guid? companyId)
+        {
+            var normalizedAccount = NormalizeEmail(account);
+            var query = _context.Users
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .Where(x => x.IsActive && x.DeletedAt == null && x.Company.IsActive && x.Company.DeletedAt == null);
+
+            if (companyId.HasValue)
+                query = query.Where(x => x.CompanyId == companyId.Value);
+
+            return await query
+                .Where(x => (x.Email != null && x.Email.ToLower() == normalizedAccount) || x.NormalizedUserName == account.ToUpperInvariant())
+                .ToListAsync();
+        }
+
+        private async Task<AuthResponse> CreateSessionAsync(AppUser user, bool revokeExisting = true)
+        {
+            if (revokeExisting)
+                await RevokeOldSessionsAsync(user.Id);
+
             var roles = await _userManager.GetRolesAsync(user);
+            var company = user.Company ?? await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == user.CompanyId)
+                ?? throw new NotFoundException("Company not found");
 
-            var accessToken = _tokenService.GenerateAccessToken(user, roles);
-            var refreshToken = _tokenService.GenerateRefreshToken(user.Id);
+            var accessToken = _tokenService.GenerateAccessToken(user, roles, user.CompanyId, company.Name);
+            var rawRefreshToken = _tokenService.GenerateRefreshToken();
 
-            await RevokeOldRefreshTokensAsync(user.Id);
+            _context.UserSessions.Add(new UserSession
+            {
+                UserId = user.Id,
+                TokenHash = HashToken(rawRefreshToken),
+                ExpiresAt = DateTime.UtcNow.AddDays(GetRefreshTokenDays())
+            });
 
-            _context.UserSessions.Add(refreshToken);
+            user.LastLoginAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             return new AuthResponse
             {
                 Token = accessToken,
-                RefreshToken = refreshToken.TokenHash,
+                RefreshToken = rawRefreshToken,
+                UserId = user.Id.ToString(),
                 UserName = user.UserName ?? string.Empty,
-                Email = user.Email ?? string.Empty
+                FullName = user.FullName,
+                Email = user.Email ?? string.Empty,
+                CompanyId = user.CompanyId,
+                CompanyName = company.Name,
+                Roles = roles
             };
         }
 
-        private async Task EnsureDefaultRoleAsync(AppUser user)
-        {
-            if (!await _roleManager.RoleExistsAsync(DefaultRole))
-            {
-                await _roleManager.CreateAsync(new AppRole(DefaultRole));
-            }
-
-            var result = await _userManager.AddToRoleAsync(user, DefaultRole);
-            if (!result.Succeeded)
-                throw IdentityErrorMapper.ToValidationException(result);
-        }
-
-        private async Task RevokeOldRefreshTokensAsync(Guid userId)
+        private async Task RevokeOldSessionsAsync(Guid userId)
         {
             var sessions = await _context.UserSessions
+                .IgnoreQueryFilters()
                 .Where(x => x.UserId == userId && x.IsActive)
                 .ToListAsync();
 
@@ -294,115 +695,188 @@ namespace InnerG.Api.Services.Implementations
             }
         }
 
-        public async Task LogoutAsync(string refreshToken)
+        private async Task AddRolesAsync(AppUser user, IEnumerable<string> roles)
         {
-            var session = await _context.UserSessions
-                .FirstOrDefaultAsync(x => x.TokenHash == refreshToken);
-
-            if (session == null) return;
-
-            session.IsActive = false;
-            session.RevokedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            var result = await _userManager.AddToRolesAsync(user, roles.Distinct(StringComparer.OrdinalIgnoreCase));
+            if (!result.Succeeded)
+                throw IdentityErrorMapper.ToValidationException(result);
         }
 
-        public async Task LogoutAllAsync(string userId)
+        private async Task<AppUser> FindActiveUserByIdAsync(string userId)
         {
-            var userGuid = Guid.Parse(userId);
-            await RevokeOldRefreshTokensAsync(userGuid);
-            await _context.SaveChangesAsync();
+            if (!Guid.TryParse(userId, out var id))
+                throw new UnauthorizedException();
+
+            return await _context.Users
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && x.DeletedAt == null && x.Company.IsActive && x.Company.DeletedAt == null)
+                ?? throw new UnauthorizedException("User not found");
         }
 
-        public async Task<AuthResponse> RefreshTokenAsync(string refreshToken)
+        private async Task<Invite> FindInviteByTokenAsync(string token)
         {
-            var session = await _context.UserSessions
-                .Include(x => x.User)
-                .IgnoreQueryFilters() // Important to find user session even if context is empty
-                .FirstOrDefaultAsync(x => x.TokenHash == refreshToken);
+            if (string.IsNullOrWhiteSpace(token))
+                throw new BadRequestException("Invite token is required");
 
-            if (session == null)
-                throw new UnauthorizedException("Invalid refresh token");
+            var tokenHash = HashToken(token);
+            return await _context.Invites
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .FirstOrDefaultAsync(x => x.TokenHash == tokenHash)
+                ?? throw new NotFoundException("Invite not found");
+        }
 
-            if (session.ExpiresAt <= DateTime.UtcNow)
-                throw new UnauthorizedException("Refresh token expired");
+        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var invite = await _context.Invites
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .FirstOrDefaultAsync(x => x.Id == inviteId)
+                ?? throw new NotFoundException("Invite not found");
 
-            if (!session.IsActive)
+            if (!isSystemAdmin && currentCompanyId != invite.CompanyId)
+                throw new ForbiddenException("You cannot manage invites outside your current company");
+
+            return invite;
+        }
+
+        private async Task ExpireInviteIfNeededAsync(Invite invite)
+        {
+            if (invite.Status == InviteStatus.Pending && invite.ExpiresAt <= DateTime.UtcNow)
             {
-                await RevokeOldRefreshTokensAsync(session.UserId);
+                invite.Status = InviteStatus.Expired;
                 await _context.SaveChangesAsync();
-                throw new UnauthorizedException("Revoked refresh token");
+            }
+        }
+
+        private async Task<IList<WorkspaceOption>> ToWorkspaceOptionsAsync(IEnumerable<AppUser> users)
+        {
+            var options = new List<WorkspaceOption>();
+            foreach (var user in users)
+            {
+                var roles = await _userManager.GetRolesAsync(user);
+                options.Add(new WorkspaceOption
+                {
+                    CompanyId = user.CompanyId,
+                    CompanyName = user.Company.Name,
+                    EmailDomain = user.Company.Domain,
+                    Roles = roles
+                });
             }
 
-            var user = session.User ?? throw new UnauthorizedException("User not found");
-            if (await _userManager.IsLockedOutAsync(user))
-                throw new UnauthorizedException("User account is locked");
+            return options;
+        }
 
-            var roles = await _userManager.GetRolesAsync(user);
+        private static IList<string> NormalizeCompanyRoles(IList<string> roles)
+        {
+            var requestedRoles = roles.Count == 0 ? [AuthRoles.Mentee] : roles;
+            return requestedRoles.Select(NormalizeCompanyRole).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
 
-            session.IsActive = false;
-            session.RevokedAt = DateTime.UtcNow;
+        private static string NormalizeCompanyRole(string role)
+        {
+            var normalized = AuthRoles.CompanyRoles.FirstOrDefault(x => string.Equals(x, role, StringComparison.OrdinalIgnoreCase));
+            return normalized ?? throw new BadRequestException($"Invalid company role: {role}");
+        }
 
-            var newAccessToken = _tokenService.GenerateAccessToken(user, roles);
-            var newRefreshToken = _tokenService.GenerateRefreshToken(user.Id);
-
-            _context.UserSessions.Add(newRefreshToken);
-            await _context.SaveChangesAsync();
-
-            return new AuthResponse
+        private InviteResponse ToInviteResponse(Invite invite, Company company, string rawToken)
+        {
+            return new InviteResponse
             {
-                Token = newAccessToken,
-                RefreshToken = newRefreshToken.TokenHash,
-                UserName = user.UserName!,
-                Email = user.Email!
+                Id = invite.Id,
+                Email = invite.Email,
+                CompanyId = company.Id,
+                CompanyName = company.Name,
+                Status = invite.Status,
+                ExpiresAt = invite.ExpiresAt,
+                Roles = invite.Roles.ToList(),
+                InviteLink = BuildInviteLink(rawToken)
             };
         }
 
-        public async Task<UserInfoResponse> GetCurrentUserInfoAsync(string userId)
+        private static CompanyResponse ToCompanyResponse(Company company)
         {
-            var userGuid = Guid.Parse(userId);
-            var user = await _userManager.Users
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(u => u.Id == userGuid);
-            if (user == null)
-                throw new NotFoundException("User not found");
-
-            var roles = await _userManager.GetRolesAsync(user);
-
-            return new UserInfoResponse
+            return new CompanyResponse
             {
-                UserName = user.UserName ?? "",
-                Email = user.Email ?? "",
-                Roles = roles
+                Id = company.Id,
+                Name = company.Name,
+                EmailDomain = company.Domain,
+                Timezone = company.Timezone,
+                Language = company.Language
             };
         }
 
-        private async Task SendConfirmEmailAsync(AppUser user)
+        private string BuildInviteLink(string rawToken)
         {
-            var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            var confirmBaseUrl = _configuration["Frontend:ConfirmEmailUrl"] ?? throw new ConfigurationException("Frontend:ConfirmEmailUrl");
-            var confirmLink = $"{confirmBaseUrl}?userId={user.Id}&token={Uri.EscapeDataString(token)}";
+            var configuredUrl = _configuration["Frontend:AcceptInviteUrl"];
+            if (!string.IsNullOrWhiteSpace(configuredUrl))
+                return $"{configuredUrl}?token={Uri.EscapeDataString(rawToken)}";
 
-            await _emailService.SendEmailConfirmationAsync(
-                user.Email!,
-                "Confirm your email",
-                $"<h3>Welcome!</h3><p>Please confirm your email by clicking the link below:</p><a href=\"{confirmLink}\">Confirm Email</a>"
-            );
+            var frontendUrl = _configuration.GetSection("Frontend:Urls").Get<string[]>()?.FirstOrDefault()
+                ?? "http://localhost:5173";
+
+            return $"{frontendUrl.TrimEnd('/')}/accept-invite?token={Uri.EscapeDataString(rawToken)}";
         }
 
-        public async Task ConfirmEmailAsync(string userId, string token)
+        private string BuildResetPasswordLink(Guid userId, string token)
         {
-            var user = await _userManager.FindByIdAsync(userId) ?? throw new NotFoundException("User not found");
-            var result = await _userManager.ConfirmEmailAsync(user, Uri.UnescapeDataString(token));
-            if (!result.Succeeded)
-                throw new BadRequestException("Invalid or expired confirmation token");
+            var configuredUrl = _configuration["Frontend:ResetPasswordUrl"];
+            if (!string.IsNullOrWhiteSpace(configuredUrl))
+                return $"{configuredUrl}?userId={userId}&token={Uri.EscapeDataString(token)}";
+
+            var frontendUrl = _configuration.GetSection("Frontend:Urls").Get<string[]>()?.FirstOrDefault()
+                ?? "http://localhost:5173";
+
+            return $"{frontendUrl.TrimEnd('/')}/reset-password?userId={userId}&token={Uri.EscapeDataString(token)}";
         }
 
-        public async Task ResendConfirmEmailAsync(string email)
+        private async Task SendTwoFactorLoginCodeAsync(AppUser user)
         {
-            var user = await _userManager.FindByEmailAsync(email) ?? throw new NotFoundException("User not found");
-            if (user.EmailConfirmed)
-                throw new BadRequestException("Email already confirmed");
-            await SendConfirmEmailAsync(user);
+            var code = await _userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
+            await _emailService.SendTwoFactorCodeAsync(
+                user.Email ?? string.Empty,
+                "Your InnerG verification code",
+                $"""<h3>InnerG verification code</h3><p>Your verification code is <strong>{code}</strong>.</p>""");
+        }
+
+        private int GetInviteExpiryDays()
+        {
+            var configured = _configuration["Invites:ExpireDays"];
+            return int.TryParse(configured, out var days) && days > 0 ? days : 7;
+        }
+
+        private int GetRefreshTokenDays()
+        {
+            var configured = _configuration["Jwt:RefreshTokenDays"];
+            return int.TryParse(configured, out var days) && days > 0 ? days : 7;
+        }
+
+        private static string HashToken(string token)
+        {
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
+        private static string NormalizeEmail(string email)
+        {
+            return email.Trim().ToLowerInvariant();
+        }
+
+        private static string NormalizeDomain(string domain)
+        {
+            return domain.Trim().TrimStart('@').ToLowerInvariant();
+        }
+
+        private static bool EmailMatchesDomain(string email, string domain)
+        {
+            var normalizedDomain = NormalizeDomain(domain);
+            return email.EndsWith($"@{normalizedDomain}", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildUserName(string email, Guid companyId)
+        {
+            return $"{NormalizeEmail(email)}|{companyId:N}";
         }
     }
 }

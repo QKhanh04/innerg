@@ -3,6 +3,8 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import GoogleLoginButton from '../../../components/login/GoogleLoginButton';
 import { useApiForm } from '../../../hooks/useApiForm';
+import { toastService } from '../../../services/toastService';
+import { getDefaultRouteFromRoles } from '../../../utils/authRoute';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -11,14 +13,23 @@ const Login = () => {
   const [formData, setFormData] = useState({
     emailOrUsername: '',
     password: '',
+    twoFactorCode: '',
   });
+  const [workspaceOptions, setWorkspaceOptions] = useState([]);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
 
-  const { submit, errors, globalError, setErrors, isLoading } = useApiForm();
+  const { submit, errors, setErrors, isLoading } = useApiForm();
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (name !== 'twoFactorCode' && requiresTwoFactor) {
+      setRequiresTwoFactor(false);
+    }
+    if (workspaceOptions.length > 0) {
+      setWorkspaceOptions([]);
+    }
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -30,11 +41,42 @@ const Login = () => {
     e.preventDefault();
     await submit({
       action: () => login(formData),
-      successMessage: "Login successfully!",
-      onSuccess: () => {
-        const from = location.state?.from?.pathname || '/';
+      showSuccessToast: false,
+      onSuccess: (data) => {
+        if (data.requiresWorkspaceSelection) {
+          setWorkspaceOptions(data.workspaces || []);
+          toastService.success('Select a workspace to continue.');
+          return;
+        }
+
+        if (data.requiresTwoFactor) {
+          setRequiresTwoFactor(true);
+          toastService.success('Enter the verification code sent to your email.');
+          return;
+        }
+
+        toastService.success('Login successfully!');
+        const from = location.state?.from?.pathname || getDefaultRouteFromRoles(data.roles || []);
         navigate(from, { replace: true });
 
+      }
+    });
+  };
+
+  const handleWorkspaceSelect = async (companyId) => {
+    await submit({
+      action: () => login({ ...formData, companyId }),
+      showSuccessToast: false,
+      onSuccess: (data) => {
+        if (data.requiresTwoFactor) {
+          setRequiresTwoFactor(true);
+          toastService.success('Enter the verification code sent to your email.');
+          return;
+        }
+
+        toastService.success('Login successfully!');
+        const from = location.state?.from?.pathname || getDefaultRouteFromRoles(data.roles || []);
+        navigate(from, { replace: true });
       }
     });
   };
@@ -125,6 +167,29 @@ const Login = () => {
             )} */}
             
             {/* Form */}
+            {workspaceOptions.length > 0 && (
+              <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+                <h2 className="text-sm font-bold text-slate-900 mb-3">Choose workspace</h2>
+                <div className="space-y-2">
+                  {workspaceOptions.map((workspace) => (
+                    <button
+                      key={workspace.companyId}
+                      type="button"
+                      onClick={() => handleWorkspaceSelect(workspace.companyId)}
+                      className="w-full flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3 text-left hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+                      disabled={isLoading}
+                    >
+                      <span>
+                        <span className="block font-semibold text-slate-900">{workspace.companyName}</span>
+                        <span className="block text-xs text-slate-500">{workspace.emailDomain}</span>
+                      </span>
+                      <span className="material-symbols-outlined text-slate-400">arrow_forward</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
 
               {/* Email Field */}
@@ -159,12 +224,12 @@ const Login = () => {
                   <label className="text-slate-900 text-sm font-semibold leading-normal">
                     Password
                   </label>
-                  <a
-                    href="#"
+                  <Link
+                    to="/forgot-password"
                     className="text-primary text-sm font-semibold hover:underline"
                   >
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <div className="relative">
                   <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
@@ -196,6 +261,35 @@ const Login = () => {
                 )}
               </div>
 
+              {requiresTwoFactor && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-slate-900 text-sm font-semibold leading-normal">
+                    Verification Code
+                  </label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+                      shield
+                    </span>
+                    <input
+                      className={`w-full h-14 pl-12 pr-4 rounded-lg text-slate-900 focus:outline-0 focus:ring-2 focus:ring-primary/50 border ${errors.twoFactorCode ? 'border-red-500' : 'border-slate-200'
+                        } bg-white placeholder:text-slate-400 text-base font-normal`}
+                      placeholder="6-digit code"
+                      type="text"
+                      name="twoFactorCode"
+                      value={formData.twoFactorCode}
+                      onChange={handleChange}
+                      required={requiresTwoFactor}
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                      maxLength={6}
+                    />
+                  </div>
+                  {errors.twoFactorCode && (
+                    <span className="text-red-500 text-sm">{errors.twoFactorCode}</span>
+                  )}
+                </div>
+              )}
+
               {/* Sign In Button */}
               <button
                 className="w-full flex h-14 items-center justify-center overflow-hidden rounded-lg bg-primary text-deep-blue text-base font-extrabold leading-normal tracking-wide hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -221,13 +315,7 @@ const Login = () => {
             {/* Footer Link */}
             <div className="mt-10 text-center">
               <p className="text-slate-500 text-sm font-medium">
-                New to InnerG?{' '}
-                <Link
-                  to="/register"
-                  className="text-primary font-bold hover:underline ml-1"
-                >
-                  Register your company
-                </Link>
+                New to InnerG? Ask your HR team for an invite link.
               </p>
             </div>
           </div>

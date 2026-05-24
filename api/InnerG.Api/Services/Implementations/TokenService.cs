@@ -22,16 +22,23 @@ namespace InnerG.Api.Services.Implementations
             _config = config;
         }
 
-        public string GenerateAccessToken(AppUser user, IList<string> roles)
+        public string GenerateAccessToken(AppUser user, IList<string> roles, Guid? companyId, string? companyName)
         {
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim("CompanyId", user.CompanyId.ToString()),
+                new Claim("full_name", user.FullName ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
+
+            if (companyId.HasValue)
+            {
+                claims.Add(new Claim("CompanyId", companyId.Value.ToString()));
+                claims.Add(new Claim("company_id", companyId.Value.ToString()));
+                claims.Add(new Claim("company_name", companyName ?? string.Empty));
+            }
 
             foreach (var role in roles)
             {
@@ -60,19 +67,9 @@ namespace InnerG.Api.Services.Implementations
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        public UserSession GenerateRefreshToken(Guid userId, string? deviceInfo = null, string? ipAddress = null)
+        public string GenerateRefreshToken()
         {
-            var refreshToken = new UserSession
-            {
-                TokenHash = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)), // We'll call it TokenHash but it's the raw token for now, or we can actually hash it.
-                UserId = userId,
-                ExpiresAt = DateTime.UtcNow.AddDays(int.Parse(_config.GetRequiredSection("Jwt:RefreshTokenDays").Value!)),
-                DeviceInfo = deviceInfo,
-                IpAddress = ipAddress,
-                IsActive = true
-            };
-
-            return refreshToken;
+            return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
         }
     }
 }
