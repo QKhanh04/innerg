@@ -15,8 +15,10 @@ export default function AppLayout() {
         <Header />
 
         {/* Scrollable page body */}
-        <main className="flex-1 overflow-y-auto p-8 max-w-7xl w-full mx-auto">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto w-full">
+          <div className="max-w-[1440px] w-full mx-auto p-6 md:p-8">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

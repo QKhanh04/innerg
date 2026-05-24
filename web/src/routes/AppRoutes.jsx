@@ -11,6 +11,7 @@ import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
+import Schedule from '../pages/common/Schedule/Schedule';
 
 const AppRoutes = () => (
     <Routes>
@@ -40,6 +41,12 @@ const AppRoutes = () => (
             <Route path="/wishlist" element={
                 <ProtectedRoute allowedRoles={['mentee', 'hr']}>
                     <LearningWishlist />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/schedule" element={
+                <ProtectedRoute allowedRoles={['mentee', 'mentor']}>
+                    <Schedule />
                 </ProtectedRoute>
             } />
 
