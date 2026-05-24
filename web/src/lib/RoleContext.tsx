@@ -29,7 +29,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
   }, [authUser]);
 
   const user = useMemo(() => {
-    const primaryAppRole = authUser?.appRoles?.[0] || 'User';
+    const primaryAppRole = authUser?.appRoles?.[0] || 'Mentee';
 
     return {
       name: authUser?.userName || 'Nguyen Van A',

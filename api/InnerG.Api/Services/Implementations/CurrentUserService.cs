@@ -40,9 +40,7 @@ namespace InnerG.Api.Services.Implementations
             get
             {
                 var user = _httpContextAccessor.HttpContext?.User;
-                return user?.IsInRole("SystemAdmin") == true ||
-                       user?.IsInRole("Admin") == true ||
-                       user?.IsInRole("SuperAdmin") == true;
+                return user?.IsInRole("SystemAdmin") == true;
             }
         }
     }

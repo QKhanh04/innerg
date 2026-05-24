@@ -86,7 +86,7 @@ namespace InnerG.Api.Services.Implementations
             if (!createResult.Succeeded)
                 throw IdentityErrorMapper.ToValidationException(createResult);
 
-            await AddRolesAsync(user, [AuthRoles.HR, AuthRoles.Mentee]);
+            await AddRolesAsync(user, [AuthRoles.HR]);
             await transaction.CommitAsync();
 
             return await CreateSessionAsync(user);
@@ -126,7 +126,7 @@ namespace InnerG.Api.Services.Implementations
                     CompanyId = company.Id,
                     Email = hrEmail,
                     FullName = request.HrFullName,
-                    Roles = [AuthRoles.HR, AuthRoles.Mentee]
+                    Roles = [AuthRoles.HR]
                 },
                 inviterId.ToString(),
                 currentCompanyId: null,
@@ -876,7 +876,7 @@ namespace InnerG.Api.Services.Implementations
 
         private static string BuildUserName(string email, Guid companyId)
         {
-            return $"{NormalizeEmail(email)}|{companyId:N}";
+            return $"{NormalizeEmail(email)}.{companyId:N}";
         }
     }
 }
