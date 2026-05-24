@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -23,6 +23,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useRole } from '../../../lib/RoleContext';
+import api from '../../../api/axios';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function SchedulePage() {
   const { role, user } = useRole();
@@ -31,6 +33,12 @@ export default function SchedulePage() {
   const [conflictResolved, setConflictResolved] = useState(false);
   const [resolvingConflict, setResolvingConflict] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // API Integration States
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [googleSync, setGoogleSync] = useState({ isConnected: false, lastSyncedAt: null, email: null });
+  const [syncingGoogleAction, setSyncingGoogleAction] = useState(false);
 
   // Dynamic Navigation Offsets
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = prev week, +1 = next week
@@ -41,11 +49,111 @@ export default function SchedulePage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Fetch Google Integration Status on mount
+  useEffect(() => {
+    fetchGoogleStatus();
+  }, []);
+
+  const fetchGoogleStatus = async () => {
+    try {
+      const response = await api.get('/integrations/google/status');
+      setGoogleSync(response.data);
+    } catch (err) {
+      console.error("Error fetching Google Status", err);
+    }
+  };
+
+  const handleConnectGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setSyncingGoogleAction(true);
+      try {
+        const response = await api.post('/integrations/google/connect', {
+          accessToken: tokenResponse.access_token
+        });
+        setGoogleSync({
+          isConnected: true,
+          lastSyncedAt: response.data.lastSyncedAt,
+          email: user?.email || "user@company.com"
+        });
+        showToast("Successfully connected to your Google Calendar! 📅");
+        fetchSchedule(); // Refresh events to show Google calendar events
+      } catch (err) {
+        showToast("Failed to connect to Google Calendar.");
+        console.error(err);
+      } finally {
+        setSyncingGoogleAction(false);
+      }
+    },
+    onError: (err) => {
+      showToast("Google authorization failed.");
+      console.error(err);
+    },
+    scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events.readonly'
+  });
+
+  const handleDisconnectGoogle = async () => {
+    setSyncingGoogleAction(true);
+    try {
+      await api.post('/integrations/google/disconnect');
+      setGoogleSync({
+        isConnected: false,
+        lastSyncedAt: null,
+        email: null
+      });
+      showToast("Disconnected from Google Calendar.");
+      fetchSchedule(); // Refresh events to remove Google calendar events
+    } catch (err) {
+      showToast("Failed to disconnect.");
+      console.error(err);
+    } finally {
+      setSyncingGoogleAction(false);
+    }
+  };
+
+  // Fetch Personal Schedule based on date range
+  const fetchSchedule = async () => {
+    setLoading(true);
+    try {
+      // Compute range based on active view mode
+      let startDateStr, endDateStr;
+      if (viewMode === 'week') {
+        startDateStr = monday.toISOString();
+        const sundayDate = new Date(monday);
+        sundayDate.setDate(monday.getDate() + 7);
+        endDateStr = sundayDate.toISOString();
+      } else {
+        startDateStr = firstDayOfMonth.toISOString();
+        const lastDayOfMonthDate = new Date(currentYear, currentMonth + 1, 0);
+        endDateStr = lastDayOfMonthDate.toISOString();
+      }
+
+      const response = await api.get('/schedule', {
+        params: {
+          startDate: startDateStr,
+          endDate: endDateStr
+        }
+      });
+      console.log("Fetched schedule events from backend:", response.data);
+      setEvents(response.data);
+    } catch (err) {
+      console.error("Error fetching schedule data from backend", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Trigger schedule fetch whenever navigation offsets or view modes change
+  useEffect(() => {
+    fetchSchedule();
+  }, [weekOffset, monthOffset, viewMode]);
+
   const handleResolveConflict = () => {
     setResolvingConflict(true);
     setTimeout(() => {
       setConflictResolved(true);
       setResolvingConflict(false);
+      // Clean up local conflicts
+      setEvents(prev => prev.map(e => ({ ...e, hasConflict: false, conflictMessage: null })));
       showToast("Conflict auto-resolved using AI Smart-Scheduler! 🚀");
     }, 1500);
   };
@@ -53,6 +161,7 @@ export default function SchedulePage() {
   const handleScheduleNow = () => {
     setSchedulerBannerVisible(false);
     showToast("Event successfully scheduled for dynamic time slot! 🎉");
+    fetchSchedule(); // Refresh schedule from backend
   };
 
   // ==========================================
@@ -64,15 +173,14 @@ export default function SchedulePage() {
   const getMonday = (d) => {
     const date = new Date(d);
     const day = date.getDay();
-    // Adjust diff to find the Monday of the week, plus the offset of weeks
     const diff = date.getDate() - day + (day === 0 ? -6 : 1) + (weekOffset * 7); 
     return new Date(date.setDate(diff));
   };
 
   const monday = getMonday(today);
 
-  // Generate 5 week days dynamically based on the actual system clock and weekOffset
-  const weekDays = Array.from({ length: 5 }, (_, idx) => {
+  // Generate 7 week days dynamically based on the actual system clock and weekOffset (Monday to Sunday)
+  const weekDays = Array.from({ length: 7 }, (_, idx) => {
     const dayDate = new Date(monday);
     dayDate.setDate(monday.getDate() + idx);
     
@@ -81,7 +189,7 @@ export default function SchedulePage() {
       dayDate.getMonth() === today.getMonth() &&
       dayDate.getFullYear() === today.getFullYear();
 
-    const labels = ['MON', 'TUE', 'WED', 'THU', 'FRI'];
+    const labels = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
     
     return {
       key: labels[idx].toLowerCase(),
@@ -92,24 +200,63 @@ export default function SchedulePage() {
     };
   });
 
-  // Format week range label (e.g. "May 18 – May 22, 2026")
+  // Format week range label (e.g. "May 18 – May 24, 2026")
   const firstDayOfWeekStr = weekDays[0].fullDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const lastDayOfWeekStr = weekDays[4].fullDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const lastDayOfWeekStr = weekDays[6].fullDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const weekRangeStr = `${firstDayOfWeekStr} – ${lastDayOfWeekStr}`;
 
-  const timeSlots = ['08:00 AM', '10:00 AM', '02:00 PM', '03:00 PM'];
+  // Base default time slots for business hours
+  const baseSlots = ['08:00 AM', '10:00 AM', '02:00 PM', '03:00 PM'];
+  
+  // Dynamically extract and append any unique hours from fetched events to ensure they always show up in the weekly grid!
+  const timeSlots = React.useMemo(() => {
+    const slots = new Set(baseSlots);
+    
+    events.forEach(evt => {
+      if (!evt.startTime) return;
+      const evtDate = new Date(evt.startTime);
+      
+      let hours = evtDate.getHours();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // convert 0 to 12
+      const formattedHour = `${String(hours).padStart(2, '0')}:00 ${ampm}`;
+      
+      slots.add(formattedHour);
+    });
+    
+    // Sort chronological
+    return Array.from(slots).sort((a, b) => {
+      const getMinutes = (timeStr) => {
+        const [timePart, ampm] = timeStr.split(' ');
+        let [hrs] = timePart.split(':').map(Number);
+        if (ampm === 'PM' && hrs < 12) hrs += 12;
+        if (ampm === 'AM' && hrs === 12) hrs = 0;
+        return hrs * 60;
+      };
+      return getMinutes(a) - getMinutes(b);
+    });
+  }, [events]);
 
-  // Map events to the relative week days of the current calendar week
-  const calendarEvents = {
-    'mon-08:00 AM': { type: 'UPCOMING', title: 'Morning Alignment', tagColor: 'text-[#3B82F6]', borderClass: 'border-l-[#3B82F6]', bgClass: 'bg-white' },
-    'mon-02:00 PM': { type: 'TEACHING', title: 'Prenatal Yoga Core', tagColor: 'text-[#10B981]', borderClass: 'border-l-[#10B981]', bgClass: 'bg-white' },
-    'tue-10:00 AM': { type: 'UPCOMING', title: 'Vinyasa Flow', tagColor: 'text-[#3B82F6]', borderClass: 'border-l-[#3B82F6]', bgClass: 'bg-white' },
-    'wed-08:00 AM': { type: 'TEACHING', title: 'Intermediate Hatha', tagColor: 'text-[#10B981]', borderClass: 'border-l-[#10B981]', bgClass: 'bg-white' },
-    'wed-02:00 PM': { type: 'UPCOMING', title: 'Sound Healing Bath', tagColor: 'text-[#3B82F6]', borderClass: 'border-l-[#3B82F6]', bgClass: 'bg-white', hasAlert: !conflictResolved },
-    'wed-03:00 PM': schedulerBannerVisible ? null : { type: 'SCHEDULED', title: 'Advanced React', tagColor: 'text-[#6366F1]', borderClass: 'border-l-[#6366F1]', bgClass: 'bg-white' },
-    'thu-10:00 AM': { type: 'TEACHING', title: 'Beginner Asanas', tagColor: 'text-[#10B981]', borderClass: 'border-l-[#10B981]', bgClass: 'bg-white' },
-    'fri-08:00 AM': { type: 'COMPLETED', title: 'Early Meditation', tagColor: 'text-[#64748B]', borderClass: 'border-l-[#64748B]', bgClass: 'bg-white' },
-    'fri-02:00 PM': { type: 'UPCOMING', title: 'Yin Yoga Special', tagColor: 'text-[#3B82F6]', borderClass: 'border-l-[#3B82F6]', bgClass: 'bg-white' }
+  // Matches database training sessions/events to dynamic grid cell hours
+  const findEventForSlot = (dayDate, slotTime) => {
+    return events.find(evt => {
+      const evtDate = new Date(evt.startTime);
+      const isSameDay = 
+        evtDate.getFullYear() === dayDate.getFullYear() &&
+        evtDate.getMonth() === dayDate.getMonth() &&
+        evtDate.getDate() === dayDate.getDate();
+        
+      if (!isSameDay) return false;
+      
+      // Match timeslot hour
+      const [timePart, ampm] = slotTime.split(' ');
+      let [hours] = timePart.split(':').map(Number);
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      
+      return evtDate.getHours() === hours;
+    });
   };
 
   const upcomingClasses = [
@@ -186,30 +333,60 @@ export default function SchedulePage() {
     });
   }
 
-  // Event distribution map based on fixed days of the month for visual perfection in any month view
-  const monthEvents = {
-    3: [{ title: 'Intro Seminar', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' }],
-    7: [{ title: 'Design Systems', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' }],
-    10: [{ title: 'C# Refactoring', bg: 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20' }],
-    14: [{ title: 'Amplitude Growth', bg: 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20' }],
-    17: [{ title: 'Stakeholder Comm', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' }],
-    21: [
-      { title: 'Morning Align', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' },
-      { title: 'Prenatal Yoga', bg: 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20' }
-    ],
-    22: [{ title: 'Vinyasa Flow', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' }],
-    23: [
-      { title: 'Intermediate Hatha', bg: 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20' },
-      { title: 'Sound Healing Bath', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20', hasAlert: !conflictResolved },
-      ...(schedulerBannerVisible ? [] : [{ title: 'Advanced React', bg: 'bg-[#6366F1]/10 text-[#6366F1] border-[#6366F1]/20' }])
-    ],
-    24: [{ title: 'Beginner Asanas', bg: 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20' }],
-    25: [
-      { title: 'Early Meditation', bg: 'bg-slate-100 text-slate-500 border-slate-200/50' },
-      { title: 'Yin Yoga Special', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' }
-    ],
-    28: [{ title: 'Performance Audit', bg: 'bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20' }]
+  // Get active events for a specific month day dynamically
+  const getMonthEventsForDay = (dayNum) => {
+    return events.filter(evt => {
+      const evtDate = new Date(evt.startTime);
+      return evtDate.getDate() === dayNum && 
+             evtDate.getMonth() === currentMonth &&
+             evtDate.getFullYear() === currentYear;
+    });
   };
+
+  // Helper to color-code calendar events based on role/source
+  const getEventStyles = (evt) => {
+    if (evt.hasConflict) {
+      return {
+        bg: 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100/60 shadow-[0_2px_8px_rgba(244,63,94,0.04)]',
+        borderClass: 'border-l-rose-500',
+        tagColor: 'text-rose-600',
+        label: 'CONFLICTED'
+      };
+    }
+    switch (evt.type) {
+      case 'TEACHING':
+        return {
+          bg: 'bg-emerald-50/50 border-emerald-100 hover:bg-emerald-50 text-emerald-800 shadow-[0_2px_8px_rgba(16,185,129,0.03)]',
+          borderClass: 'border-l-emerald-500',
+          tagColor: 'text-emerald-600',
+          label: 'TEACHING'
+        };
+      case 'COMPLETED':
+        return {
+          bg: 'bg-slate-50 border-slate-200/60 text-slate-500 hover:bg-slate-100/50 shadow-none',
+          borderClass: 'border-l-slate-400',
+          tagColor: 'text-slate-400',
+          label: 'COMPLETED'
+        };
+      case 'EXTERNAL':
+        return {
+          bg: 'bg-amber-50/50 border-amber-100 hover:bg-amber-50 text-amber-800 shadow-[0_2px_8px_rgba(245,158,11,0.03)]',
+          borderClass: 'border-l-amber-500',
+          tagColor: 'text-amber-600',
+          label: 'GOOGLE CALENDAR'
+        };
+      default:
+        return {
+          bg: 'bg-blue-50/40 border-blue-100/60 hover:bg-blue-50 text-blue-800 shadow-[0_2px_8px_rgba(59,130,246,0.03)]',
+          borderClass: 'border-l-blue-500',
+          tagColor: 'text-blue-600',
+          label: 'UPCOMING'
+        };
+    }
+  };
+
+  // Find if there are any active conflicts in the current schedule
+  const activeConflict = events.find(e => e.hasConflict);
 
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto pb-16">
@@ -303,7 +480,18 @@ export default function SchedulePage() {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         
         {/* LEFT: Calendar Grid Container (70%) */}
-        <div className="flex-[0.70] bg-white rounded-3xl border border-slate-200/60 shadow-sm p-6 overflow-hidden">
+        <div className="flex-[0.70] bg-white rounded-3xl border border-slate-200/60 shadow-sm p-6 overflow-hidden w-full relative">
+          
+          {/* Real-time Loader Overlay */}
+          {loading && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-xs z-50 flex items-center justify-center rounded-3xl">
+              <div className="flex flex-col items-center gap-3">
+                <RefreshCw className="size-8 text-[#00C896] animate-spin" />
+                <p className="text-slate-400 text-xs font-extrabold uppercase tracking-widest">Fetching schedule...</p>
+              </div>
+            </div>
+          )}
+
           <AnimatePresence mode="wait">
             
             {viewMode === 'week' ? (
@@ -351,15 +539,15 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
-                {/* 6-Column Grid Header */}
-                <div className="grid grid-cols-[100px_repeat(5,_1fr)] gap-4 items-center pb-4 border-b border-slate-100">
+                {/* 8-Column Grid Header (Time + 7 Days) */}
+                <div className="grid gap-4 items-center pb-4 border-b border-slate-100" style={{ gridTemplateColumns: '100px repeat(7, 1fr)' }}>
                   <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest pl-2">Time</div>
                   {weekDays.map((day, idx) => (
                     <div key={idx} className="flex justify-center">
                       <div className={cn(
                         "flex flex-col items-center py-2 px-4 rounded-[20px] w-24 transition-all",
                         day.isToday 
-                          ? "bg-[#e6faf4] text-[#00C896] border border-[#00C896]/20 font-extrabold" 
+                           ? "bg-[#e6faf4] text-[#00C896] border border-[#00C896]/20 font-extrabold" 
                           : "text-slate-500"
                       )}>
                         <span className="text-[9px] font-extrabold tracking-widest leading-none mb-1">{day.label}</span>
@@ -372,7 +560,7 @@ export default function SchedulePage() {
                 {/* Grid Rows */}
                 <div className="space-y-4 pt-2">
                   {timeSlots.map((time, rowIdx) => (
-                    <div key={rowIdx} className="grid grid-cols-[100px_repeat(5,_1fr)] gap-4 items-center">
+                    <div key={rowIdx} className="grid gap-4 items-center" style={{ gridTemplateColumns: '100px repeat(7, 1fr)' }}>
                       
                       {/* Fixed Time Column Cell */}
                       <div className="text-[11px] font-extrabold text-slate-400 uppercase tracking-tight pl-2">
@@ -381,8 +569,7 @@ export default function SchedulePage() {
 
                       {/* Day Column Cells */}
                       {weekDays.map((day, colIdx) => {
-                        const eventKey = `${day.key}-${time}`;
-                        const event = calendarEvents[eventKey];
+                        const event = findEventForSlot(day.fullDate, time);
                         const isAiRecommendedCell = day.key === 'wed' && time === '03:00 PM' && schedulerBannerVisible;
 
                         return (
@@ -392,22 +579,22 @@ export default function SchedulePage() {
                                 whileHover={{ y: -2, scale: 1.01 }}
                                 onClick={() => showToast(`Selected "${event.title}"`)}
                                 className={cn(
-                                  "p-3.5 rounded-[20px] border-l-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.02)] border border-slate-200/50 hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:border-slate-350 transition-all cursor-pointer h-[78px] flex flex-col justify-between relative group",
-                                  event.bgClass, event.borderClass
+                                  "p-3.5 rounded-[20px] border-l-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.015)] border transition-all cursor-pointer h-[78px] flex flex-col justify-between relative group",
+                                  getEventStyles(event).bg, getEventStyles(event).borderClass
                                 )}
                               >
                                 <div className="space-y-0.5">
                                   <span className={cn(
-                                    "text-[9px] font-extrabold uppercase tracking-widest block leading-none",
-                                    event.tagColor
+                                    "text-[8px] font-extrabold uppercase tracking-widest block leading-none",
+                                    getEventStyles(event).tagColor
                                   )}>
-                                    {event.type}
+                                    {getEventStyles(event).label}
                                   </span>
-                                  <p className="text-xs font-extrabold text-slate-800 leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                                  <p className="text-[11px] font-extrabold text-slate-800 leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                                     {event.title}
                                   </p>
                                 </div>
-                                {event.hasAlert && (
+                                {event.hasConflict && (
                                   <span className="absolute top-3.5 right-3.5 size-2 bg-rose-500 rounded-full border border-white animate-pulse shadow-sm shadow-rose-500" />
                                 )}
                               </motion.div>
@@ -496,7 +683,7 @@ export default function SchedulePage() {
                 {/* 35/42-Day Dynamic Grid */}
                 <div className="grid grid-cols-7 gap-3">
                   {monthDays.map((day, idx) => {
-                    const dayEvts = monthEvents[day.dayNumber] && day.isCurrentMonth ? monthEvents[day.dayNumber] : [];
+                    const dayEvts = getMonthEventsForDay(day.dayNumber);
                     return (
                       <div 
                         key={idx}
@@ -520,23 +707,35 @@ export default function SchedulePage() {
                         </div>
 
                         <div className="flex-1 mt-2 space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar">
-                          {dayEvts.map((evt, eIdx) => (
-                            <div 
-                              key={eIdx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                showToast(`Selected "${evt.title}"`);
-                              }}
-                              className={cn(
-                                "text-[9px] font-extrabold px-1.5 py-1 rounded-lg truncate border flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]",
-                                evt.bg
-                              )}
-                              title={evt.title}
-                            >
-                              <span className="truncate">{evt.title}</span>
-                              {evt.hasAlert && <span className="size-1.5 bg-rose-500 rounded-full animate-pulse shrink-0 ml-1" />}
-                            </div>
-                          ))}
+                          {day.isCurrentMonth && dayEvts.map((evt, eIdx) => {
+                            const isCompleted = evt.type === 'COMPLETED';
+                            const isExternal = evt.type === 'EXTERNAL';
+                            const hasConflict = evt.hasConflict;
+
+                            return (
+                              <div 
+                                key={eIdx}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  showToast(`Selected "${evt.title}"`);
+                                }}
+                                className={cn(
+                                  "text-[9px] font-extrabold px-1.5 py-1 rounded-lg truncate border flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]",
+                                  hasConflict 
+                                    ? "bg-rose-50 border-rose-250 text-rose-700" 
+                                    : isCompleted
+                                      ? "bg-slate-100 text-slate-500 border-slate-200/50"
+                                      : isExternal 
+                                        ? "bg-amber-50 text-amber-800 border-amber-200/40"
+                                        : "bg-emerald-50 text-emerald-800 border-emerald-250/40"
+                                )}
+                                title={evt.title}
+                              >
+                                <span className="truncate">{evt.title}</span>
+                                {evt.hasConflict && <span className="size-1.5 bg-rose-500 rounded-full animate-pulse shrink-0 ml-1" />}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -548,7 +747,7 @@ export default function SchedulePage() {
         </div>
 
         {/* RIGHT: Stats and Integration Sidebar (30%) */}
-        <div className="flex-[0.30] space-y-8">
+        <div className="flex-[0.30] space-y-8 w-full">
           
           {/* A. UPCOMING CLASSES */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/60 shadow-sm">
@@ -613,7 +812,7 @@ export default function SchedulePage() {
           {/* C. EXTERNAL SYNC */}
           <div className="bg-white rounded-3xl p-6 border border-slate-200/60 shadow-sm space-y-4">
             <div className="flex items-center gap-2">
-              <RefreshCw className="size-4.5 text-[#00C896] animate-spin" />
+              <RefreshCw className={cn("size-4.5 text-[#00C896]", (syncingGoogleAction || loading) && "animate-spin")} />
               <h3 className="font-extrabold text-slate-900 text-sm tracking-tight">External Sync</h3>
             </div>
 
@@ -624,12 +823,31 @@ export default function SchedulePage() {
                   <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" className="size-5 shrink-0" alt="Google Calendar" />
                   <div>
                     <p className="font-extrabold text-xs text-slate-800">Google Calendar</p>
-                    <p className="text-[8px] text-emerald-600 font-extrabold uppercase tracking-wider mt-0.5">CONNECTED</p>
+                    <p className={cn(
+                      "text-[8px] font-extrabold uppercase tracking-wider mt-0.5",
+                      googleSync.isConnected ? "text-emerald-600" : "text-slate-400"
+                    )}>
+                      {googleSync.isConnected ? "CONNECTED" : "DISCONNECTED"}
+                    </p>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-100/40 text-emerald-655 rounded-md text-[8px] font-extrabold tracking-widest uppercase">
-                  Active
-                </span>
+                {googleSync.isConnected ? (
+                  <button 
+                    onClick={handleDisconnectGoogle}
+                    disabled={syncingGoogleAction}
+                    className="px-2 py-1 border border-rose-250 hover:bg-rose-50 text-rose-500 rounded-md text-[8px] font-extrabold tracking-widest uppercase bg-white cursor-pointer transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleConnectGoogle}
+                    disabled={syncingGoogleAction}
+                    className="px-2 py-1 border border-slate-200 hover:border-slate-350 text-[#00C896] rounded-md text-[8px] font-extrabold tracking-widest uppercase bg-white cursor-pointer hover:bg-slate-50 transition-colors"
+                  >
+                    Connect
+                  </button>
+                )}
               </div>
 
               {/* Outlook Calendar */}
@@ -652,19 +870,19 @@ export default function SchedulePage() {
 
             {/* Conflict Detected Alert Card */}
             <AnimatePresence>
-              {!conflictResolved && (
+              {activeConflict && !conflictResolved && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="p-4 rounded-2xl bg-amber-50 border border-amber-100/60 space-y-3 shadow-xs"
+                  className="p-4 rounded-2xl bg-amber-50 border border-amber-100/60 space-y-3 shadow-xs text-left"
                 >
                   <div className="flex items-start gap-2.5 text-amber-700">
                     <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-500" />
                     <div className="space-y-0.5">
                       <p className="text-[9px] font-extrabold uppercase tracking-widest">CONFLICT DETECTED</p>
                       <p className="text-[11px] font-bold leading-normal text-amber-800">
-                        Your "Vinyasa Mastery" overlaps with an external "Product Review" on Google Calendar.
+                        {activeConflict.title} overlaps with another scheduled session: {activeConflict.conflictMessage}.
                       </p>
                     </div>
                   </div>
@@ -755,3 +973,4 @@ export default function SchedulePage() {
     </div>
   );
 }
+
