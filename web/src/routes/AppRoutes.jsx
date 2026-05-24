@@ -13,6 +13,7 @@ import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
+import Schedule from '../pages/common/Schedule/Schedule';
 
 const LegacyRegisterRedirect = () => {
     const location = useLocation();
@@ -55,6 +56,12 @@ const AppRoutes = () => (
             <Route path="/wishlist" element={
                 <ProtectedRoute allowedRoles={['mentee', 'hr']}>
                     <LearningWishlist />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/schedule" element={
+                <ProtectedRoute allowedRoles={['mentee', 'mentor']}>
+                    <Schedule />
                 </ProtectedRoute>
             } />
 
