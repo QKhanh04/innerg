@@ -103,8 +103,8 @@ export function Sidebar() {
           >
             <option value="mentee">Mentee (Learner)</option>
             <option value="mentor">Mentor (Teacher)</option>
-            <option value="hr">HR/Admin (Manager)</option>
-            <option value="admin">Super Admin</option>
+            <option value="hr">HR</option>
+            <option value="admin">System Admin</option>
           </select>
         </div>
 

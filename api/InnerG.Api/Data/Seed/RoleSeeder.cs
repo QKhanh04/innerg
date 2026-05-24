@@ -17,7 +17,7 @@ namespace InnerG.Api.Data.Seed
             var context = services.GetRequiredService<AppDbContext>();
 
             // Seed Roles
-            string[] roles = { "Employee", "Mentor", "HRManager", "Admin", "User" };
+            string[] roles = { AuthRoles.SystemAdmin, AuthRoles.HR, AuthRoles.Mentor, AuthRoles.Mentee };
 
             foreach (var role in roles)
             {
