@@ -109,7 +109,7 @@ export default function MembersPage() {
                     </div>
                 )}
 
-                <MemberTable members={data?.data || []} />
+                <MemberTable members={data?.data || []} isLoading={isLoading} />
 
                 {/* Pagination */}
                 {data && data.total > 0 && (

@@ -61,7 +61,7 @@ const AppRoutes = () => (
             } />
 
             <Route path="/members" element={
-                <MembersPage />
+                    <MembersPage />
             } />
 
             <Route path="/schedule" element={

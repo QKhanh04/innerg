@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils';
 import MemberActionMenu from './MemberActionMenu';
 import { Star } from 'lucide-react';
 
-export default function MemberTable({ members }) {
+export default function MemberTable({ members, isLoading }) {
     return (
         <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
@@ -82,7 +82,7 @@ export default function MemberTable({ members }) {
                             </tr>
                         ))}
 
-                        {(!members || members.length === 0) && (
+                        {(!members || members.length === 0) && !isLoading && (
                             <tr>
                                 <td colSpan={6} className="px-6 py-12 text-center text-sm font-medium text-slate-500">
                                     Không tìm thấy nhân viên nào.
