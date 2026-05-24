@@ -244,7 +244,7 @@ namespace InnerG.Api.Data.Seed
             SeedUserDefinition definition)
         {
             var normalizedEmail = definition.Email.Trim().ToLowerInvariant();
-            var expectedUserName = BuildUserName(normalizedEmail, company.Id);
+            var expectedUserName = normalizedEmail;
 
             var user = await userManager.Users
                 .IgnoreQueryFilters()
@@ -322,11 +322,6 @@ namespace InnerG.Api.Data.Seed
                 throw new InvalidOperationException(
                     $"Failed to assign roles to seed user '{normalizedEmail}': {string.Join("; ", addRolesResult.Errors.Select(x => x.Description))}");
             }
-        }
-
-        private static string BuildUserName(string email, Guid companyId)
-        {
-            return $"{email.Trim().ToLowerInvariant()}.{companyId:N}";
         }
 
         private sealed record SeedUserDefinition(string Email, string FullName, string[] Roles);

@@ -75,7 +75,7 @@ namespace InnerG.Api.Services.Implementations
             var user = new AppUser
             {
                 CompanyId = company.Id,
-                UserName = BuildUserName(hrEmail, company.Id),
+                UserName = await GenerateUniqueUserNameAsync(hrEmail),
                 Email = hrEmail,
                 FullName = request.HrFullName.Trim(),
                 EmailConfirmed = true,
@@ -311,7 +311,7 @@ namespace InnerG.Api.Services.Implementations
             {
                 CompanyId = invite.CompanyId,
                 DepartmentId = invite.DepartmentId,
-                UserName = BuildUserName(invite.Email, invite.CompanyId),
+                UserName = await GenerateUniqueUserNameAsync(invite.Email),
                 Email = invite.Email,
                 FullName = request.FullName.Trim(),
                 AvatarUrl = request.AvatarUrl,
@@ -874,9 +874,22 @@ namespace InnerG.Api.Services.Implementations
             return email.EndsWith($"@{normalizedDomain}", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string BuildUserName(string email, Guid companyId)
+        private async Task<string> GenerateUniqueUserNameAsync(string email)
         {
-            return $"{NormalizeEmail(email)}.{companyId:N}";
+            var baseUserName = NormalizeEmail(email);
+            if (string.IsNullOrWhiteSpace(baseUserName))
+                baseUserName = $"user-{Guid.NewGuid():N}";
+
+            var candidate = baseUserName;
+            var suffix = 2;
+
+            while (await _context.Users.AnyAsync(x => x.NormalizedUserName == candidate.ToUpperInvariant()))
+            {
+                candidate = $"{baseUserName}-{suffix}";
+                suffix++;
+            }
+
+            return candidate;
         }
     }
 }
