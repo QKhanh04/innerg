@@ -10,14 +10,27 @@ import AcceptInvite from '../pages/auth/AcceptInvite/AcceptInvite';
 import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
 import ForgotPassword from '../pages/auth/ForgotPassword/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
+import AdminDashboard from '../pages/admin/AdminDashboard/AdminDashboard';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
+import { useAuth } from '../hooks/useAuth';
+import { getDefaultRouteForUser } from '../utils/authRoute';
 
 const LegacyRegisterRedirect = () => {
     const location = useLocation();
     return <Navigate to={`/accept-invite${location.search}`} replace />;
+};
+
+const HomeRedirect = () => {
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return null;
+    }
+
+    return <Navigate to={getDefaultRouteForUser(user)} replace />;
 };
 
 const AppRoutes = () => (
@@ -47,6 +60,12 @@ const AppRoutes = () => (
 
         {/* Private Routes with AppLayout Wrapper */}
         <Route element={<AppLayout />}>
+            <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                </ProtectedRoute>
+            } />
+
             <Route path="/dashboard" element={
                 <ProtectedRoute allowedRoles={['mentee']}>
                     <Dashboard />
@@ -73,7 +92,7 @@ const AppRoutes = () => (
             {/* You can add more protected routes here for other roles */}
         </Route>
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<HomeRedirect />} />
         <Route path="*" element={<Navigate to="/" />} />
     </Routes>
 );

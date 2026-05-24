@@ -19,6 +19,10 @@ export const getDefaultRouteForUser = (user) => {
     return '/login';
   }
 
+  if (user.uiRoles?.includes('admin')) {
+    return '/admin';
+  }
+
   if (user.uiRoles?.includes('mentee')) {
     return '/dashboard';
   }
@@ -27,7 +31,7 @@ export const getDefaultRouteForUser = (user) => {
     return '/wishlist';
   }
 
-  if (user.uiRoles?.includes('mentor') || user.uiRoles?.includes('admin')) {
+  if (user.uiRoles?.includes('mentor')) {
     return '/resources';
   }
 

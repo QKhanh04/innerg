@@ -32,9 +32,9 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     const primaryAppRole = authUser?.appRoles?.[0] || 'Mentee';
 
     return {
-      name: authUser?.userName || 'Nguyen Van A',
+      name: authUser?.fullName || authUser?.email || 'InnerG User',
       position: primaryAppRole,
-      avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(authUser?.email || authUser?.userName || 'innerg-user')}`,
+      avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(authUser?.email || authUser?.fullName || 'innerg-user')}`,
     };
   }, [authUser]);
 
