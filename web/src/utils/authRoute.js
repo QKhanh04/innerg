@@ -3,15 +3,21 @@ export const canAccessRoute = (user, allowedRoles = []) => {
     return false;
   }
 
+  // No specific role required → allow any authenticated user
   if (allowedRoles.length === 0) {
     return true;
   }
 
-  if (user.uiRoles?.includes('admin')) {
+  // Normalise UI roles to lower‑case for case‑insensitive comparison
+  const normalizedRoles = (user.uiRoles || []).map((r) => r.toLowerCase());
+
+  // Admin (any case) always has access
+  if (normalizedRoles.includes('admin')) {
     return true;
   }
 
-  return allowedRoles.some((role) => user.uiRoles?.includes(role));
+  // Check if any of the allowedRoles (already lower‑case) exist in the normalized list
+  return allowedRoles.some((role) => normalizedRoles.includes(role));
 };
 
 export const getDefaultRouteForUser = (user) => {

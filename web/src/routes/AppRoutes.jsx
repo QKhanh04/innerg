@@ -12,6 +12,7 @@ import ForgotPassword from '../pages/auth/ForgotPassword/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
+import MembersPage from '../pages/hr/MembersPage/MembersPage';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
 
@@ -52,11 +53,15 @@ const AppRoutes = () => (
                     <Dashboard />
                 </ProtectedRoute>
             } />
-            
+
             <Route path="/wishlist" element={
                 <ProtectedRoute allowedRoles={['mentee', 'hr']}>
                     <LearningWishlist />
                 </ProtectedRoute>
+            } />
+
+            <Route path="/members" element={
+                <MembersPage />
             } />
 
             <Route path="/schedule" element={
