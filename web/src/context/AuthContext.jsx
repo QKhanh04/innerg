@@ -1,9 +1,8 @@
-import React, { createContext, useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import authService from '../services/authService';
 import { useCallback } from 'react';
 import { buildAuthUser } from '../utils/auth';
-
-export const AuthContext = createContext(null);
+import { AuthContext } from './AuthContextBase';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -19,8 +18,19 @@ export const AuthProvider = ({ children }) => {
     accessTokenRef.current = token;
   }, []);
   const setAuthenticatedUser = useCallback((data) => {
-    setAccessToken(data?.token ?? null);
-    setUser(data?.token ? buildAuthUser(data) : null);
+    if (!data) {
+      setAccessToken(null);
+      setUser(null);
+      return false;
+    }
+
+    if (!data?.token || data.requiresWorkspaceSelection || data.requiresTwoFactor) {
+      return false;
+    }
+
+    setAccessToken(data.token);
+    setUser(buildAuthUser(data));
+    return true;
   }, [setAccessToken]);
 
   // Initialize auth state on mount
@@ -39,9 +49,7 @@ export const AuthProvider = ({ children }) => {
         // Try to get new token from refresh token cookie
         const data = await authService.refreshToken();
         
-        if (data && data.token) {
-          setAuthenticatedUser(data);
-        }
+        setAuthenticatedUser(data);
       } catch {
         // No valid refresh token - user needs to login
         // This is normal for first visit or expired session
@@ -63,14 +71,40 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const loginWithGoogle = async (idToken) => {
-    const data = await authService.loginWithGoogle(idToken);
+  const loginWithGoogle = async (idToken, companyId = null) => {
+    const data = await authService.loginWithGoogle(idToken, companyId);
     setAuthenticatedUser(data);
     return data;
   };
 
-  const register = async (userData) => {
-    return await authService.register(userData);
+  const acceptInvite = async (userData) => {
+    const data = await authService.acceptInvite(userData);
+    setAuthenticatedUser(data);
+    return data;
+  };
+
+  const getInvite = async (token) => {
+    return await authService.getInvite(token);
+  };
+
+  const createInvite = async (inviteData) => {
+    return await authService.createInvite(inviteData);
+  };
+
+  const createBulkInvites = async (bulkInviteData) => {
+    return await authService.createBulkInvites(bulkInviteData);
+  };
+
+  const resendInvite = async (inviteId) => {
+    return await authService.resendInvite(inviteId);
+  };
+
+  const revokeInvite = async (inviteId) => {
+    return await authService.revokeInvite(inviteId);
+  };
+
+  const createCompany = async (companyData) => {
+    return await authService.createCompany(companyData);
   };
 
   const logout = async () => {
@@ -98,6 +132,26 @@ export const AuthProvider = ({ children }) => {
     return await authService.resetPassword(data);
   };
 
+  const sendTwoFactorEnableCode = async () => {
+    return await authService.sendTwoFactorEnableCode();
+  };
+
+  const enableTwoFactor = async (data) => {
+    return await authService.enableTwoFactor(data);
+  };
+
+  const disableTwoFactor = async (data) => {
+    return await authService.disableTwoFactor(data);
+  };
+
+  const getSessions = async () => {
+    return await authService.getSessions();
+  };
+
+  const revokeSession = async (sessionId) => {
+    return await authService.revokeSession(sessionId);
+  };
+
   const refreshAccessToken = async () => {
 
     try {
@@ -116,12 +170,23 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     loginWithGoogle,
-    register,
+    acceptInvite,
+    getInvite,
+    createInvite,
+    createBulkInvites,
+    resendInvite,
+    revokeInvite,
+    createCompany,
     logout,
     verifyEmail,
     resendVerificationEmail,
     forgotPassword,
     resetPassword,
+    sendTwoFactorEnableCode,
+    enableTwoFactor,
+    disableTwoFactor,
+    getSessions,
+    revokeSession,
     isAuthenticated: !!user,
     getAccessToken,
     refreshAccessToken,

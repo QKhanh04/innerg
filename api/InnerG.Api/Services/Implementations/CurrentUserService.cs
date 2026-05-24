@@ -27,11 +27,23 @@ namespace InnerG.Api.Services.Implementations
         {
             get
             {
-                var companyId = _httpContextAccessor.HttpContext?.User?.FindFirstValue("CompanyId");
+                var companyId = _httpContextAccessor.HttpContext?.User?.FindFirstValue("company_id")
+                    ?? _httpContextAccessor.HttpContext?.User?.FindFirstValue("CompanyId");
                 return string.IsNullOrEmpty(companyId) ? Guid.Empty : Guid.Parse(companyId);
             }
         }
 
         public bool IsAuthenticated => _httpContextAccessor.HttpContext?.User?.Identity?.IsAuthenticated ?? false;
+
+        public bool IsSystemAdmin
+        {
+            get
+            {
+                var user = _httpContextAccessor.HttpContext?.User;
+                return user?.IsInRole("SystemAdmin") == true ||
+                       user?.IsInRole("Admin") == true ||
+                       user?.IsInRole("SuperAdmin") == true;
+            }
+        }
     }
 }

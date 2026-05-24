@@ -5,6 +5,7 @@
         public class GoogleLoginRequest
         {
             public string IdToken { get; set; } = string.Empty;
+            public Guid? CompanyId { get; set; }
         }
         public class GoogleUserInfo
         {

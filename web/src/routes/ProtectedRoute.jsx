@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { canAccessRoute } from '../utils/authRoute';
+import { canAccessRoute, getDefaultRouteForUser } from '../utils/authRoute';
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { isAuthenticated, loading, user } = useAuth();
@@ -21,7 +21,8 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
   // If a specific role is required and user doesn't have it
   if (!canAccessRoute(user, allowedRoles)) {
-    return <Navigate to="/dashboard" replace />;
+    const fallback = getDefaultRouteForUser(user);
+    return <Navigate to={fallback === location.pathname ? '/resources' : fallback} replace />;
   }
 
   return children;

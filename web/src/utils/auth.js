@@ -29,6 +29,8 @@ const ROLE_MAP = {
   HRManager: 'hr',
   Admin: 'admin',
   SuperAdmin: 'admin',
+  SystemAdmin: 'admin',
+  Mentee: 'mentee',
 };
 
 export const normalizeRolesForUi = (roles = []) => {
@@ -44,6 +46,9 @@ export const buildAuthUser = (data) => {
     userId: payload?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || null,
     userName: data?.userName || payload?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || '',
     email: data?.email || payload?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || '',
+    fullName: data?.fullName || payload?.full_name || '',
+    companyId: data?.companyId || payload?.company_id || payload?.CompanyId || null,
+    companyName: data?.companyName || payload?.company_name || '',
     appRoles,
     uiRoles: normalizeRolesForUi(appRoles),
   };

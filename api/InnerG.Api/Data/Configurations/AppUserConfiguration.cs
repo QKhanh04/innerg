@@ -9,7 +9,9 @@ namespace InnerG.Api.Data.Configurations
         public void Configure(EntityTypeBuilder<AppUser> builder)
         {
             // Unique: (CompanyId, Email)
-            builder.HasIndex(x => new { x.CompanyId, x.Email }).IsUnique();
+            builder.HasIndex(x => new { x.CompanyId, x.Email })
+                .IsUnique()
+                .HasFilter("\"DeletedAt\" IS NULL");
 
             // Indexes
             builder.HasIndex(x => x.CompanyId);
