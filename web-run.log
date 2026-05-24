@@ -9,3 +9,14 @@
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.184.1:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.13.1:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.5:[1m5173[22m/[39m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.jsx, /src/index.css[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/lib/RoleContext.tsx, /src/index.css[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/context/AuthContext.jsx[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/context/AuthContext.jsx, /src/index.css[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Login/Login.jsx[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/Register/Register.jsx[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/auth/VerifyEmail/VerifyEmail.jsx[22m
+[2m2:06:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.jsx, /src/index.css[22m
+[2m2:06:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/context/AuthContext.jsx[22m Could not Fast Refresh ("AuthContext" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m2:06:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/routes/ProtectedRoute.jsx, /src/routes/PublicRoute.jsx, /src/pages/auth/VerifyEmail/VerifyEmail.jsx, /src/pages/auth/Login/Login.jsx, /src/pages/auth/Register/Register.jsx, /src/layouts/Header.tsx, /src/components/login/GoogleLoginButton.jsx, /src/lib/RoleContext.tsx, /src/pages/auth/ResetPassword/ResetPassword.jsx, /src/pages/auth/ForgotPassword/ForgotPassword.jsx[22m
+[2m2:07:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/routes/AppRoutes.jsx, /src/index.css[22m

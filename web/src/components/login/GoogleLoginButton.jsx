@@ -4,12 +4,15 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getErrorMessage } from '../../utils/errorHandler';
 import { toastService } from '../../services/toastService';
+import { getDefaultRouteFromRoles } from '../../utils/authRoute';
 const GoogleLoginButton = () => {
     const { loginWithGoogle } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [workspaceOptions, setWorkspaceOptions] = useState([]);
+    const [pendingIdToken, setPendingIdToken] = useState(null);
     const googleButtonRef = React.useRef(null);
 
     const handleGoogleLoginSuccess = useCallback(async (credentialResponse) => {
@@ -17,10 +20,16 @@ const GoogleLoginButton = () => {
         setError(null);
         try {
             const idToken = credentialResponse.credential;
-            await loginWithGoogle(idToken);
+            const data = await loginWithGoogle(idToken);
+            if (data.requiresWorkspaceSelection) {
+                setPendingIdToken(idToken);
+                setWorkspaceOptions(data.workspaces || []);
+                toastService.success('Select a workspace to continue.');
+                return;
+            }
             toastService.success('Logged in successfully!');
             
-            const from = location.state?.from?.pathname || '/';
+            const from = location.state?.from?.pathname || getDefaultRouteFromRoles(data.roles || []);
             navigate(from, { replace: true });
         } catch (err) {
             console.error('Google login error:', err);
@@ -31,6 +40,27 @@ const GoogleLoginButton = () => {
             setIsLoading(false);
         }
     }, [loginWithGoogle, navigate, location]);
+
+    const handleWorkspaceSelect = useCallback(async (companyId) => {
+        if (!pendingIdToken) return;
+
+        setIsLoading(true);
+        setError(null);
+        try {
+            const data = await loginWithGoogle(pendingIdToken, companyId);
+            setWorkspaceOptions([]);
+            setPendingIdToken(null);
+            toastService.success('Logged in successfully!');
+            const from = location.state?.from?.pathname || getDefaultRouteFromRoles(data.roles || []);
+            navigate(from, { replace: true });
+        } catch (err) {
+            const errorMsg = getErrorMessage(err);
+            setError(errorMsg);
+            toastService.error(errorMsg);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loginWithGoogle, pendingIdToken, navigate, location]);
 
     const handleGoogleLoginError = useCallback((err) => {
         console.error('Google login failed:', err);
@@ -51,6 +81,26 @@ const GoogleLoginButton = () => {
 
     return (
         <div className="w-full">
+            {workspaceOptions.length > 0 && (
+                <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="mb-2 text-sm font-semibold text-slate-900">Choose Google workspace</p>
+                    <div className="space-y-2">
+                        {workspaceOptions.map((workspace) => (
+                            <button
+                                key={workspace.companyId}
+                                type="button"
+                                onClick={() => handleWorkspaceSelect(workspace.companyId)}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-left hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+                                disabled={isLoading}
+                            >
+                                <span className="block text-sm font-semibold text-slate-900">{workspace.companyName}</span>
+                                <span className="block text-xs text-slate-500">{workspace.emailDomain}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Hidden Google Login Button */}
             <div ref={googleButtonRef} className="hidden">
                 <GoogleLogin

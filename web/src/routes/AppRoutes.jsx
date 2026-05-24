@@ -1,18 +1,23 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
 import AppLayout from '../layouts/AppLayout';
 
 import Login from '../pages/auth/Login/Login';
-import Register from '../pages/auth/Register/Register';
+import AcceptInvite from '../pages/auth/AcceptInvite/AcceptInvite';
 import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
 import ForgotPassword from '../pages/auth/ForgotPassword/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
+
+const LegacyRegisterRedirect = () => {
+    const location = useLocation();
+    return <Navigate to={`/accept-invite${location.search}`} replace />;
+};
 
 const AppRoutes = () => (
     <Routes>
@@ -23,11 +28,13 @@ const AppRoutes = () => (
             </PublicRoute>
         } />
 
-        <Route path="/register" element={
+        <Route path="/accept-invite" element={
             <PublicRoute>
-                <Register />
+                <AcceptInvite />
             </PublicRoute>
         } />
+
+        <Route path="/register" element={<LegacyRegisterRedirect />} />
 
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={

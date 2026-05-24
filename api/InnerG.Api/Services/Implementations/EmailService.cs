@@ -1,11 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Mail;
-using System.Threading.Tasks;
-using InnerG.Api.Services.Interfaces;
 using InnerG.Api.Exceptions;
+using InnerG.Api.Services.Interfaces;
 
 namespace InnerG.Api.Services.Implementations
 {
@@ -18,57 +14,32 @@ namespace InnerG.Api.Services.Implementations
             _config = config;
         }
 
-        public async Task SendEmailConfirmationAsync(string toEmail, string subject, string html)
+        public Task SendEmailConfirmationAsync(string toEmail, string subject, string html)
         {
-            string host = _config["SMTP_HOST"]
-                ?? throw new ConfigurationException("SMTP_HOST");
-
-            string username = _config["SMTP_USERNAME"]
-                ?? throw new ConfigurationException("SMTP_USERNAME");
-
-            string password = _config["SMTP_PASSWORD"]
-                ?? throw new ConfigurationException("SMTP_PASSWORD");
-
-            string fromName = _config["SMTP_FROM_NAME"] ?? "Support";
-
-            try
-            {
-                var message = new MailMessage
-                {
-                    Subject = subject,
-                    Body = html,
-                    IsBodyHtml = true,
-                    From = new MailAddress(username, fromName)
-                };
-
-                message.To.Add(toEmail);
-
-                using var smtp = new SmtpClient(host, 587)
-                {
-                    Credentials = new NetworkCredential(username, password),
-                    EnableSsl = true
-                };
-
-                await smtp.SendMailAsync(message);
-            }
-            catch (SmtpException)
-            {
-                throw new ExternalServiceException("Failed to send confirmation email");
-            }
+            return SendHtmlEmailAsync(toEmail, subject, html);
         }
 
-        public async Task SendPasswordResetAsync(string toEmail, string subject, string html)
+        public Task SendPasswordResetAsync(string toEmail, string subject, string html)
         {
-            string host = _config["SMTP_HOST"]
-                ?? throw new ConfigurationException("SMTP_HOST");
+            return SendHtmlEmailAsync(toEmail, subject, html);
+        }
 
-            string username = _config["SMTP_USERNAME"]
-                ?? throw new ConfigurationException("SMTP_USERNAME");
+        public Task SendInviteAsync(string toEmail, string subject, string html)
+        {
+            return SendHtmlEmailAsync(toEmail, subject, html);
+        }
 
-            string password = _config["SMTP_PASSWORD"]
-                ?? throw new ConfigurationException("SMTP_PASSWORD");
+        public Task SendTwoFactorCodeAsync(string toEmail, string subject, string html)
+        {
+            return SendHtmlEmailAsync(toEmail, subject, html);
+        }
 
-            string fromName = _config["SMTP_FROM_NAME"] ?? "Support";
+        private async Task SendHtmlEmailAsync(string toEmail, string subject, string html)
+        {
+            var host = _config["SMTP_HOST"] ?? throw new ConfigurationException("SMTP_HOST");
+            var username = _config["SMTP_USERNAME"] ?? throw new ConfigurationException("SMTP_USERNAME");
+            var password = _config["SMTP_PASSWORD"] ?? throw new ConfigurationException("SMTP_PASSWORD");
+            var fromName = _config["SMTP_FROM_NAME"] ?? "Support";
 
             try
             {
@@ -92,7 +63,7 @@ namespace InnerG.Api.Services.Implementations
             }
             catch (SmtpException)
             {
-                throw new ExternalServiceException("Failed to send password reset email");
+                throw new ExternalServiceException("Failed to send email");
             }
         }
     }

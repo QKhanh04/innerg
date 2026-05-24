@@ -13,3 +13,41 @@ export const canAccessRoute = (user, allowedRoles = []) => {
 
   return allowedRoles.some((role) => user.uiRoles?.includes(role));
 };
+
+export const getDefaultRouteForUser = (user) => {
+  if (!user) {
+    return '/login';
+  }
+
+  if (user.uiRoles?.includes('mentee')) {
+    return '/dashboard';
+  }
+
+  if (user.uiRoles?.includes('hr')) {
+    return '/wishlist';
+  }
+
+  if (user.uiRoles?.includes('mentor') || user.uiRoles?.includes('admin')) {
+    return '/resources';
+  }
+
+  return '/resources';
+};
+
+export const getDefaultRouteFromRoles = (roles = []) => {
+  const map = {
+    Mentee: 'mentee',
+    Mentor: 'mentor',
+    HR: 'hr',
+    HRManager: 'hr',
+    Admin: 'admin',
+    SuperAdmin: 'admin',
+    SystemAdmin: 'admin',
+    User: 'mentee',
+    Trainer: 'mentor',
+  };
+
+  return getDefaultRouteForUser({
+    uiRoles: roles.map((role) => map[role]).filter(Boolean),
+  });
+};

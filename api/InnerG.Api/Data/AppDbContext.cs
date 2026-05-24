@@ -25,6 +25,7 @@ namespace InnerG.Api.Data
 
         public DbSet<Company> Companies => Set<Company>();
         public DbSet<UserSession> UserSessions => Set<UserSession>();
+        public DbSet<Invite> Invites => Set<Invite>();
         public DbSet<Department> Departments => Set<Department>();
         public DbSet<Skill> Skills => Set<Skill>();
         public DbSet<UserSkill> UserSkills => Set<UserSkill>();
@@ -78,16 +79,10 @@ namespace InnerG.Api.Data
             // Global configurations
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
-                // Soft Delete Filter
-                if (typeof(ISoftDelete).IsAssignableFrom(entityType.ClrType))
+                if (typeof(ISoftDelete).IsAssignableFrom(entityType.ClrType) ||
+                    typeof(IMultiTenant).IsAssignableFrom(entityType.ClrType))
                 {
-                    builder.Entity(entityType.ClrType).HasQueryFilter(GetSoftDeleteFilter(entityType.ClrType));
-                }
-
-                // Multi-tenancy Filter
-                if (typeof(IMultiTenant).IsAssignableFrom(entityType.ClrType))
-                {
-                    builder.Entity(entityType.ClrType).HasQueryFilter(GetTenantFilter(entityType.ClrType));
+                    builder.Entity(entityType.ClrType).HasQueryFilter(GetGlobalFilter(entityType.ClrType));
                 }
 
                 // Global Enum to String Conversion
@@ -145,24 +140,30 @@ namespace InnerG.Api.Data
 
             return await base.SaveChangesAsync(cancellationToken);
         }
-        //sdf
-        private LambdaExpression GetSoftDeleteFilter(Type type)
+        private LambdaExpression GetGlobalFilter(Type type)
         {
             var parameter = Expression.Parameter(type, "it");
-            var property = Expression.Property(parameter, nameof(ISoftDelete.DeletedAt));
-            var nullValue = Expression.Constant(null, typeof(DateTime?));
-            var comparison = Expression.Equal(property, nullValue);
-            return Expression.Lambda(comparison, parameter);
-        }
+            Expression? filter = null;
 
-        private LambdaExpression GetTenantFilter(Type type)
-        {
-            var parameter = Expression.Parameter(type, "it");
-            var property = Expression.Property(parameter, nameof(IMultiTenant.CompanyId));
-            var tenantId = Expression.Property(Expression.Constant(this), nameof(CurrentUserService));
-            var tenantIdValue = Expression.Property(tenantId, nameof(ICurrentUserService.CompanyId));
-            var comparison = Expression.Equal(property, tenantIdValue);
-            return Expression.Lambda(comparison, parameter);
+            if (typeof(ISoftDelete).IsAssignableFrom(type))
+            {
+                var deletedAt = Expression.Property(parameter, nameof(ISoftDelete.DeletedAt));
+                var notDeleted = Expression.Equal(deletedAt, Expression.Constant(null, typeof(DateTime?)));
+                filter = notDeleted;
+            }
+
+            if (typeof(IMultiTenant).IsAssignableFrom(type))
+            {
+                var companyId = Expression.Property(parameter, nameof(IMultiTenant.CompanyId));
+                var currentUserService = Expression.Property(Expression.Constant(this), nameof(CurrentUserService));
+                var tenantId = Expression.Property(currentUserService, nameof(ICurrentUserService.CompanyId));
+                var isSystemAdmin = Expression.Property(currentUserService, nameof(ICurrentUserService.IsSystemAdmin));
+                var tenantMatches = Expression.Equal(companyId, tenantId);
+                var tenantFilter = Expression.OrElse(isSystemAdmin, tenantMatches);
+                filter = filter == null ? tenantFilter : Expression.AndAlso(filter, tenantFilter);
+            }
+
+            return Expression.Lambda(filter ?? Expression.Constant(true), parameter);
         }
     }
 }
