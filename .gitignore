@@ -1,0 +1,8 @@
+# Build artifacts
+bin/
+obj/
+api-build-temp/
+
+# Run logs
+*.log
+*.err.log
