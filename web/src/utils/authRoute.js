@@ -39,12 +39,7 @@ export const getDefaultRouteFromRoles = (roles = []) => {
     Mentee: 'mentee',
     Mentor: 'mentor',
     HR: 'hr',
-    HRManager: 'hr',
-    Admin: 'admin',
-    SuperAdmin: 'admin',
     SystemAdmin: 'admin',
-    User: 'mentee',
-    Trainer: 'mentor',
   };
 
   return getDefaultRouteForUser({

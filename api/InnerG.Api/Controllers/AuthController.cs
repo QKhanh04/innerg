@@ -56,7 +56,7 @@ namespace InnerG.Api.Controllers
         }
 
         [HttpPost("companies")]
-        [Authorize(Roles = "SystemAdmin,Admin,SuperAdmin")]
+        [Authorize(Roles = "SystemAdmin")]
         public async Task<IActionResult> CreateCompanyAsync([FromBody] CreateCompanyRequest request)
         {
             ValidationHelper.FromModelState(ModelState);
@@ -69,7 +69,7 @@ namespace InnerG.Api.Controllers
         }
 
         [HttpPost("invites")]
-        [Authorize(Roles = "HR,SystemAdmin,HRManager,Admin,SuperAdmin")]
+        [Authorize(Roles = "HR,SystemAdmin")]
         public async Task<IActionResult> CreateInviteAsync([FromBody] CreateInviteRequest request)
         {
             ValidationHelper.FromModelState(ModelState);
@@ -87,7 +87,7 @@ namespace InnerG.Api.Controllers
         }
 
         [HttpPost("invites/bulk")]
-        [Authorize(Roles = "HR,SystemAdmin,HRManager,Admin,SuperAdmin")]
+        [Authorize(Roles = "HR,SystemAdmin")]
         public async Task<IActionResult> CreateBulkInvitesAsync([FromBody] BulkInviteRequest request)
         {
             ValidationHelper.FromModelState(ModelState);
@@ -105,7 +105,7 @@ namespace InnerG.Api.Controllers
         }
 
         [HttpPost("invites/{inviteId:guid}/resend")]
-        [Authorize(Roles = "HR,SystemAdmin,HRManager,Admin,SuperAdmin")]
+        [Authorize(Roles = "HR,SystemAdmin")]
         public async Task<IActionResult> ResendInviteAsync(Guid inviteId)
         {
             var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -122,7 +122,7 @@ namespace InnerG.Api.Controllers
         }
 
         [HttpPost("invites/{inviteId:guid}/revoke")]
-        [Authorize(Roles = "HR,SystemAdmin,HRManager,Admin,SuperAdmin")]
+        [Authorize(Roles = "HR,SystemAdmin")]
         public async Task<IActionResult> RevokeInviteAsync(Guid inviteId)
         {
             var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -345,7 +345,7 @@ namespace InnerG.Api.Controllers
 
         private bool IsSystemAdmin()
         {
-            return User.IsInRole("SystemAdmin") || User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+            return User.IsInRole("SystemAdmin");
         }
     }
 }

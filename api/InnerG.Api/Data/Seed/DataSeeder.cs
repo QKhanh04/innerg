@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,22 +7,28 @@ namespace InnerG.Api.Data.Seed
 {
     public static class DataSeeder
     {
+        private const string SeedPassword = "InnerG123";
+
         public static async Task SeedAsync(IServiceProvider serviceProvider)
         {
             using var context = serviceProvider.GetRequiredService<AppDbContext>();
             var roleManager = serviceProvider.GetRequiredService<RoleManager<AppRole>>();
+            var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
 
-            // 1. Seed Roles
-            string[] roles = { AuthRoles.SystemAdmin, AuthRoles.HR, AuthRoles.Mentor, AuthRoles.Mentee, "SuperAdmin", "Admin", "HRManager", "Trainer", "User" };
+            var roles = new[]
+            {
+                AuthRoles.SystemAdmin,
+                AuthRoles.HR,
+                AuthRoles.Mentor,
+                AuthRoles.Mentee
+            };
+
             foreach (var roleName in roles)
             {
                 if (!await roleManager.RoleExistsAsync(roleName))
-                {
                     await roleManager.CreateAsync(new AppRole(roleName));
-                }
             }
 
-            // 2. Seed Default Company
             var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync();
             if (company == null)
             {
@@ -35,13 +37,26 @@ namespace InnerG.Api.Data.Seed
                     Id = Guid.NewGuid(),
                     Name = "InnerG Corporation",
                     Domain = "innerg.com",
+                    Timezone = "Asia/Ho_Chi_Minh",
+                    Language = "vi",
                     IsActive = true
                 };
+
                 context.Companies.Add(company);
                 await context.SaveChangesAsync();
             }
 
-            // 3. Seed Default Subscription Plan
+            var seedUsers = new[]
+            {
+                new SeedUserDefinition("systemadmin@innerg.com", "System Administrator", new[] { AuthRoles.SystemAdmin }),
+                new SeedUserDefinition("hr@innerg.com", "Human Resources", new[] { AuthRoles.HR }),
+                new SeedUserDefinition("mentor@innerg.com", "Mentor User", new[] { AuthRoles.Mentor }),
+                new SeedUserDefinition("mentee@innerg.com", "Mentee User", new[] { AuthRoles.Mentee })
+            };
+
+            foreach (var seedUser in seedUsers)
+                await EnsureSeedUserAsync(userManager, company, seedUser);
+
             if (!await context.SubscriptionPlans.AnyAsync())
             {
                 context.SubscriptionPlans.Add(new SubscriptionPlan
@@ -52,8 +67,102 @@ namespace InnerG.Api.Data.Seed
                     BillingCycle = BillingCycle.Monthly,
                     IsActive = true
                 });
+
                 await context.SaveChangesAsync();
             }
         }
+
+        private static async Task EnsureSeedUserAsync(
+            UserManager<AppUser> userManager,
+            Company company,
+            SeedUserDefinition definition)
+        {
+            var normalizedEmail = definition.Email.Trim().ToLowerInvariant();
+            var expectedUserName = BuildUserName(normalizedEmail, company.Id);
+
+            var user = await userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.CompanyId == company.Id && x.Email == normalizedEmail && x.DeletedAt == null);
+
+            if (user == null)
+            {
+                user = new AppUser
+                {
+                    CompanyId = company.Id,
+                    UserName = expectedUserName,
+                    Email = normalizedEmail,
+                    FullName = definition.FullName,
+                    EmailConfirmed = true,
+                    IsActive = true
+                };
+
+                var createResult = await userManager.CreateAsync(user, SeedPassword);
+                if (!createResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"Failed to seed user '{normalizedEmail}': {string.Join("; ", createResult.Errors.Select(x => x.Description))}");
+                }
+            }
+            else
+            {
+                var changed = false;
+
+                if (!string.Equals(user.UserName, expectedUserName, StringComparison.Ordinal))
+                {
+                    user.UserName = expectedUserName;
+                    changed = true;
+                }
+
+                if (!string.Equals(user.FullName, definition.FullName, StringComparison.Ordinal))
+                {
+                    user.FullName = definition.FullName;
+                    changed = true;
+                }
+
+                if (!user.EmailConfirmed)
+                {
+                    user.EmailConfirmed = true;
+                    changed = true;
+                }
+
+                if (!user.IsActive)
+                {
+                    user.IsActive = true;
+                    changed = true;
+                }
+
+                if (changed)
+                {
+                    var updateResult = await userManager.UpdateAsync(user);
+                    if (!updateResult.Succeeded)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to update seed user '{normalizedEmail}': {string.Join("; ", updateResult.Errors.Select(x => x.Description))}");
+                    }
+                }
+            }
+
+            var currentRoles = await userManager.GetRolesAsync(user);
+            var missingRoles = definition.Roles
+                .Except(currentRoles, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (missingRoles.Length == 0)
+                return;
+
+            var addRolesResult = await userManager.AddToRolesAsync(user, missingRoles);
+            if (!addRolesResult.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Failed to assign roles to seed user '{normalizedEmail}': {string.Join("; ", addRolesResult.Errors.Select(x => x.Description))}");
+            }
+        }
+
+        private static string BuildUserName(string email, Guid companyId)
+        {
+            return $"{email.Trim().ToLowerInvariant()}.{companyId:N}";
+        }
+
+        private sealed record SeedUserDefinition(string Email, string FullName, string[] Roles);
     }
 }

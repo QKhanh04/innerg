@@ -22,13 +22,8 @@ export const parseJwtPayload = (token) => {
 };
 
 const ROLE_MAP = {
-  User: 'mentee',
-  Trainer: 'mentor',
   Mentor: 'mentor',
   HR: 'hr',
-  HRManager: 'hr',
-  Admin: 'admin',
-  SuperAdmin: 'admin',
   SystemAdmin: 'admin',
   Mentee: 'mentee',
 };
