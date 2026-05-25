@@ -80,7 +80,9 @@ const AppRoutes = () => (
             } />
 
             <Route path="/members" element={
+                <ProtectedRoute allowedRoles={['hr']}>
                     <MembersPage />
+                </ProtectedRoute>
             } />
 
             <Route path="/schedule" element={

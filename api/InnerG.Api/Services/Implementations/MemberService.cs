@@ -33,6 +33,25 @@ namespace InnerG.Api.Services.Implementations
                 .Include(u => u.Department)
                 .AsQueryable();
 
+            var company = await _context.Companies.FindAsync(companyId);
+            if (company != null && !string.IsNullOrEmpty(company.Domain))
+            {
+                var excludedRoleNames = new[] { AuthRoles.HR, AuthRoles.SystemAdmin, "Admin", "SuperAdmin" };
+                var excludedRoleIds = await _context.Roles
+                    .Where(r => excludedRoleNames.Contains(r.Name))
+                    .Select(r => r.Id)
+                    .ToListAsync();
+
+                var excludedUserIds = await _context.UserRoles
+                    .Where(ur => excludedRoleIds.Contains(ur.RoleId))
+                    .Select(ur => ur.UserId)
+                    .ToListAsync();
+                
+                var domainSuffix = "@" + company.Domain.ToLower();
+                usersQuery = usersQuery.Where(u => 
+                    !((u.Email == null || !u.Email.ToLower().EndsWith(domainSuffix)) || excludedUserIds.Contains(u.Id)));
+            }
+
             if (!string.IsNullOrEmpty(query.Search))
             {
                 var lowerSearch = query.Search.ToLower();

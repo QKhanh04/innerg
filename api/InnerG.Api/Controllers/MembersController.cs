@@ -11,6 +11,7 @@ namespace InnerG.Api.Controllers
 {
     [ApiController]
     [Route("api/hr/members")]
+    [Authorize(Roles = "HR")]
     public class MembersController : ControllerBase
     {
         private readonly IMemberService _memberService;
