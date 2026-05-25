@@ -51,9 +51,7 @@ namespace InnerG.Api.Data.Seed
                 new SeedUserDefinition("systemadmin@innerg.com", "System Administrator", new[] { AuthRoles.SystemAdmin }),
                 new SeedUserDefinition("hr@innerg.com", "Human Resources", new[] { AuthRoles.HR }),
                 new SeedUserDefinition("mentor@innerg.com", "Mentor User", new[] { AuthRoles.Mentor }),
-                new SeedUserDefinition("mentee@innerg.com", "Mentee User", new[] { AuthRoles.Mentee }),
-                new SeedUserDefinition("dangcongquockhanh@gmail.com", "Dang Cong Quoc Khanh", new[] { AuthRoles.Mentee }),
-                new SeedUserDefinition("khanhhoakt2k4@gmail.com", "Khanh Hoa", new[] { AuthRoles.Mentee })
+                new SeedUserDefinition("mentee@innerg.com", "Mentee User", new[] { AuthRoles.Mentee })
             };
 
             foreach (var seedUser in seedUsers)

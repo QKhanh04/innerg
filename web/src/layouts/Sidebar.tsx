@@ -93,22 +93,6 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-slate-100 space-y-3">
-        <div className="px-3">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
-            Dev Mode: Switch Role
-          </label>
-          <select
-            value={role}
-            onChange={(e) => handleRoleChange(e.target.value as Role)}
-            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2"
-          >
-            <option value="mentee">Mentee (Learner)</option>
-            <option value="mentor">Mentor (Teacher)</option>
-            <option value="hr">HR</option>
-            <option value="admin">System Admin</option>
-          </select>
-        </div>
-
         <Link
           to="/settings"
           className="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"

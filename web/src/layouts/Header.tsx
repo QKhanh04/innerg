@@ -12,7 +12,7 @@ interface HeaderProps {
 export function Header({ title }: HeaderProps) {
   const navigate = useNavigate();
   const { user: roleUser } = useRole();
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, logout } = useAuth() as any;
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const displayName = authUser?.fullName || authUser?.email || roleUser.name;
