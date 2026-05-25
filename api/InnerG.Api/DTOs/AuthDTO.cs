@@ -57,6 +57,7 @@ namespace InnerG.Api.DTOs
         public string Language { get; set; } = "vi";
         public string HrEmail { get; set; } = string.Empty;
         public string? HrFullName { get; set; }
+        public bool AllowExternalHrEmail { get; set; }
     }
 
     public class CreateInviteRequest
@@ -119,6 +120,8 @@ namespace InnerG.Api.DTOs
         public DateTime ExpiresAt { get; set; }
         public IList<string> Roles { get; set; } = new List<string>();
         public string InviteLink { get; set; } = string.Empty;
+        public bool EmailSent { get; set; }
+        public string EmailDeliveryMessage { get; set; } = string.Empty;
     }
 
     public class CompanyResponse

@@ -11,6 +11,7 @@ import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
 import ForgotPassword from '../pages/auth/ForgotPassword/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
 import AdminDashboard from '../pages/admin/AdminDashboard/AdminDashboard';
+import CompanyDetail from '../pages/admin/CompanyDetail/CompanyDetail';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import MembersPage from '../pages/hr/MembersPage/MembersPage';
@@ -44,9 +45,7 @@ const AppRoutes = () => (
         } />
 
         <Route path="/accept-invite" element={
-            <PublicRoute>
-                <AcceptInvite />
-            </PublicRoute>
+            <AcceptInvite />
         } />
 
         <Route path="/register" element={<LegacyRegisterRedirect />} />
@@ -64,6 +63,11 @@ const AppRoutes = () => (
             <Route path="/admin" element={
                 <ProtectedRoute allowedRoles={['admin']}>
                     <AdminDashboard />
+                </ProtectedRoute>
+            } />
+            <Route path="/admin/companies/:companyId" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <CompanyDetail />
                 </ProtectedRoute>
             } />
 
