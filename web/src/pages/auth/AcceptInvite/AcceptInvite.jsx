@@ -10,7 +10,7 @@ const AcceptInvite = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('token') || '';
-  const { acceptInvite, getInvite } = useAuth();
+  const { acceptInvite, getInvite, isAuthenticated, user, logout } = useAuth();
 
   const [invite, setInvite] = useState(null);
   const [inviteLoading, setInviteLoading] = useState(true);
@@ -92,6 +92,11 @@ const AcceptInvite = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (isAuthenticated) {
+      toastService.error('Please log out before activating this invite.');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -157,6 +162,22 @@ const AcceptInvite = () => {
             </span>
           </div>
         </div>
+
+        {isAuthenticated && (
+          <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-semibold">You are currently signed in.</p>
+            <p className="mt-1">
+              This invite is for {invite?.email}. Log out from {user?.email || 'the current account'} before activating it.
+            </p>
+            <button
+              type="button"
+              onClick={logout}
+              className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-amber-700"
+            >
+              Logout current account
+            </button>
+          </div>
+        )}
 
         {globalError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -243,9 +264,9 @@ const AcceptInvite = () => {
           <button
             type="submit"
             className="w-full bg-primary hover:bg-[#11d4a3] text-deep-blue font-bold py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20"
-            disabled={isLoading}
+            disabled={isLoading || isAuthenticated}
           >
-            {isLoading ? 'Activating account...' : 'Activate account'}
+            {isLoading ? 'Activating account...' : isAuthenticated ? 'Logout to activate invite' : 'Activate account'}
           </button>
         </form>
 
