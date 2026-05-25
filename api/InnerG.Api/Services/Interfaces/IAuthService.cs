@@ -7,7 +7,7 @@ namespace InnerG.Api.Services.Interfaces
     {
         Task<AuthResponse> BootstrapCompanyAsync(BootstrapCompanyRequest request);
         Task<CompanyOnboardingResponse> CreateCompanyAsync(CreateCompanyRequest request, string systemAdminUserId);
-        Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin);
+        Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin, bool allowExternalEmail = false);
         Task<BulkInviteResponse> CreateBulkInvitesAsync(BulkInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin);
         Task<InviteResponse> ResendInviteAsync(Guid inviteId, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin);
         Task RevokeInviteAsync(Guid inviteId, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin);

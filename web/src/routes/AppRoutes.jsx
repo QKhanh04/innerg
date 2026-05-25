@@ -11,8 +11,10 @@ import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
 import ForgotPassword from '../pages/auth/ForgotPassword/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword/ResetPassword';
 import AdminDashboard from '../pages/admin/AdminDashboard/AdminDashboard';
+import CompanyDetail from '../pages/admin/CompanyDetail/CompanyDetail';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
+import MembersPage from '../pages/hr/MembersPage/MembersPage';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
 import Explore from '../pages/common/Explore/Explore';
@@ -44,9 +46,7 @@ const AppRoutes = () => (
         } />
 
         <Route path="/accept-invite" element={
-            <PublicRoute>
-                <AcceptInvite />
-            </PublicRoute>
+            <AcceptInvite />
         } />
 
         <Route path="/register" element={<LegacyRegisterRedirect />} />
@@ -66,17 +66,26 @@ const AppRoutes = () => (
                     <AdminDashboard />
                 </ProtectedRoute>
             } />
+            <Route path="/admin/companies/:companyId" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <CompanyDetail />
+                </ProtectedRoute>
+            } />
 
             <Route path="/dashboard" element={
                 <ProtectedRoute allowedRoles={['mentee']}>
                     <Dashboard />
                 </ProtectedRoute>
             } />
-            
+
             <Route path="/wishlist" element={
                 <ProtectedRoute allowedRoles={['mentee', 'hr']}>
                     <LearningWishlist />
                 </ProtectedRoute>
+            } />
+
+            <Route path="/members" element={
+                    <MembersPage />
             } />
 
             <Route path="/schedule" element={
