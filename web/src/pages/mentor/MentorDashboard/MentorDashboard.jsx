@@ -21,7 +21,11 @@ import {
   Settings2,
   CalendarDays,
   BookmarkCheck,
-  CheckCircle2
+  CheckCircle2,
+  QrCode,
+  Scan,
+  Copy,
+  Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
@@ -30,10 +34,30 @@ import { useNavigate } from 'react-router-dom';
 export default function MentorDashboard() {
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
+  const [activeLaunchSession, setActiveLaunchSession] = useState(null);
+  const [rollCallList, setRollCallList] = useState([
+    { name: 'Jane Doe', avatar: 'https://i.pravatar.cc/150?u=janedoe', position: 'Junior Frontend Developer', attended: true },
+    { name: 'Michael Scott', avatar: 'https://i.pravatar.cc/150?u=michael', position: 'Sales Lead', attended: false },
+    { name: 'Pam Beesly', avatar: 'https://i.pravatar.cc/150?u=pam', position: 'Designer', attended: true }
+  ]);
 
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleConfirmAttendance = () => {
+    const attendees = rollCallList.filter(s => s.attended).map(s => s.name);
+    if (attendees.length === 0) {
+      showToast("No students checked in!");
+      return;
+    }
+    showToast(`Roll call success! Awarded +${activeLaunchSession?.points || 150} points to ${attendees.length} attendees! 🎁`);
+    setActiveLaunchSession(null);
+  };
+
+  const toggleAttendance = (idx) => {
+    setRollCallList(prev => prev.map((std, i) => i === idx ? { ...std, attended: !std.attended } : std));
   };
 
   // Mock Mentor General Stats
@@ -132,6 +156,7 @@ export default function MentorDashboard() {
       duration: '90 mins',
       totalSlots: 20,
       takenSlots: 15,
+      points: 150,
       status: 'PUBLISHED',
       rating: '4.9 (12 reviews)',
       image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=300&auto=format&fit=crop'
@@ -147,6 +172,7 @@ export default function MentorDashboard() {
       duration: '60 mins',
       totalSlots: 30,
       takenSlots: 30, // Full
+      points: 80,
       status: 'PUBLISHED',
       rating: '5.0 (28 reviews)',
       image: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=300&auto=format&fit=crop'
@@ -162,6 +188,7 @@ export default function MentorDashboard() {
       duration: '180 mins',
       totalSlots: 12,
       takenSlots: 11,
+      points: 200,
       status: 'DRAFT',
       rating: 'N/A',
       image: 'https://images.unsplash.com/photo-1561070791-26c113006238?q=80&w=300&auto=format&fit=crop'
@@ -483,7 +510,7 @@ export default function MentorDashboard() {
 
                       <div className="flex gap-2 pt-1">
                         <button 
-                          onClick={() => showToast(`Launching live classroom for "${cls.title}"...`)}
+                          onClick={() => setActiveLaunchSession(cls)}
                           className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
                         >
                           <ExternalLink className="size-3" />
@@ -500,6 +527,193 @@ export default function MentorDashboard() {
         </div>
 
       </div>
+
+      {/* 5. ONLINE / OFFLINE LAUNCH SESSION MODALS */}
+      <AnimatePresence>
+        {activeLaunchSession && (
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-[200] flex items-center justify-center p-4">
+            {activeLaunchSession.format === 'Online' ? (
+              /* A. ONLINE MEETING LAUNCHER MODAL */
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-100 text-center space-y-6 text-left"
+              >
+                <div className="size-16 bg-indigo-50 text-indigo-650 rounded-full flex items-center justify-center mx-auto border border-indigo-100 animate-bounce">
+                  <Video className="size-8 stroke-[2.5]" />
+                </div>
+
+                <div className="space-y-2 text-center">
+                  <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Virtual Classroom Live!</h3>
+                  <p className="text-slate-500 text-xs leading-relaxed">
+                    Your online training session for <strong>"{activeLaunchSession.title}"</strong> is successfully launched.
+                  </p>
+                </div>
+
+                {/* Virtual Meeting Details */}
+                <div className="p-4.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 text-left">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block">Meeting URL Platform</span>
+                    <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className="size-2 bg-emerald-500 rounded-full animate-ping" />
+                      {activeLaunchSession.formatDetail} (Zoom Meeting Room)
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      readOnly 
+                      value="https://zoom.us/j/9876543210?pwd=innergActive" 
+                      className="flex-1 bg-white border border-slate-250 px-3 py-2 rounded-xl text-[10px] font-bold text-slate-650 outline-none select-all" 
+                    />
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText("https://zoom.us/j/9876543210?pwd=innergActive");
+                        showToast("Zoom link copied to clipboard! 📋");
+                      }}
+                      className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-650 rounded-xl transition-colors cursor-pointer"
+                    >
+                      <Copy className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2.5 pt-2">
+                  <a 
+                    href="https://zoom.us/j/9876543210?pwd=innergActive"
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      showToast("Redirecting to Zoom Classroom...");
+                      setActiveLaunchSession(null);
+                    }}
+                    className="w-full bg-[#00C896] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all text-center flex items-center justify-center gap-2 shadow-sm"
+                  >
+                    <ExternalLink className="size-4 stroke-[3]" />
+                    Join Classroom as Host
+                  </a>
+                  <button 
+                    onClick={() => setActiveLaunchSession(null)}
+                    className="w-full bg-white hover:bg-slate-50 text-slate-500 border border-slate-200 py-3 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98]"
+                  >
+                    Close & Keep Active
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              /* B. OFFLINE ROLL CALL & QR CODE CHECK-IN MODAL */
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-3xl p-6 lg:p-8 max-w-3xl w-full shadow-2xl border border-slate-100 flex flex-col gap-6 text-left"
+              >
+                <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                      <BookmarkCheck className="size-5.5 text-emerald-650" />
+                      Offline Attendance Roll Call
+                    </h3>
+                    <p className="text-slate-500 text-xs leading-normal">
+                      Class: <strong>"{activeLaunchSession.title}"</strong> ({activeLaunchSession.formatDetail})
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setActiveLaunchSession(null)}
+                    className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-650 rounded-lg cursor-pointer"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  
+                  {/* Left panel: Simulated QR Code */}
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-center space-y-4 flex flex-col items-center">
+                    <span className="inline-flex items-center gap-1.5 text-[8px] font-extrabold text-rose-600 bg-rose-50 border border-rose-100 px-2.5 py-0.5 rounded-full uppercase tracking-widest">
+                      <span className="size-1.5 bg-rose-500 rounded-full animate-pulse" />
+                      Live QR Code Check-in
+                    </span>
+
+                    {/* QR Code Container */}
+                    <div className="size-40 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-center relative group">
+                      <QrCode className="size-full text-slate-800 transition-opacity duration-300 group-hover:opacity-40" />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <Scan className="size-8 text-indigo-650 animate-pulse" />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-455 max-w-[200px] leading-relaxed">
+                      Mentees can scan this QR code with their mobile phone or check in instantly inside the InnerG app.
+                    </p>
+                  </div>
+
+                  {/* Right panel: Manual roll call */}
+                  <div className="space-y-4 flex flex-col h-full justify-between">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Manual Attendance List</label>
+                      <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+                        {rollCallList.map((student, sIdx) => (
+                          <div 
+                            key={sIdx}
+                            onClick={() => toggleAttendance(sIdx)}
+                            className={cn(
+                              "p-3 rounded-xl border transition-all cursor-pointer flex justify-between items-center gap-3",
+                              student.attended 
+                                ? "bg-emerald-50/50 border-emerald-200 hover:border-emerald-350" 
+                                : "bg-slate-50/40 border-slate-200/60 hover:border-slate-300"
+                            )}
+                          >
+                            <div className="flex gap-2.5">
+                              <img src={student.avatar} className="size-8 rounded-full object-cover border border-slate-200" alt={student.name} />
+                              <div>
+                                <p className="text-xs font-extrabold text-slate-800">{student.name}</p>
+                                <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">{student.position}</p>
+                              </div>
+                            </div>
+
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-lg text-[8px] font-extrabold uppercase tracking-wider transition-colors",
+                              student.attended 
+                                ? "text-emerald-700 bg-emerald-100" 
+                                : "text-slate-400 bg-slate-100"
+                            )}>
+                              {student.attended ? "Attended" : "Absent"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-emerald-50/50 to-indigo-50/50 p-3 rounded-xl border border-emerald-100/50 text-[10px] text-slate-650 font-bold leading-normal">
+                      🎁 Confirming attendance will instantly distribute <strong>+{activeLaunchSession.points} points</strong> to all checked-in mentees.
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer confirm */}
+                <div className="flex gap-3 pt-3 border-t border-slate-100">
+                  <button 
+                    onClick={() => setActiveLaunchSession(null)}
+                    className="flex-1 bg-white hover:bg-slate-50 text-slate-500 border border-slate-250 py-3 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] text-center"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleConfirmAttendance}
+                    className="flex-1 bg-gradient-to-r from-[#00C896] to-[#00B083] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all shadow-sm"
+                  >
+                    Confirm & Distribute Points
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* TOAST NOTIFICATION */}
       <AnimatePresence>
