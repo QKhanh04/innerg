@@ -106,12 +106,13 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 /* =========================
    CORS
-   ========================= */
+   ========================= */ 
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
         policy.WithOrigins(frontendUrls)
+         .WithOrigins("http://localhost:5173")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -176,6 +177,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IMemberService, MemberService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();

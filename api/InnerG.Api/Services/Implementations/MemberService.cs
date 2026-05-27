@@ -31,10 +31,11 @@ namespace InnerG.Api.Services.Implementations
         {
             var usersQuery = _context.Users
                 .Include(u => u.Department)
+                .Where(u => u.CompanyId == companyId)
                 .AsQueryable();
 
             var company = await _context.Companies.FindAsync(companyId);
-            if (company != null && !string.IsNullOrEmpty(company.Domain))
+            if (company != null)
             {
                 var excludedRoleNames = new[] { AuthRoles.HR, AuthRoles.SystemAdmin, "Admin", "SuperAdmin" };
                 var excludedRoleIds = await _context.Roles
@@ -47,9 +48,7 @@ namespace InnerG.Api.Services.Implementations
                     .Select(ur => ur.UserId)
                     .ToListAsync();
                 
-                var domainSuffix = "@" + company.Domain.ToLower();
-                usersQuery = usersQuery.Where(u => 
-                    !((u.Email == null || !u.Email.ToLower().EndsWith(domainSuffix)) || excludedUserIds.Contains(u.Id)));
+                usersQuery = usersQuery.Where(u => !excludedUserIds.Contains(u.Id));
             }
 
             if (!string.IsNullOrEmpty(query.Search))
@@ -127,7 +126,7 @@ namespace InnerG.Api.Services.Implementations
                 .Include(u => u.UserSkills).ThenInclude(us => us.Skill)
                 .Include(u => u.Badges).ThenInclude(ub => ub.Badge)
                 .Include(u => u.Enrollments).ThenInclude(e => e.TrainingEvent)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+                .FirstOrDefaultAsync(u => u.Id == userId && u.CompanyId == companyId);
 
             if (user == null)
             {

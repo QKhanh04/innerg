@@ -17,7 +17,6 @@ namespace InnerG.Api.Services.Implementations
     public class AuthService : IAuthService
     {
         private const string GoogleProvider = "Google";
-
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ITokenService _tokenService;
@@ -25,6 +24,7 @@ namespace InnerG.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthService> _logger;
+        private readonly IInvitationService _invitationService;
 
         public AuthService(
             UserManager<AppUser> userManager,
@@ -34,7 +34,8 @@ namespace InnerG.Api.Services.Implementations
             AppDbContext context,
             IEmailService emailService,
             IConfiguration configuration,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IInvitationService invitationService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -43,6 +44,7 @@ namespace InnerG.Api.Services.Implementations
             _emailService = emailService;
             _configuration = configuration;
             _logger = logger;
+            _invitationService = invitationService;
         }
 
         public async Task<AuthResponse> BootstrapCompanyAsync(BootstrapCompanyRequest request)
@@ -120,7 +122,7 @@ namespace InnerG.Api.Services.Implementations
             _context.Companies.Add(company);
             await _context.SaveChangesAsync();
 
-            var invite = await CreateInviteAsync(
+            var invite = await _invitationService.CreateInviteAsync(
                 new CreateInviteRequest
                 {
                     CompanyId = company.Id,
@@ -141,140 +143,6 @@ namespace InnerG.Api.Services.Implementations
             };
         }
 
-        public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var companyId = request.CompanyId ?? currentCompanyId
-                ?? throw new BadRequestException("CompanyId is required");
-
-            if (!Guid.TryParse(inviterUserId, out var inviterId))
-                throw new UnauthorizedException();
-
-            if (!isSystemAdmin && currentCompanyId != companyId)
-                throw new ForbiddenException("You cannot invite users outside your current company");
-
-            var company = await _context.Companies
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.Id == companyId && x.IsActive && x.DeletedAt == null)
-                ?? throw new NotFoundException("Company not found");
-
-            if (request.DepartmentId.HasValue)
-            {
-                var departmentExists = await _context.Departments
-                    .IgnoreQueryFilters()
-                    .AnyAsync(x => x.Id == request.DepartmentId && x.CompanyId == companyId && x.DeletedAt == null);
-
-                if (!departmentExists)
-                    throw new BadRequestException("Department does not belong to this company");
-            }
-
-            var email = NormalizeEmail(request.Email);
-            if (!EmailMatchesDomain(email, company.Domain))
-                throw new BadRequestException("Invite email must belong to the company domain");
-
-            if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.Email == email && x.DeletedAt == null))
-                throw new ConflictException("User is already a member of this company");
-
-            var pendingInvite = await _context.Invites
-                .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Email == email && x.Status == InviteStatus.Pending);
-
-            if (pendingInvite != null && pendingInvite.ExpiresAt > DateTime.UtcNow)
-                throw new ConflictException("A pending invite already exists for this email");
-
-            if (pendingInvite != null && pendingInvite.ExpiresAt <= DateTime.UtcNow)
-                pendingInvite.Status = InviteStatus.Expired;
-
-            var roles = NormalizeCompanyRoles(request.Roles);
-            var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
-            var invite = new Invite
-            {
-                CompanyId = companyId,
-                InviterId = inviterId,
-                DepartmentId = request.DepartmentId,
-                Email = email,
-                FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
-                Position = string.IsNullOrWhiteSpace(request.Position) ? null : request.Position.Trim(),
-                RolesCsv = string.Join(",", roles),
-                TokenHash = HashToken(rawToken),
-                ExpiresAt = DateTime.UtcNow.AddDays(GetInviteExpiryDays())
-            };
-
-            _context.Invites.Add(invite);
-            await _context.SaveChangesAsync();
-
-            var inviteLink = BuildInviteLink(rawToken);
-            await _emailService.SendInviteAsync(
-                email,
-                $"You're invited to join {company.Name} on InnerG",
-                $"""
-                <h3>You're invited to InnerG</h3>
-                <p>{company.Name} has invited you to join its internal learning workspace.</p>
-                <p>Please click the link below to activate your account. This invite expires on {invite.ExpiresAt:yyyy-MM-dd HH:mm} UTC.</p>
-                <a href="{inviteLink}">Accept invite</a>
-                """);
-
-            return ToInviteResponse(invite, company, rawToken);
-        }
-
-        public async Task<BulkInviteResponse> CreateBulkInvitesAsync(BulkInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var response = new BulkInviteResponse();
-            for (var i = 0; i < request.Invites.Count; i++)
-            {
-                var inviteRequest = request.Invites[i];
-                try
-                {
-                    response.SuccessfulInvites.Add(await CreateInviteAsync(inviteRequest, inviterUserId, currentCompanyId, isSystemAdmin));
-                }
-                catch (AppException ex)
-                {
-                    response.Errors.Add(new BulkInviteError { Row = i + 1, Email = inviteRequest.Email, Error = ex.Message });
-                }
-            }
-
-            response.SuccessCount = response.SuccessfulInvites.Count;
-            response.ErrorCount = response.Errors.Count;
-            return response;
-        }
-
-        public async Task<InviteResponse> ResendInviteAsync(Guid inviteId, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var invite = await GetInviteForMutationAsync(inviteId, currentCompanyId, isSystemAdmin);
-            if (invite.Status == InviteStatus.Accepted)
-                throw new BadRequestException("Accepted invite cannot be resent");
-            if (invite.Status == InviteStatus.Revoked)
-                throw new BadRequestException("Revoked invite cannot be resent");
-            if (!Guid.TryParse(inviterUserId, out var actorId))
-                throw new UnauthorizedException();
-
-            var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
-            invite.InviterId = actorId;
-            invite.TokenHash = HashToken(rawToken);
-            invite.Status = InviteStatus.Pending;
-            invite.ExpiresAt = DateTime.UtcNow.AddDays(GetInviteExpiryDays());
-            invite.RevokedAt = null;
-            invite.AcceptedAt = null;
-            await _context.SaveChangesAsync();
-
-            var inviteLink = BuildInviteLink(rawToken);
-            await _emailService.SendInviteAsync(
-                invite.Email,
-                $"You're invited to join {invite.Company.Name} on InnerG",
-                $"""<h3>You're invited to InnerG</h3><p>Please click the link below to activate your account.</p><a href="{inviteLink}">Accept invite</a>""");
-
-            return ToInviteResponse(invite, invite.Company, rawToken);
-        }
-
-        public async Task RevokeInviteAsync(Guid inviteId, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var invite = await GetInviteForMutationAsync(inviteId, currentCompanyId, isSystemAdmin);
-            if (invite.Status != InviteStatus.Pending)
-                throw new BadRequestException("Only pending invites can be revoked");
-
-            invite.Status = InviteStatus.Revoked;
-            invite.RevokedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-        }
 
         public async Task<InvitePreviewResponse> GetInviteAsync(string token)
         {
@@ -727,19 +595,6 @@ namespace InnerG.Api.Services.Implementations
                 ?? throw new NotFoundException("Invite not found");
         }
 
-        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var invite = await _context.Invites
-                .IgnoreQueryFilters()
-                .Include(x => x.Company)
-                .FirstOrDefaultAsync(x => x.Id == inviteId)
-                ?? throw new NotFoundException("Invite not found");
-
-            if (!isSystemAdmin && currentCompanyId != invite.CompanyId)
-                throw new ForbiddenException("You cannot manage invites outside your current company");
-
-            return invite;
-        }
 
         private async Task ExpireInviteIfNeededAsync(Invite invite)
         {
@@ -768,32 +623,6 @@ namespace InnerG.Api.Services.Implementations
             return options;
         }
 
-        private static IList<string> NormalizeCompanyRoles(IList<string> roles)
-        {
-            var requestedRoles = roles.Count == 0 ? [AuthRoles.Mentee] : roles;
-            return requestedRoles.Select(NormalizeCompanyRole).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        }
-
-        private static string NormalizeCompanyRole(string role)
-        {
-            var normalized = AuthRoles.CompanyRoles.FirstOrDefault(x => string.Equals(x, role, StringComparison.OrdinalIgnoreCase));
-            return normalized ?? throw new BadRequestException($"Invalid company role: {role}");
-        }
-
-        private InviteResponse ToInviteResponse(Invite invite, Company company, string rawToken)
-        {
-            return new InviteResponse
-            {
-                Id = invite.Id,
-                Email = invite.Email,
-                CompanyId = company.Id,
-                CompanyName = company.Name,
-                Status = invite.Status,
-                ExpiresAt = invite.ExpiresAt,
-                Roles = invite.Roles.ToList(),
-                InviteLink = BuildInviteLink(rawToken)
-            };
-        }
 
         private static CompanyResponse ToCompanyResponse(Company company)
         {

@@ -49,6 +49,9 @@ namespace InnerG.Api.Exceptions
     {
         public ExternalServiceException(string message)
             : base(message, StatusCodes.Status503ServiceUnavailable) { }
+
+        public ExternalServiceException(string message, Exception innerException)
+            : base(message, StatusCodes.Status503ServiceUnavailable, innerException) { }
     }
 
     public class ConfigurationException : AppException

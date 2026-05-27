@@ -13,5 +13,11 @@ namespace InnerG.Api.Exceptions
         {
             StatusCode = statusCode;
         }
+
+        protected AppException(string message, int statusCode, Exception innerException)
+                : base(message, innerException)
+        {
+            StatusCode = statusCode;
+        }
     }
 }

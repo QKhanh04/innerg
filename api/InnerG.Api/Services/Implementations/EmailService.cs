@@ -40,6 +40,8 @@ namespace InnerG.Api.Services.Implementations
             var username = _config["SMTP_USERNAME"] ?? throw new ConfigurationException("SMTP_USERNAME");
             var password = _config["SMTP_PASSWORD"] ?? throw new ConfigurationException("SMTP_PASSWORD");
             var fromName = _config["SMTP_FROM_NAME"] ?? "Support";
+            var portStr = _config["SMTP_PORT"] ?? "587";
+            int.TryParse(portStr, out var port);
 
             try
             {
@@ -53,7 +55,7 @@ namespace InnerG.Api.Services.Implementations
 
                 message.To.Add(toEmail);
 
-                using var smtp = new SmtpClient(host, 587)
+                using var smtp = new SmtpClient(host, port > 0 ? port : 587)
                 {
                     Credentials = new NetworkCredential(username, password),
                     EnableSsl = true
@@ -61,9 +63,10 @@ namespace InnerG.Api.Services.Implementations
 
                 await smtp.SendMailAsync(message);
             }
-            catch (SmtpException)
+            catch (Exception ex)
             {
-                throw new ExternalServiceException("Failed to send email");
+                // Bao gồm lỗi gốc để dễ debug
+                throw new ExternalServiceException($"Failed to send email: {ex.Message}", ex);
             }
         }
     }
