@@ -19,6 +19,7 @@ import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
 import Explore from '../pages/common/Explore/Explore';
 import CreateClass from '../pages/mentor/CreateClass/CreateClass';
+import MentorDashboard from '../pages/mentor/MentorDashboard/MentorDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getDefaultRouteForUser } from '../utils/authRoute';
 
@@ -110,6 +111,12 @@ const AppRoutes = () => (
             <Route path="/mentor/create" element={
                 <ProtectedRoute allowedRoles={['mentor', 'hr']}>
                     <CreateClass />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/mentor" element={
+                <ProtectedRoute allowedRoles={['mentor']}>
+                    <MentorDashboard />
                 </ProtectedRoute>
             } />
             {/* You can add more protected routes here for other roles */}
