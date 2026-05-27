@@ -16,11 +16,19 @@ import {
   Gift,
   ArrowRight,
   ChevronRight,
-  Play
+  Play,
+  Paperclip,
+  Link2,
+  UploadCloud,
+  FileText,
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { mentorApi } from '../../../api/mentorApi';
+import { toastService } from '../../../services/toastService';
 
 export default function CreateClassPage() {
   const navigate = useNavigate();
@@ -44,13 +52,13 @@ export default function CreateClassPage() {
   const [skillInput, setSkillInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [toast, setToast] = useState(null);
   const [aiOptimizing, setAiOptimizing] = useState(false);
 
-  const showToast = (message) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
-  };
+  // Learning Resources & Attachments States
+  const [resources, setResources] = useState([]);
+  const [linkData, setLinkData] = useState({ title: '', url: '' });
+  const [uploadingFile, setUploadingFile] = useState(null);
+  const [resourceTab, setResourceTab] = useState('upload');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -63,7 +71,7 @@ export default function CreateClassPage() {
     const cleanInput = skillInput.trim();
     if (!cleanInput) return;
     if (skills.includes(cleanInput)) {
-      showToast("Skill tag already added!");
+      toastService.warning("Skill tag already added!");
       return;
     }
     setSkills(prev => [...prev, cleanInput]);
@@ -74,10 +82,82 @@ export default function CreateClassPage() {
     setSkills(prev => prev.filter(s => s !== skillToRemove));
   };
 
+  // Handle adding a web reference link
+  const handleAddLinkResource = (e) => {
+    e.preventDefault();
+    if (!linkData.title.trim()) {
+      toastService.warning("Please enter a title for the reference link");
+      return;
+    }
+    if (!linkData.url.trim()) {
+      toastService.warning("Please enter the URL");
+      return;
+    }
+    try {
+      new URL(linkData.url);
+    } catch (err) {
+      toastService.warning("Please enter a valid URL (including http:// or https://)");
+      return;
+    }
+
+    setResources(prev => [
+      ...prev,
+      {
+        title: linkData.title.trim(),
+        description: "Reference web link",
+        type: "Link",
+        url: linkData.url.trim(),
+        fileType: "url",
+        fileSizeBytes: 0
+      }
+    ]);
+    setLinkData({ title: '', url: '' });
+    toastService.success("Link added successfully!");
+  };
+
+  // Simulate file upload with premium progress loading state
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Simulate upload starting
+    setUploadingFile({ name: file.name, progress: 10 });
+    
+    let currentProgress = 10;
+    const interval = setInterval(() => {
+      currentProgress += 30;
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        setUploadingFile(null);
+        
+        // Add to resources list
+        setResources(prev => [
+          ...prev,
+          {
+            title: file.name,
+            description: "Class attachment file",
+            type: "Document",
+            url: `https://innerg-storage.s3.amazonaws.com/attachments/${file.name}`,
+            fileType: file.name.substring(file.name.lastIndexOf('.')),
+            fileSizeBytes: file.size
+          }
+        ]);
+        toastService.success("File uploaded and attached successfully! 🎉");
+      } else {
+        setUploadingFile({ name: file.name, progress: currentProgress });
+      }
+    }, 300);
+  };
+
+  const handleRemoveResource = (indexToRemove) => {
+    setResources(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    toastService.success("Resource removed");
+  };
+
   // AI Assistant Optimization Logic (Fills out optimal fields and reviews scheduling)
   const handleAIOptimize = () => {
     if (!formData.title) {
-      showToast("Please enter a class title first to optimize!");
+      toastService.warning("Please enter a class title first to optimize!");
       return;
     }
     
@@ -94,42 +174,116 @@ export default function CreateClassPage() {
       if (!skills.includes('Software Architecture')) {
         setSkills(prev => [...prev, 'Software Architecture']);
       }
-      showToast("Class optimized by InnerG AI! Optimal slot found: Wed at 03:00 PM 🚀");
+      toastService.success("Class optimized by InnerG AI! Optimal slot found: Wed at 03:00 PM 🚀");
     }, 1200);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Core Form Validation
-    if (!formData.title.trim()) {
-      showToast("Please enter a class title");
+    // 1. Title Validation
+    const cleanTitle = formData.title.trim();
+    if (!cleanTitle) {
+      toastService.warning("Please enter a class title");
       return;
     }
-    if (!formData.description.trim()) {
-      showToast("Please write a course syllabus/description");
+    if (cleanTitle.length < 5) {
+      toastService.warning("Class title must be at least 5 characters long");
       return;
     }
+
+    // 2. Description Validation
+    const cleanDesc = formData.description.trim();
+    if (!cleanDesc) {
+      toastService.warning("Please write a course syllabus/description");
+      return;
+    }
+    if (cleanDesc.length < 20) {
+      toastService.warning("Please write a more detailed syllabus description (at least 20 characters)");
+      return;
+    }
+
+    // 3. Date & Time Validation (Future Schedule Only)
     if (!formData.date || !formData.time) {
-      showToast("Please schedule a valid date and time slot");
+      toastService.warning("Please schedule a valid date and time slot");
       return;
     }
-    if (formData.format === 'Online' && !formData.meetingLink) {
-      showToast("Please provide an online meeting URL");
+    const now = new Date();
+    const classStartDateTime = new Date(`${formData.date}T${formData.time}`);
+    if (isNaN(classStartDateTime.getTime())) {
+      toastService.warning("Please schedule a valid date and time slot");
       return;
     }
-    if (formData.format === 'Offline' && !formData.location) {
-      showToast("Please provide a physical room location");
+    if (classStartDateTime <= now) {
+      toastService.warning("The scheduled class time must be in the future. Please select a future date and time slot.");
+      return;
+    }
+
+    // 4. Format-specific Validation
+    if (formData.format === 'Online') {
+      if (!formData.meetingLink.trim()) {
+        toastService.warning("Please provide a Zoom or Teams meeting URL");
+        return;
+      }
+      try {
+        new URL(formData.meetingLink);
+      } catch (err) {
+        toastService.warning("Please enter a valid meeting URL (e.g. https://zoom.us/...)");
+        return;
+      }
+    } else {
+      if (!formData.location.trim() || formData.location.trim().length < 3) {
+        toastService.warning("Please provide a valid physical room or venue location (at least 3 characters)");
+        return;
+      }
+    }
+
+    // 5. Numeric range validations
+    const durationVal = parseInt(formData.duration, 10);
+    if (isNaN(durationVal) || durationVal < 15 || durationVal > 360) {
+      toastService.warning("Duration must be between 15 and 360 minutes");
+      return;
+    }
+
+    const maxSlotsVal = parseInt(formData.maxSlots, 10);
+    if (isNaN(maxSlotsVal) || maxSlotsVal < 1 || maxSlotsVal > 200) {
+      toastService.warning("Available slots must be between 1 and 200");
+      return;
+    }
+
+    const pointsVal = parseInt(formData.points, 10);
+    if (isNaN(pointsVal) || pointsVal < 10 || pointsVal > 1000) {
+      toastService.warning("Learning points value must be between 10 and 1000 points");
+      return;
+    }
+
+    // 6. Skills tag check
+    if (!skills || skills.length === 0) {
+      toastService.warning("Please add at least one relevant skill tag for the class");
       return;
     }
 
     setIsSubmitting(true);
     
-    // Simulate API registration
-    setTimeout(() => {
+    try {
+      await mentorApi.createClass({
+        ...formData,
+        title: cleanTitle,
+        description: cleanDesc,
+        duration: durationVal,
+        maxSlots: maxSlotsVal,
+        points: pointsVal,
+        skills,
+        resources
+      });
       setIsSubmitting(false);
       setShowSuccessModal(true);
-    }, 1500);
+    } catch (error) {
+      setIsSubmitting(false);
+      console.error(error);
+      const errMsg = error.response?.data?.message || "Failed to create class. Please try again.";
+      toastService.error(errMsg);
+    }
   };
 
   // Capacity visual feedback tags helper
@@ -303,6 +457,185 @@ export default function CreateClassPage() {
 
           </div>
 
+          {/* ATTACHMENTS & LEARNING RESOURCES */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 lg:p-8 space-y-6 text-left relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-[#00C896]/5 to-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-800 text-base tracking-tight flex items-center gap-2">
+                <Paperclip className="size-5 text-[#00C896]" />
+                Attachments & Learning Resources
+              </h3>
+              <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-md font-bold text-slate-500 uppercase tracking-wider">
+                {resources.length} {resources.length === 1 ? 'Resource' : 'Resources'}
+              </span>
+            </div>
+
+            <p className="text-slate-500 text-xs leading-relaxed -mt-2">
+              Share syllabus slides, preparatory materials, documents or direct references so mentees can prepare before attending the session.
+            </p>
+
+            {/* TAB SELECTOR FOR FILE VS LINK */}
+            <div className="flex bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setResourceTab('upload')}
+                className={cn(
+                  "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                  resourceTab === 'upload' 
+                    ? "bg-white text-slate-800 shadow-xs" 
+                    : "text-slate-450 hover:text-slate-700"
+                )}
+              >
+                Upload Document Files
+              </button>
+              <button
+                type="button"
+                onClick={() => setResourceTab('link')}
+                className={cn(
+                  "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                  resourceTab === 'link' 
+                    ? "bg-white text-slate-800 shadow-xs" 
+                    : "text-slate-450 hover:text-slate-700"
+                )}
+              >
+                Add External URL Link
+              </button>
+            </div>
+
+            {/* TAB PANELS */}
+            <AnimatePresence mode="wait">
+              {resourceTab === 'upload' ? (
+                <motion.div
+                  key="tab-upload"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="space-y-4"
+                >
+                  {/* File Upload Dropzone */}
+                  <label className="border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all bg-slate-50/50 hover:bg-indigo-50/10 group relative">
+                    <input 
+                      type="file" 
+                      onChange={handleFileUpload} 
+                      className="hidden" 
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.zip"
+                    />
+                    
+                    {uploadingFile ? (
+                      <div className="flex flex-col items-center gap-3 w-full max-w-[200px]">
+                        <Loader2 className="size-8 text-indigo-600 animate-spin" />
+                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                          <div className="bg-indigo-600 h-full transition-all duration-300" style={{ width: `${uploadingFile.progress}%` }}></div>
+                        </div>
+                        <p className="text-[10px] text-slate-650 font-bold truncate max-w-full">
+                          Uploading {uploadingFile.name}...
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="size-10 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <UploadCloud className="size-5" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs font-bold text-slate-700">Click or drag file to upload</p>
+                          <p className="text-[10px] text-slate-400 mt-1">PDF, Word, Excel, PowerPoint, ZIP (Max 25MB)</p>
+                        </div>
+                      </>
+                    )}
+                  </label>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="tab-link"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="space-y-3"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Link Title</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. GitHub Repository, Google Slides" 
+                        value={linkData.title}
+                        onChange={(e) => setLinkData(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-xs rounded-xl outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Resource URL</label>
+                      <input 
+                        type="url" 
+                        placeholder="https://github.com/..." 
+                        value={linkData.url}
+                        onChange={(e) => setLinkData(prev => ({ ...prev, url: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-xs rounded-xl outline-none transition-all placeholder:text-slate-400 text-slate-800 font-semibold"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddLinkResource}
+                    className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-[0.99]"
+                  >
+                    <Plus className="size-3.5" />
+                    Attach External Resource Link
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* LIST OF CURRENT ATTACHED RESOURCES */}
+            {resources.length > 0 && (
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Attached Materials List</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {resources.map((res, rIdx) => {
+                    const isLink = res.type === 'Link';
+                    const isPdf = res.fileType?.toLowerCase() === '.pdf';
+                    
+                    return (
+                      <div 
+                        key={rIdx}
+                        className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 group hover:border-slate-200 transition-all text-left"
+                      >
+                        <div className={cn(
+                          "size-8 rounded-xl flex items-center justify-center shrink-0",
+                          isLink 
+                            ? "bg-sky-50 text-sky-600" 
+                            : isPdf 
+                              ? "bg-rose-50 text-rose-600" 
+                              : "bg-emerald-50 text-emerald-600"
+                        )}>
+                          {isLink ? <Link2 className="size-4" /> : <FileText className="size-4" />}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate" title={res.title}>
+                            {res.title}
+                          </p>
+                          <p className="text-[9px] text-slate-400 uppercase tracking-wider font-extrabold mt-0.5">
+                            {isLink ? 'Web URL Link' : `${res.fileType?.replace('.', '') || 'Doc'} File • ${(res.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB`}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveResource(rIdx)}
+                          className="size-7 bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-500 border border-slate-200/50 rounded-lg flex items-center justify-center cursor-pointer transition-all shrink-0 active:scale-95 shadow-sm"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* RIGHT COLUMN (1/3): Schedule & Logistics */}
@@ -395,6 +728,7 @@ export default function CreateClassPage() {
                   <input 
                     type="date" 
                     name="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={formData.date}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-xs rounded-2xl outline-none transition-all text-slate-700 cursor-pointer"
@@ -567,25 +901,6 @@ export default function CreateClassPage() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* TOAST NOTIFICATION */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            style={{ left: '50%', translateX: '-50%' }}
-            className="fixed bottom-10 z-[200] px-6 py-4 bg-slate-900/95 backdrop-blur-sm text-white rounded-2xl shadow-2xl font-extrabold text-xs flex items-center gap-3 border border-slate-800"
-          >
-            <div className="size-6 bg-[#00C896] rounded-full flex items-center justify-center text-[#0F1F3D] shrink-0 shadow-[0_0_8px_#00C896]">
-              <Check className="size-4 stroke-[2.5]" />
-            </div>
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </div>
   );
 }

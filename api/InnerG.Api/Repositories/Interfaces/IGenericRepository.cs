@@ -9,6 +9,7 @@ namespace InnerG.Api.Repositories.Interfaces
     public interface IGenericRepository<T>
     {
         Task<IEnumerable<T>> GetAllAsync();
+        IQueryable<T> GetQueryable();
         Task<T?> GetByIdAsync(object id);
         Task AddAsync(T entity);
         Task UpdateAsync(T entity);

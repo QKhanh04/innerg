@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useRole } from '../../../lib/RoleContext';
+import { toastService } from '../../../services/toastService';
 
 export default function ExplorePage() {
   const { role } = useRole();
@@ -30,7 +31,6 @@ export default function ExplorePage() {
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedFormat, setSelectedFormat] = useState('All');
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-  const [toast, setToast] = useState(null);
   
   // Registration state simulation
   const [registeredIds, setRegisteredIds] = useState([2]); // Card 2 is pre-registered
@@ -44,8 +44,14 @@ export default function ExplorePage() {
   });
 
   const showToast = (message) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.includes('failed') || lowerMsg.includes('error') || lowerMsg.includes('full')) {
+      toastService.error(message);
+    } else if (lowerMsg.includes('success') || lowerMsg.includes('register') || lowerMsg.includes('added') || message.includes('🎉') || message.includes('❤️')) {
+      toastService.success(message);
+    } else {
+      toastService.info(message);
+    }
   };
 
   const categories = ['All', 'Technical', 'Soft Skills', 'Design', 'Leadership', 'Wellness'];
@@ -590,25 +596,6 @@ export default function ExplorePage() {
         )}
 
       </section>
-
-      {/* TOAST NOTIFICATION */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            style={{ left: '50%', translateX: '-50%' }}
-            className="fixed bottom-10 z-[200] px-6 py-4 bg-slate-900/95 backdrop-blur-sm text-white rounded-2xl shadow-2xl font-extrabold text-xs flex items-center gap-3 border border-slate-800"
-          >
-            <div className="size-6 bg-[#00C896] rounded-full flex items-center justify-center text-[#0F1F3D] shrink-0 shadow-[0_0_8px_#00C896]">
-              <Check className="size-4 stroke-[2.5]" />
-            </div>
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
     </div>
   );
 }

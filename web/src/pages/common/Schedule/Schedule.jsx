@@ -25,6 +25,7 @@ import { cn } from '../../../lib/utils';
 import { useRole } from '../../../lib/RoleContext';
 import api from '../../../api/axios';
 import { useGoogleLogin } from '@react-oauth/google';
+import { toastService } from '../../../services/toastService';
 
 export default function SchedulePage() {
   const { role, user } = useRole();
@@ -32,7 +33,6 @@ export default function SchedulePage() {
   const [schedulerBannerVisible, setSchedulerBannerVisible] = useState(true);
   const [conflictResolved, setConflictResolved] = useState(false);
   const [resolvingConflict, setResolvingConflict] = useState(false);
-  const [toast, setToast] = useState(null);
 
   // API Integration States
   const [events, setEvents] = useState([]);
@@ -295,12 +295,15 @@ export default function SchedulePage() {
   // Find if there are any active conflicts in the current schedule
   const activeConflict = events.find(e => e.hasConflict);
 
-  // ==========================================
-  // TOAST AND ACTIONS HELPER FUNCTIONS
-  // ==========================================
   const showToast = (message) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.includes('failed') || lowerMsg.includes('error') || lowerMsg.includes('conflict')) {
+      toastService.error(message);
+    } else if (lowerMsg.includes('success') || lowerMsg.includes('sync') || lowerMsg.includes('connected') || lowerMsg.includes('resolved') || message.includes('🎉') || message.includes('🚀') || message.includes('⌚')) {
+      toastService.success(message);
+    } else {
+      toastService.info(message);
+    }
   };
 
   // Real-time hour matching tracker to highlight current active timeslot
@@ -1219,24 +1222,6 @@ export default function SchedulePage() {
           ))}
         </div>
       </section>
-
-      {/* TOAST NOTIFICATION */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            style={{ left: '50%', translateX: '-50%' }}
-            className="fixed bottom-10 z-[200] px-6 py-4 bg-slate-900/95 backdrop-blur-sm text-white rounded-2xl shadow-2xl font-extrabold text-xs flex items-center gap-3 border border-slate-800"
-          >
-            <div className="size-6 bg-[#00C896] rounded-full flex items-center justify-center text-[#0F1F3D] shrink-0 shadow-[0_0_8px_#00C896]">
-              <Check className="size-4 stroke-[2.5]" />
-            </div>
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

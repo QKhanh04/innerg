@@ -30,6 +30,8 @@ namespace InnerG.Api.Models
         public int TotalStudents { get; set; } = 0;
         public string MentorStatus { get; set; } = "PENDING_VERIFICATION";
 
+        // Availability Config JSON
+        public string? AvailabilityConfig { get; set; }
         // Navigation properties
         public virtual AppUser? User { get; set; }
         public virtual ICollection<TrainerSkill> TrainerSkills { get; set; } = new List<TrainerSkill>();
