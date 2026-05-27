@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -10,8 +10,6 @@ namespace InnerG.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Commented out to fix "column already exists" error during auto-migration
-            /*
             migrationBuilder.AddColumn<double>(
                 name: "AvgRating",
                 table: "Trainers",
@@ -39,7 +37,6 @@ namespace InnerG.Api.Migrations
                 type: "integer",
                 nullable: false,
                 defaultValue: 0);
-            */
         }
 
         /// <inheritdoc />

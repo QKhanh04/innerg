@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { mentorApi } from '../../../api/mentorApi';
 import { 
   BarChart3, 
   BookOpen, 
@@ -30,10 +31,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { toastService } from '../../../services/toastService';
 
 export default function MentorDashboard() {
   const navigate = useNavigate();
-  const [toast, setToast] = useState(null);
   const [activeLaunchSession, setActiveLaunchSession] = useState(null);
   const [rollCallList, setRollCallList] = useState([
     { name: 'Jane Doe', avatar: 'https://i.pravatar.cc/150?u=janedoe', position: 'Junior Frontend Developer', attended: true },
@@ -42,158 +43,114 @@ export default function MentorDashboard() {
   ]);
 
   const showToast = (message) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleConfirmAttendance = () => {
-    const attendees = rollCallList.filter(s => s.attended).map(s => s.name);
-    if (attendees.length === 0) {
-      showToast("No students checked in!");
-      return;
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.includes('failed') || lowerMsg.includes('error') || lowerMsg.includes('decline') || lowerMsg.includes('reject')) {
+      toastService.error(message);
+    } else if (lowerMsg.includes('success') || lowerMsg.includes('approve') || lowerMsg.includes('confirm') || lowerMsg.includes('copied') || lowerMsg.includes('launch') || message.includes('🎉') || message.includes('🎁') || message.includes('⌚') || message.includes('📋')) {
+      toastService.success(message);
+    } else {
+      toastService.info(message);
     }
-    showToast(`Roll call success! Awarded +${activeLaunchSession?.points || 150} points to ${attendees.length} attendees! 🎁`);
-    setActiveLaunchSession(null);
   };
 
   const toggleAttendance = (idx) => {
     setRollCallList(prev => prev.map((std, i) => i === idx ? { ...std, attended: !std.attended } : std));
-  };
-
-  // Mock Mentor General Stats
-  const stats = {
-    totalSessions: 24,
-    totalStudents: 188,
-    avgRating: 4.95,
-    pointsEarned: 4800,
-    levelBadge: "Master Instructor"
-  };
-
-  // 1. Weekly Availability Settings state
+  };  // Data States
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const [classes, setClasses] = useState([]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
   const [availability, setAvailability] = useState([
-    { day: 'Monday', active: true, start: '09:00', end: '11:00' },
-    { day: 'Tuesday', active: false, start: '14:00', end: '16:00' },
-    { day: 'Wednesday', active: true, start: '15:00', end: '17:00' },
-    { day: 'Thursday', active: true, start: '10:00', end: '12:00' },
-    { day: 'Friday', active: false, start: '09:00', end: '11:00' }
+    { dayOfWeek: 'Monday', isAvailable: true, timeSlots: [{ startTime: '09:00', endTime: '11:00' }] },
+    { dayOfWeek: 'Tuesday', isAvailable: false, timeSlots: [] },
+    { dayOfWeek: 'Wednesday', isAvailable: true, timeSlots: [{ startTime: '15:00', endTime: '17:00' }] },
+    { dayOfWeek: 'Thursday', isAvailable: true, timeSlots: [{ startTime: '10:00', endTime: '12:00' }] },
+    { dayOfWeek: 'Friday', isAvailable: false, timeSlots: [] }
   ]);
 
+  // Fetch initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [statsRes, classesRes, pendingRes, availRes] = await Promise.all([
+          mentorApi.getDashboardStats(),
+          mentorApi.getHostedClasses(),
+          mentorApi.getPendingEnrollments(),
+          mentorApi.getAvailability()
+        ]);
+
+        setStats(statsRes);
+        setClasses(classesRes);
+        setPendingApprovals(pendingRes);
+        
+        if (availRes?.weeklySchedule?.length > 0) {
+          setAvailability(availRes.weeklySchedule);
+        }
+      } catch (error) {
+        console.error('Failed to fetch mentor data:', error);
+        showToast('Failed to load dashboard data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const handleAvailabilityToggle = (idx) => {
-    setAvailability(prev => prev.map((item, i) => i === idx ? { ...item, active: !item.active } : item));
+    setAvailability(prev => prev.map((item, i) => i === idx ? { ...item, isAvailable: !item.isAvailable } : item));
   };
 
   const handleTimeChange = (idx, field, value) => {
-    setAvailability(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item));
+    setAvailability(prev => prev.map((item, i) => {
+      if (i === idx) {
+        const newTimeSlots = item.timeSlots?.length > 0 ? [...item.timeSlots] : [{ startTime: '09:00', endTime: '17:00' }];
+        newTimeSlots[0] = { ...newTimeSlots[0], [field]: value };
+        return { ...item, timeSlots: newTimeSlots };
+      }
+      return item;
+    }));
   };
 
-  const saveAvailability = () => {
-    showToast("Availability settings saved successfully! ⌚");
-  };
-
-  // 2. Pending Student Registrations State (Approval Required Mode)
-  const [pendingApprovals, setPendingApprovals] = useState([
-    {
-      id: 101,
-      student: {
-        name: 'Jane Doe',
-        avatar: 'https://i.pravatar.cc/150?u=janedoe',
-        position: 'Junior Frontend Developer',
-        department: 'Engineering'
-      },
-      classTitle: 'Advanced React Architecture',
-      requestedAt: '10 minutes ago'
-    },
-    {
-      id: 102,
-      student: {
-        name: 'Michael Scott',
-        avatar: 'https://i.pravatar.cc/150?u=michael',
-        position: 'Sales Lead',
-        department: 'Commercial'
-      },
-      classTitle: 'High-Impact Presentation Skills',
-      requestedAt: '1 hour ago'
-    },
-    {
-      id: 103,
-      student: {
-        name: 'Pam Beesly',
-        avatar: 'https://i.pravatar.cc/150?u=pam',
-        position: 'Designer',
-        department: 'Product Design'
-      },
-      classTitle: 'UI Design Principles & Figma Mastery',
-      requestedAt: '3 hours ago'
-    }
-  ]);
-
-  const handleApprovalAction = (id, action, name) => {
-    setPendingApprovals(prev => prev.filter(item => item.id !== id));
-    if (action === 'approve') {
-      showToast(`Approved registration for ${name}! 🎉`);
-      // Simulating incrementing the slots on matching class
-      setClasses(prev => prev.map(c => {
-        if (id === 101 && c.id === 1) return { ...c, takenSlots: c.takenSlots + 1 };
-        if (id === 102 && c.id === 3) return { ...c, takenSlots: c.takenSlots + 1 };
-        if (id === 103 && c.id === 4) return { ...c, takenSlots: c.takenSlots + 1 };
-        return c;
-      }));
-    } else {
-      showToast(`Declined registration request from ${name}.`);
+  const saveAvailability = async () => {
+    try {
+      await mentorApi.updateAvailability(availability);
+      showToast("Availability settings saved successfully! ⌚");
+    } catch (error) {
+      showToast("Failed to save availability. Please try again.");
     }
   };
 
-  // 3. Hosted Classes List State
-  const [classes, setClasses] = useState([
-    {
-      id: 1,
-      title: 'Advanced React Architecture',
-      category: 'Technical',
-      format: 'Online',
-      formatDetail: 'Zoom Meeting',
-      date: 'May 28, 2026',
-      time: '03:00 PM',
-      duration: '90 mins',
-      totalSlots: 20,
-      takenSlots: 15,
-      points: 150,
-      status: 'PUBLISHED',
-      rating: '4.9 (12 reviews)',
-      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=300&auto=format&fit=crop'
-    },
-    {
-      id: 3,
-      title: 'High-Impact Presentation Skills',
-      category: 'Soft Skills',
-      format: 'Online',
-      formatDetail: 'MS Teams',
-      date: 'May 30, 2026',
-      time: '02:00 PM',
-      duration: '60 mins',
-      totalSlots: 30,
-      takenSlots: 30, // Full
-      points: 80,
-      status: 'PUBLISHED',
-      rating: '5.0 (28 reviews)',
-      image: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=300&auto=format&fit=crop'
-    },
-    {
-      id: 4,
-      title: 'UI Design Principles & Figma Mastery',
-      category: 'Design',
-      format: 'Offline',
-      formatDetail: 'Design Studio 10',
-      date: 'June 01, 2026',
-      time: '09:30 AM',
-      duration: '180 mins',
-      totalSlots: 12,
-      takenSlots: 11,
-      points: 200,
-      status: 'DRAFT',
-      rating: 'N/A',
-      image: 'https://images.unsplash.com/photo-1561070791-26c113006238?q=80&w=300&auto=format&fit=crop'
+  const handleApprovalAction = async (id, action, name) => {
+    try {
+      if (action === 'approve') {
+        await mentorApi.approveEnrollment(id);
+        showToast(`Approved registration for ${name}! 🎉`);
+        // Refresh classes to update slots
+        const classesRes = await mentorApi.getHostedClasses();
+        setClasses(classesRes);
+      } else {
+        await mentorApi.rejectEnrollment(id);
+        showToast(`Declined registration request from ${name}.`);
+      }
+      // Remove from list
+      setPendingApprovals(prev => prev.filter(item => item.enrollmentId !== id));
+    } catch (error) {
+      showToast(`Failed to ${action} enrollment. Please try again.`);
     }
-  ]);
+  };
+
+  const handleConfirmRollCall = async () => {
+    const attendedIds = rollCallList.filter(s => s.attended).map(s => s.id || 'mock-id');
+    try {
+      await mentorApi.submitRollCall(activeLaunchSession?.id || 'mock-session', attendedIds, "Roll call note");
+      showToast(`Roll call success! Awarded points to ${attendedIds.length} attendees! 🎁`);
+      setActiveLaunchSession(null);
+    } catch (error) {
+      showToast('Failed to submit roll call.');
+    }
+  };
 
   // 4. Auto-Scheduler Golden Slots state
   const goldenSlots = [
@@ -232,22 +189,38 @@ export default function MentorDashboard() {
           {/* Stats Badges */}
           <div className="flex flex-wrap gap-4 pt-2">
             <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-left min-w-[120px]">
-              <p className="text-xl font-extrabold text-white">{stats.totalSessions}</p>
+              {isLoading ? (
+                <div className="h-7 w-12 bg-white/10 animate-pulse rounded mb-1"></div>
+              ) : (
+                <p className="text-xl font-extrabold text-white">{stats?.totalClassesTaught || 0}</p>
+              )}
               <p className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Classes Taught</p>
             </div>
             <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-left min-w-[120px]">
-              <p className="text-xl font-extrabold text-[#00C896]">{stats.totalStudents}</p>
+              {isLoading ? (
+                <div className="h-7 w-12 bg-white/10 animate-pulse rounded mb-1"></div>
+              ) : (
+                <p className="text-xl font-extrabold text-[#00C896]">{stats?.totalStudents || 0}</p>
+              )}
               <p className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Total Students</p>
             </div>
             <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-left min-w-[120px]">
-              <p className="text-xl font-extrabold text-amber-400 flex items-center gap-1">
-                <Star className="size-4.5 fill-current" />
-                {stats.avgRating}
-              </p>
+              {isLoading ? (
+                <div className="h-7 w-12 bg-white/10 animate-pulse rounded mb-1"></div>
+              ) : (
+                <p className="text-xl font-extrabold text-amber-400 flex items-center gap-1">
+                  <Star className="size-4.5 fill-current" />
+                  {stats?.averageRating?.toFixed(1) || '0.0'}
+                </p>
+              )}
               <p className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Avg Rating</p>
             </div>
             <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-left min-w-[120px]">
-              <p className="text-xl font-extrabold text-indigo-300">+{stats.pointsEarned}</p>
+              {isLoading ? (
+                <div className="h-7 w-12 bg-white/10 animate-pulse rounded mb-1"></div>
+              ) : (
+                <p className="text-xl font-extrabold text-indigo-300">+{stats?.currentPoints || 0}</p>
+              )}
               <p className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Points Balance</p>
             </div>
           </div>
@@ -284,37 +257,47 @@ export default function MentorDashboard() {
             </div>
 
             <div className="space-y-4">
-              <AnimatePresence mode="popLayout">
-                {pendingApprovals.map((req) => (
+              {isLoading && [1, 2].map((i) => (
+                <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex gap-3 animate-pulse">
+                  <div className="size-9 rounded-full bg-slate-200 shrink-0"></div>
+                  <div className="space-y-2 flex-1 pt-1">
+                    <div className="h-3 bg-slate-200 rounded w-1/3"></div>
+                    <div className="h-2 bg-slate-200 rounded w-1/2"></div>
+                  </div>
+                </div>
+              ))}
+              {!isLoading && (
+                <AnimatePresence mode="popLayout">
+                  {pendingApprovals.map((req) => (
                   <motion.div 
                     layout
-                    key={req.id}
+                    key={req.enrollmentId}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 10 }}
                     className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl flex flex-col gap-3 relative overflow-hidden"
                   >
                     <div className="flex gap-3">
-                      <img src={req.student.avatar} className="size-9 rounded-full object-cover border border-slate-200" alt={req.student.name} />
+                      <img src={req.menteeAvatar || 'https://ui-avatars.com/api/?name=User'} className="size-9 rounded-full object-cover border border-slate-200" alt={req.menteeName} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-extrabold text-slate-850">{req.student.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold">{req.student.position} • {req.student.department}</p>
-                        <p className="text-[10px] text-indigo-600 font-extrabold mt-1 truncate">Class: "{req.classTitle}"</p>
+                        <p className="text-xs font-extrabold text-slate-850">{req.menteeName}</p>
+                        <p className="text-[10px] text-slate-400 font-bold">{req.jobTitle || 'Member'}</p>
+                        <p className="text-[10px] text-indigo-600 font-extrabold mt-1 truncate">Class: "{req.eventTitle}"</p>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center pt-2 border-t border-slate-200/50">
-                      <span className="text-[9px] text-slate-400 font-semibold">{req.requestedAt}</span>
+                      <span className="text-[9px] text-slate-400 font-semibold">{new Date(req.requestedAt).toLocaleDateString()}</span>
                       
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => handleApprovalAction(req.id, 'decline', req.student.name)}
+                          onClick={() => handleApprovalAction(req.enrollmentId, 'decline', req.menteeName)}
                           className="size-7 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-400 hover:text-rose-500 rounded-lg flex items-center justify-center cursor-pointer transition-all active:scale-[0.95]"
                         >
                           <X className="size-3.5" />
                         </button>
                         <button 
-                          onClick={() => handleApprovalAction(req.id, 'approve', req.student.name)}
+                          onClick={() => handleApprovalAction(req.enrollmentId, 'approve', req.menteeName)}
                           className="size-7 bg-slate-900 hover:bg-emerald-600 border border-slate-900 hover:border-emerald-600 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all active:scale-[0.95]"
                         >
                           <Check className="size-3.5" />
@@ -324,8 +307,9 @@ export default function MentorDashboard() {
                   </motion.div>
                 ))}
               </AnimatePresence>
+              )}
 
-              {pendingApprovals.length === 0 && (
+              {!isLoading && pendingApprovals.length === 0 && (
                 <div className="py-8 text-center space-y-2">
                   <CheckCircle2 className="size-8 text-emerald-500 mx-auto" />
                   <p className="text-xs font-bold text-slate-700">All caught up!</p>
@@ -398,22 +382,22 @@ export default function MentorDashboard() {
 
             <div className="divide-y divide-slate-100">
               {availability.map((item, idx) => (
-                <div key={item.day} className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div key={item.dayOfWeek} className="py-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   
                   {/* Day active state toggle */}
                   <div className="flex items-center gap-3">
                     <input 
                       type="checkbox" 
-                      id={`day-${item.day}`}
-                      checked={item.active} 
+                      id={`day-${item.dayOfWeek}`}
+                      checked={item.isAvailable} 
                       onChange={() => handleAvailabilityToggle(idx)}
                       className="size-4 accent-indigo-650 rounded cursor-pointer" 
                     />
-                    <label htmlFor={`day-${item.day}`} className={cn(
+                    <label htmlFor={`day-${item.dayOfWeek}`} className={cn(
                       "text-xs font-extrabold cursor-pointer select-none",
-                      item.active ? "text-slate-800" : "text-slate-400 line-through"
+                      item.isAvailable ? "text-slate-800" : "text-slate-400 line-through"
                     )}>
-                      {item.day}
+                      {item.dayOfWeek}
                     </label>
                   </div>
 
@@ -423,17 +407,17 @@ export default function MentorDashboard() {
                     <div className="flex items-center gap-2">
                       <input 
                         type="time" 
-                        value={item.start}
-                        disabled={!item.active}
-                        onChange={(e) => handleTimeChange(idx, 'start', e.target.value)}
+                        value={item.timeSlots?.[0]?.startTime || ''}
+                        disabled={!item.isAvailable}
+                        onChange={(e) => handleTimeChange(idx, 'startTime', e.target.value)}
                         className="px-3 py-1.5 bg-slate-50 disabled:bg-slate-100 border border-slate-200 disabled:border-slate-200/50 rounded-xl text-xs font-bold text-slate-700 disabled:text-slate-400 outline-none focus:border-indigo-400 transition-colors cursor-pointer disabled:cursor-not-allowed"
                       />
                       <span className="text-slate-400 text-xs">—</span>
                       <input 
                         type="time" 
-                        value={item.end}
-                        disabled={!item.active}
-                        onChange={(e) => handleTimeChange(idx, 'end', e.target.value)}
+                        value={item.timeSlots?.[0]?.endTime || ''}
+                        disabled={!item.isAvailable}
+                        onChange={(e) => handleTimeChange(idx, 'endTime', e.target.value)}
                         className="px-3 py-1.5 bg-slate-50 disabled:bg-slate-100 border border-slate-200 disabled:border-slate-200/50 rounded-xl text-xs font-bold text-slate-700 disabled:text-slate-400 outline-none focus:border-indigo-400 transition-colors cursor-pointer disabled:cursor-not-allowed"
                       />
                     </div>
@@ -455,9 +439,22 @@ export default function MentorDashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {classes.map((cls) => {
-                const spotsLeft = cls.totalSlots - cls.takenSlots;
-                const isFull = spotsLeft === 0;
+              {isLoading && [1, 2].map((i) => (
+                <div key={i} className="bg-white border border-slate-100 rounded-2xl overflow-hidden h-64 animate-pulse">
+                  <div className="h-28 bg-slate-200"></div>
+                  <div className="p-4 space-y-3">
+                    <div className="h-3 bg-slate-200 rounded w-1/4"></div>
+                    <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                  </div>
+                </div>
+              ))}
+              {!isLoading && classes.map((cls) => {
+                const spotsLeft = (cls.maxParticipants || 0) - cls.registeredCount;
+                const isFull = spotsLeft <= 0 && cls.maxParticipants !== null;
+
+                const formatString = cls.type === 0 ? 'Course' : cls.type === 1 ? 'Workshop' : cls.type === 2 ? 'Seminar' : 'SharingSession';
+                const statusString = cls.status === 0 ? 'DRAFT' : cls.status === 1 ? 'PENDING' : cls.status === 2 ? 'PUBLISHED' : cls.status === 3 ? 'CANCELLED' : 'COMPLETED';
 
                 return (
                   <div 
@@ -466,33 +463,33 @@ export default function MentorDashboard() {
                   >
                     {/* Header Cover Image */}
                     <div className="h-28 w-full relative overflow-hidden bg-slate-100">
-                      <img src={cls.image} className="size-full object-cover group-hover:scale-101 transition-transform duration-500" alt={cls.title} />
+                      <img src={cls.coverImageUrl || 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=300&auto=format&fit=crop'} className="size-full object-cover group-hover:scale-101 transition-transform duration-500" alt={cls.title} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                       
                       <span className={cn(
                         "absolute top-3 left-3 text-[7px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-lg text-white backdrop-blur-md",
-                        cls.format === 'Online' ? "bg-indigo-600/85" : "bg-teal-600/85"
+                        "bg-indigo-600/85"
                       )}>
-                        {cls.format}
+                        {formatString}
                       </span>
 
                       <span className={cn(
                         "absolute bottom-3 left-3 text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-lg text-white backdrop-blur-md",
-                        cls.status === 'PUBLISHED' ? "bg-emerald-600/85" : "bg-slate-650/85"
+                        statusString === 'PUBLISHED' ? "bg-emerald-600/85" : "bg-slate-650/85"
                       )}>
-                        {cls.status}
+                        {statusString}
                       </span>
                     </div>
 
                     {/* Body */}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
                       <div className="space-y-1">
-                        <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">{cls.category}</span>
+                        <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">{cls.skillName}</span>
                         <h4 className="text-xs font-extrabold text-slate-800 line-clamp-1 leading-snug">{cls.title}</h4>
                         
                         <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-500 font-bold">
                           <Calendar className="size-3 text-slate-400" />
-                          <span>{cls.date} • {cls.time} ({cls.duration})</span>
+                          <span>{new Date(cls.startDate).toLocaleDateString()} • {new Date(cls.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                       </div>
 
@@ -500,11 +497,11 @@ export default function MentorDashboard() {
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-650 font-bold">
                         <div className="flex items-center gap-0.5 text-amber-500">
                           <Star className="size-3 fill-current" />
-                          <span>{cls.rating}</span>
+                          <span>-</span>
                         </div>
                         
                         <span className="text-slate-400">
-                          {cls.takenSlots}/{cls.totalSlots} Slots Taken
+                          {cls.registeredCount}/{cls.maxParticipants || '∞'} Slots Taken
                         </span>
                       </div>
 
@@ -703,7 +700,7 @@ export default function MentorDashboard() {
                     Cancel
                   </button>
                   <button 
-                    onClick={handleConfirmAttendance}
+                    onClick={handleConfirmRollCall}
                     className="flex-1 bg-gradient-to-r from-[#00C896] to-[#00B083] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all shadow-sm"
                   >
                     Confirm & Distribute Points
@@ -714,25 +711,6 @@ export default function MentorDashboard() {
           </div>
         )}
       </AnimatePresence>
-
-      {/* TOAST NOTIFICATION */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            style={{ left: '50%', translateX: '-50%' }}
-            className="fixed bottom-10 z-[200] px-6 py-4 bg-slate-900/95 backdrop-blur-sm text-white rounded-2xl shadow-2xl font-extrabold text-xs flex items-center gap-3 border border-slate-800"
-          >
-            <div className="size-6 bg-[#00C896] rounded-full flex items-center justify-center text-[#0F1F3D] shrink-0 shadow-[0_0_8px_#00C896]">
-              <Check className="size-4 stroke-[2.5]" />
-            </div>
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
     </div>
   );
 }
