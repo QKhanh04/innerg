@@ -35,16 +35,16 @@ export default function MembersPage() {
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-[#0a192f] tracking-tight">Thành viên</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Quản lý nhân sự, phân quyền và trạng thái học tập.</p>
+                    <h1 className="text-3xl font-extrabold text-[#0a192f] tracking-tight">Members</h1>
+                    <p className="text-slate-500 mt-2 font-medium">Personnel management, access control, and learning status tracking.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl shadow-sm hover:bg-slate-50 transition-colors">
-                        <Download className="w-4 h-4" /> Xuất Excel
+                        <Download className="w-4 h-4" /> Export Excel
                     </button>
                     <button className="flex items-center gap-2 px-5 py-2.5 bg-[#13ecb6] text-[#0a192f] font-bold rounded-xl shadow-md shadow-[#13ecb6]/20 hover:brightness-105 transition-all">
-                        <Plus className="w-5 h-5" /> Thêm mới
+                        <Plus className="w-5 h-5" /> Add new
                     </button>
                 </div>
             </div>
@@ -71,7 +71,7 @@ export default function MembersPage() {
                             onChange={(e) => handleFilterChange('role', e.target.value)}
                             className="block w-full pl-3 pr-10 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#13ecb6] focus:bg-white appearance-none text-slate-600 font-medium cursor-pointer transition-all"
                         >
-                            <option value="">Tất cả Role</option>
+                            <option value="">All</option>
                             <option value="HR">HR</option>
                             <option value="MENTOR">Mentor</option>
                             <option value="MENTEE">Mentee</option>
@@ -87,9 +87,9 @@ export default function MembersPage() {
                             onChange={(e) => handleFilterChange('status', e.target.value)}
                             className="block w-full pl-3 pr-10 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#13ecb6] focus:bg-white appearance-none text-slate-600 font-medium cursor-pointer transition-all"
                         >
-                            <option value="">Trạng thái</option>
-                            <option value="ACTIVE">Đang hoạt động</option>
-                            <option value="INACTIVE">Vô hiệu hóa</option>
+                            <option value="">Status</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="INACTIVE">Inactive</option>
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                             <Filter className="w-4 h-4" />
@@ -104,7 +104,7 @@ export default function MembersPage() {
                     <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
                         <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-lg border border-slate-100 font-bold text-slate-600 text-sm">
                             <div className="w-5 h-5 border-2 border-[#13ecb6] border-t-transparent rounded-full animate-spin"></div>
-                            Đang tải danh sách...
+                            Loading...
                         </div>
                     </div>
                 )}

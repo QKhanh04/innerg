@@ -14,6 +14,7 @@ import AdminDashboard from '../pages/admin/AdminDashboard/AdminDashboard';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import MembersPage from '../pages/hr/MembersPage/MembersPage';
+import InvitationsPage from '../pages/hr/invitations/InvitationsPage';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
 import { useAuth } from '../hooks/useAuth';
@@ -82,6 +83,12 @@ const AppRoutes = () => (
             <Route path="/members" element={
                 <ProtectedRoute allowedRoles={['hr']}>
                     <MembersPage />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/invitations" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <InvitationsPage />
                 </ProtectedRoute>
             } />
 
