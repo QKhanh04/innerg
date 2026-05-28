@@ -17,9 +17,11 @@ import {
   ArrowRight,
   SlidersHorizontal,
   BookmarkCheck,
-  Plus
+  Plus,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useRole } from '../../../lib/RoleContext';
 import { toastService } from '../../../services/toastService';
@@ -27,6 +29,7 @@ import { exploreApi } from '../../../api/exploreApi';
 
 export default function ExplorePage() {
   const { role } = useRole();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedLevel, setSelectedLevel] = useState('All');
@@ -435,7 +438,8 @@ export default function ExplorePage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.96 }}
                     whileHover={{ y: -4 }}
-                    className="bg-white rounded-[24px] overflow-hidden border border-slate-200 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col h-full group"
+                    onClick={() => navigate(`/explore/${item.id}`)}
+                    className="bg-white rounded-[24px] overflow-hidden border border-slate-200 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col h-full group cursor-pointer"
                   >
                     {/* Card Header Image with Cover */}
                     <div className="h-44 w-full relative overflow-hidden bg-slate-100">
@@ -476,17 +480,25 @@ export default function ExplorePage() {
                           <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">
                             {item.category} • {item.level}
                           </span>
-                          
-                          <button 
-                            onClick={() => handleWishlistToggle(item.id)}
-                            className={cn(
-                              "size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
-                              inWishlist ? "text-rose-500 bg-rose-50" : "text-slate-300 hover:text-slate-500 bg-slate-50"
-                            )}
-                            title="Add to wishlist"
-                          >
-                            <Bookmark className={cn("size-3.5", inWishlist && "fill-current")} />
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); navigate(`/explore/${item.id}`); }}
+                              className="size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50"
+                              title="View Details"
+                            >
+                              <Info className="size-3.5" />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleWishlistToggle(item.id); }}
+                              className={cn(
+                                "size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
+                                inWishlist ? "text-rose-500 bg-rose-50" : "text-slate-300 hover:text-slate-500 bg-slate-50"
+                              )}
+                              title="Add to wishlist"
+                            >
+                              <Bookmark className={cn("size-3.5", inWishlist && "fill-current")} />
+                            </button>
+                          </div>
                         </div>
 
                         <h4 className="text-sm font-extrabold text-slate-800 leading-snug group-hover:text-indigo-600 transition-colors line-clamp-1">

@@ -45,7 +45,8 @@ export default function CreateClassPage() {
     duration: 60,
     maxSlots: 15,
     points: 100,
-    department: 'All'
+    department: 'All',
+    coverImageUrl: ''
   });
 
   const [skills, setSkills] = useState(['React', 'Frontend']);
@@ -274,7 +275,8 @@ export default function CreateClassPage() {
         maxSlots: maxSlotsVal,
         points: pointsVal,
         skills,
-        resources
+        resources,
+        coverImageUrl: formData.coverImageUrl.trim() || null
       });
       setIsSubmitting(false);
       setShowSuccessModal(true);
@@ -340,6 +342,40 @@ export default function CreateClassPage() {
                 onChange={handleInputChange}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-sm rounded-2xl outline-none transition-all placeholder:text-slate-400 text-slate-850"
               />
+            </div>
+
+            {/* Cover Image URL */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block flex justify-between">
+                <span>Cover Image URL (Optional)</span>
+              </label>
+              <div className="flex gap-4 items-start">
+                <div className="flex-1 space-y-2">
+                  <input 
+                    type="url" 
+                    name="coverImageUrl"
+                    placeholder="https://images.unsplash.com/..."
+                    value={formData.coverImageUrl}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-xs rounded-2xl outline-none transition-all placeholder:text-slate-400 text-slate-850"
+                  />
+                  <p className="text-[10px] text-slate-400 leading-normal">Paste a valid image URL. If left empty, a default premium placeholder will be used.</p>
+                </div>
+                {/* Image Preview */}
+                <div className="size-16 rounded-xl border border-slate-200 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center relative group">
+                  <img 
+                    src={formData.coverImageUrl || "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop"} 
+                    alt="Cover preview" 
+                    className="size-full object-cover"
+                    onError={(e) => { 
+                      if (formData.coverImageUrl && e.target.src !== "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop") {
+                        toastService.warning("The image URL you entered is invalid or protected. Using default cover.");
+                        e.target.src = "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop";
+                      }
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Category & Difficulty Level */}
@@ -888,7 +924,8 @@ export default function CreateClassPage() {
                       duration: 60,
                       maxSlots: 15,
                       points: 100,
-                      department: 'All'
+                      department: 'All',
+                      coverImageUrl: ''
                     });
                     setSkills([]);
                   }}

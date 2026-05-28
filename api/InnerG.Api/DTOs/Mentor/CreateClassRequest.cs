@@ -17,6 +17,7 @@ namespace InnerG.Api.DTOs.Mentor
         public int Duration { get; set; } = 60; // in minutes
         public int MaxSlots { get; set; } = 15;
         public int Points { get; set; } = 100;
+        public string? CoverImageUrl { get; set; }
         public List<string> Skills { get; set; } = new List<string>();
         public List<CreateResourceRequest> Resources { get; set; } = new List<CreateResourceRequest>();
     }
