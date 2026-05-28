@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Plus, 
   ThumbsUp, 
@@ -20,10 +20,13 @@ import {
   List,
   ArrowUpDown,
   BookOpen,
-  User
+  User,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
+import { wishlistApi } from '../../../api/wishlistApi';
+import { toastService } from '../../../services/toastService';
 
 export default function LearningWishlist() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,7 +34,9 @@ export default function LearningWishlist() {
   const [sortBy, setSortBy] = useState('votes'); // votes, recent
   const [viewMode, setViewMode] = useState('grid'); // grid, list
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
   
   // Track expanded descriptions
   const [expandedItems, setExpandedItems] = useState({});
@@ -44,139 +49,70 @@ export default function LearningWishlist() {
     reason: ''
   });
 
-  // Mock initial wishlist data
-  const [wishlistItems, setWishlistItems] = useState([
-    {
-      id: 1,
-      title: "Advanced System Design & Microservices Architecture",
-      description: "Learn how to build high-scale, fault-tolerant distributed systems. We'll cover message queues, caching strategies, API gateways, and database sharding.",
-      category: "Technical",
-      proposedBy: "Trinh Van Hieu",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=hieu",
-      votes: 48,
-      voted: true,
-      status: "in-review", 
-      commentsCount: 14,
-      voters: [
-        "https://i.pravatar.cc/150?u=1",
-        "https://i.pravatar.cc/150?u=2",
-        "https://i.pravatar.cc/150?u=3",
-        "https://i.pravatar.cc/150?u=4"
-      ],
-      hrNote: "HR is actively talking to Alex Rivera (Senior Architect) to host a 3-part workshop series next month! Stay tuned."
-    },
-    {
-      id: 2,
-      title: "Generative AI Integration with LLMs & LangChain",
-      description: "Practical guide to integrating OpenAI, Claude, and local LLMs into web applications using LangChain and vector databases like Pinecone.",
-      category: "Technical",
-      proposedBy: "Nguyen Van Minh",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=minh",
-      votes: 62,
-      voted: false,
-      status: "approved",
-      commentsCount: 22,
-      voters: [
-        "https://i.pravatar.cc/150?u=5",
-        "https://i.pravatar.cc/150?u=6",
-        "https://i.pravatar.cc/150?u=7"
-      ],
-      hrNote: "Workshop scheduled for Sep 26! Mentee can register from the home dashboard now."
-    },
-    {
-      id: 3,
-      title: "Strategic Stakeholder Communication & Negotiation",
-      description: "How to effectively align cross-functional stakeholders, handle pushback from executives, and negotiate roadmaps without burning bridges.",
-      category: "Soft Skill",
-      proposedBy: "Sarah Chen",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=sarah",
-      votes: 27,
-      voted: false,
-      status: "pending",
-      commentsCount: 5,
-      voters: [
-        "https://i.pravatar.cc/150?u=8",
-        "https://i.pravatar.cc/150?u=9"
-      ]
-    },
-    {
-      id: 4,
-      title: "Clean Code & Refactoring Practices in C#",
-      description: "A deep dive into SOLID principles, architectural patterns, design smells, and refactoring legacy dotnet core applications to clean code standards.",
-      category: "Technical",
-      proposedBy: "Tran Minh Dang",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=dang",
-      votes: 19,
-      voted: false,
-      status: "pending",
-      commentsCount: 8,
-      voters: [
-        "https://i.pravatar.cc/150?u=10"
-      ]
-    },
-    {
-      id: 5,
-      title: "Mastering Tailwind CSS v4 & Creative Layouts",
-      description: "Explore the new features of Tailwind CSS v4, including CSS-first configuration, improved compiler performance, custom animations, and complex grid patterns.",
-      category: "Design",
-      proposedBy: "Pham Thu Thao",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=thao",
-      votes: 31,
-      voted: false,
-      status: "pending",
-      commentsCount: 11,
-      voters: [
-        "https://i.pravatar.cc/150?u=11",
-        "https://i.pravatar.cc/150?u=12"
-      ]
-    },
-    {
-      id: 6,
-      title: "Product Analytics with Amplitude & Mixpanel",
-      description: "Understand user behavior, set up tracking events, analyze retention funnels, and build powerful cohorts to drive data-informed product growth.",
-      category: "Product",
-      proposedBy: "Le Hoang Nam",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=nam",
-      votes: 15,
-      voted: false,
-      status: "pending",
-      commentsCount: 3,
-      voters: [
-        "https://i.pravatar.cc/150?u=13"
-      ]
+  const showToast = (message) => {
+    toastService.success(message);
+  };
+
+  // Live fetch function
+  const fetchWishlist = async () => {
+    try {
+      setLoading(true);
+      const data = await wishlistApi.getWishlist();
+      if (isMounted.current) {
+        setWishlistItems(data);
+      }
+    } catch (err) {
+      console.error("Failed to load wishlist items:", err);
+      toastService.error("Failed to load wishlist from server");
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
-  ]);
+  };
 
-  const handleVote = (id) => {
-    setWishlistItems(prevItems => 
-      prevItems.map(item => {
-        if (item.id === id) {
-          const newVoted = !item.voted;
-          const voteDiff = newVoted ? 1 : -1;
-          const currentVoters = [...item.voters || []];
-          
-          if (newVoted) {
-            currentVoters.push("https://i.pravatar.cc/150?u=current_user");
-          } else {
-            const index = currentVoters.indexOf("https://i.pravatar.cc/150?u=current_user");
-            if (index > -1) currentVoters.splice(index, 1);
+  useEffect(() => {
+    isMounted.current = true;
+    fetchWishlist();
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const handleVote = async (id) => {
+    try {
+      const res = await wishlistApi.toggleVote(id); const targetItem = wishlistItems.find(item => item.id === id); const title = targetItem ? targetItem.title : "this topic"; if (res.voted) { showToast(`Upvoted "${title}"! 👍`); } else { showToast(`Removed upvote from "${title}".`); }
+      
+      // Update locally
+      setWishlistItems(prevItems => 
+        prevItems.map(item => {
+          if (item.id === id) {
+            const hasVoted = res.voted;
+            const currentVoters = [...item.voters || []];
+            
+            if (hasVoted) {
+              currentVoters.push("https://api.dicebear.com/7.x/adventurer/svg?seed=You");
+              /* Already notified */
+            } else {
+              const index = currentVoters.indexOf("https://api.dicebear.com/7.x/adventurer/svg?seed=You");
+              if (index > -1) currentVoters.splice(index, 1);
+               /* Already notified */
+            }
+
+            return {
+              ...item,
+              voted: hasVoted,
+              votes: res.votes,
+              voters: currentVoters
+            };
           }
-
-          if (newVoted) {
-            setToast(`Upvoted "${item.title}"! 👍`);
-            setTimeout(() => setToast(null), 3000);
-          }
-
-          return {
-            ...item,
-            voted: newVoted,
-            votes: item.votes + voteDiff,
-            voters: currentVoters
-          };
-        }
-        return item;
-      })
-    );
+          return item;
+        })
+      );
+    } catch (err) {
+      console.error("Failed to cast vote:", err);
+      showToast("Failed to submit vote. Please try again. ⚠️");
+    }
   };
 
   const toggleExpand = (id) => {
@@ -186,48 +122,47 @@ export default function LearningWishlist() {
     }));
   };
 
-  const handleCreateRequest = (e) => {
+  const handleCreateRequest = async (e) => {
     e.preventDefault();
     if (!newRequest.title || !newRequest.description) return;
 
-    const newItem = {
-      id: Date.now(),
-      title: newRequest.title,
-      description: newRequest.description,
-      category: newRequest.category,
-      proposedBy: "You",
-      proposedByAvatar: "https://i.pravatar.cc/150?u=current_user",
-      votes: 1,
-      voted: true,
-      status: "pending",
-      commentsCount: 0,
-      voters: ["https://i.pravatar.cc/150?u=current_user"]
-    };
+    try {
+      const createdItem = await wishlistApi.createRequest({
+        title: newRequest.title,
+        category: newRequest.category,
+        description: newRequest.description,
+        reason: newRequest.reason
+      });
 
-    setWishlistItems(prev => [newItem, ...prev]);
-    setIsModalOpen(false);
-    setNewRequest({ title: '', category: 'Technical', description: '', reason: '' });
-    setToast("Your training request has been published! 🚀");
-    setTimeout(() => setToast(null), 3000);
+      setWishlistItems(prev => [createdItem, ...prev]);
+      setIsModalOpen(false);
+      setNewRequest({ title: '', category: 'Technical', description: '', reason: '' });
+      showToast("Your training request has been published! 🚀");
+    } catch (err) {
+      console.error("Failed to create request:", err);
+      showToast("Failed to submit request. ⚠️");
+    }
   };
 
   // Filter, Search, and Sort Logic
-  const filteredItems = wishlistItems
-    .filter(item => {
-      const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                            item.description.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      if (!matchesSearch) return false;
-      
-      if (selectedFilter === 'popular') return item.votes >= 30;
-      if (selectedFilter === 'approved') return item.status === 'approved';
-      if (selectedFilter === 'my-proposals') return item.proposedBy === 'You';
-      return true; // all
-    })
-    .sort((a, b) => {
-      if (sortBy === 'votes') return b.votes - a.votes;
-      return b.id - a.id; // recent
-    });
+  const filteredItems = useMemo(() => {
+    return wishlistItems
+      .filter(item => {
+        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              item.description.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        if (!matchesSearch) return false;
+        
+        if (selectedFilter === 'popular') return item.votes >= 30;
+        if (selectedFilter === 'approved') return item.status === 'approved';
+        if (selectedFilter === 'my-proposals') return item.proposedBy === 'You';
+        return true; // all
+      })
+      .sort((a, b) => {
+        if (sortBy === 'votes') return b.votes - a.votes;
+        return b.id.localeCompare(a.id); // Guid string locale comparison for stable recent sorting
+      });
+  }, [wishlistItems, searchQuery, selectedFilter, sortBy]);
 
   return (
     <div className="space-y-10 max-w-[1400px] mx-auto pb-16">
@@ -347,7 +282,30 @@ export default function LearningWishlist() {
       {/* WISHLIST GRID/LIST CONTAINER */}
       <div>
         <AnimatePresence mode="popLayout">
-          {filteredItems.length > 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-white rounded-2xl p-5 border border-slate-200/50 shadow-sm space-y-4 animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="h-5 w-16 bg-slate-200 rounded-lg" />
+                    <div className="h-5 w-20 bg-slate-200 rounded-lg" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-6 w-3/4 bg-slate-200 rounded-lg" />
+                    <div className="h-4 w-full bg-slate-200 rounded" />
+                    <div className="h-4 w-5/6 bg-slate-200 rounded" />
+                  </div>
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="size-6 rounded-full bg-slate-200" />
+                      <div className="h-3 w-16 bg-slate-200 rounded" />
+                    </div>
+                    <div className="h-8 w-16 bg-slate-200 rounded-xl" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredItems.length > 0 ? (
             
             viewMode === 'grid' ? (
               // DENSE GRID LAYOUT (2 or 3 columns to maximize visibility)
@@ -675,24 +633,6 @@ export default function LearningWishlist() {
                 </div>
              </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-
-      {/* TOAST */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            style={{ left: '50%', translateX: '-50%' }}
-            className="fixed bottom-10 z-[200] px-6 py-4 bg-slate-900/95 backdrop-blur-sm text-white rounded-2xl shadow-2xl font-bold text-xs flex items-center gap-3 border border-slate-800"
-          >
-            <div className="size-6 bg-[#00C896] rounded-full flex items-center justify-center text-[#0F1F3D] shrink-0 shadow-[0_0_8px_#00C896]">
-              <ChevronRight className="size-4.5" />
-            </div>
-            {toast}
-          </motion.div>
         )}
       </AnimatePresence>
     </div>

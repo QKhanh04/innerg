@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { mentorApi } from '../../../api/mentorApi';
 import { 
   BarChart3, 
@@ -68,8 +68,11 @@ export default function MentorDashboard() {
     { dayOfWeek: 'Friday', isAvailable: false, timeSlots: [] }
   ]);
 
+  const isMounted = useRef(true);
+
   // Fetch initial data
   useEffect(() => {
+    isMounted.current = true;
     const fetchData = async () => {
       try {
         setIsLoading(true);
@@ -80,6 +83,8 @@ export default function MentorDashboard() {
           mentorApi.getAvailability()
         ]);
 
+        if (!isMounted.current) return;
+
         setStats(statsRes);
         setClasses(classesRes);
         setPendingApprovals(pendingRes);
@@ -88,14 +93,21 @@ export default function MentorDashboard() {
           setAvailability(availRes.weeklySchedule);
         }
       } catch (error) {
-        console.error('Failed to fetch mentor data:', error);
-        showToast('Failed to load dashboard data. Please try again.');
+        if (isMounted.current) {
+          console.error('Failed to fetch mentor data:', error);
+          showToast('Failed to load dashboard data. Please try again.');
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   const handleAvailabilityToggle = (idx) => {

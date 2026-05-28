@@ -183,6 +183,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IMentorService, MentorService>();
+builder.Services.AddScoped<IResourceHubService, ResourceHubService>();
 
 builder.Services.AddHostedService<UserSessionCleanupService>();
 
