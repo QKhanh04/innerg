@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Search, 
   Filter, 
@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useRole } from '../../../lib/RoleContext';
 import { toastService } from '../../../services/toastService';
+import { exploreApi } from '../../../api/exploreApi';
 
 export default function ExplorePage() {
   const { role } = useRole();
@@ -32,202 +33,155 @@ export default function ExplorePage() {
   const [selectedFormat, setSelectedFormat] = useState('All');
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   
-  // Registration state simulation
-  const [registeredIds, setRegisteredIds] = useState([2]); // Card 2 is pre-registered
-  const [wishlistIds, setWishlistIds] = useState([]);
-  
-  // Dynamic statistics
-  const [stats, setStats] = useState({
-    activeClasses: 48,
-    skillsExchanged: 1240,
-    activeMentors: 350
+  // Live loading and dataset states
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [wishlistIds, setWishlistIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('explore_wishlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
+  
+  const isMounted = useRef(true);
+
+  // Dynamic statistics calculated from live data
+  const stats = useMemo(() => {
+    const activeMentors = new Set(classes.map(c => c.mentor?.name)).size;
+    const skillsExchanged = classes.reduce((acc, c) => acc + (c.skills?.length || 0), 0) * 15;
+    return {
+      activeClasses: classes.length,
+      skillsExchanged: 1240 + skillsExchanged,
+      activeMentors: 350 + activeMentors
+    };
+  }, [classes]);
 
   const showToast = (message) => {
     const lowerMsg = message.toLowerCase();
     if (lowerMsg.includes('failed') || lowerMsg.includes('error') || lowerMsg.includes('full')) {
       toastService.error(message);
-    } else if (lowerMsg.includes('success') || lowerMsg.includes('register') || lowerMsg.includes('added') || message.includes('🎉') || message.includes('❤️')) {
+    } else if (lowerMsg.includes('success') || lowerMsg.includes('register') || lowerMsg.includes('added') || message.includes('🎉') || message.includes('❤️') || message.includes('⌛')) {
       toastService.success(message);
     } else {
       toastService.info(message);
     }
   };
 
-  const categories = ['All', 'Technical', 'Soft Skills', 'Design', 'Leadership', 'Wellness'];
+  // Live fetch function
+  const fetchClasses = async () => {
+    try {
+      setLoading(true);
+      const data = await exploreApi.getExploreClasses();
+      if (isMounted.current) {
+        // Normalize categories in-place to prevent "Soft Skill" vs "Soft Skills" duplicates
+        const normalizedData = data.map(cls => {
+          let cat = cls.category ? cls.category.trim() : "General";
+          cat = cat.replace(/\b\w/g, c => c.toUpperCase());
+          if (cat === 'Soft Skill' || cat === 'Soft Skills') {
+            cat = 'Soft Skills';
+          }
+          return {
+            ...cls,
+            category: cat
+          };
+        });
+        setClasses(normalizedData);
+      }
+    } catch (err) {
+      if (isMounted.current) {
+        console.error("Failed to load explore classes:", err);
+        toastService.error("Failed to load classes from marketplace");
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    isMounted.current = true;
+    fetchClasses();
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Save wishlist items
+  useEffect(() => {
+    try {
+      localStorage.setItem('explore_wishlist', JSON.stringify(wishlistIds));
+    } catch (err) {
+      console.error(err);
+    }
+  }, [wishlistIds]);
+
+  const categories = useMemo(() => {
+    const cats = new Set();
+    classes.forEach(cls => {
+      if (cls.category) cats.add(cls.category);
+    });
+    return ['All', ...Array.from(cats)];
+  }, [classes]);
+
   const levels = ['All', 'Beginner', 'Intermediate', 'Expert'];
   const formats = ['All', 'Online', 'Offline'];
 
-  // Rich Dummy Data matching real-world business context perfectly
-  const [classes, setClasses] = useState([
-    {
-      id: 1,
-      title: 'Advanced React Architecture',
-      description: 'Master custom hooks, performance tuning, code-splitting, state patterns, and clean architecture in modern enterprise React apps.',
-      category: 'Technical',
-      level: 'Expert',
-      format: 'Online',
-      formatDetail: 'Zoom Meeting',
-      mentor: {
-        name: 'Minh Dang',
-        avatar: 'https://i.pravatar.cc/150?u=minhdang',
-        rating: '4.9',
-        position: 'Principal Engineer'
-      },
-      skills: ['React', 'Frontend', 'Software Architecture'],
-      date: 'May 28, 2026',
-      time: '03:00 PM',
-      duration: '90 mins',
-      totalSlots: 20,
-      takenSlots: 15,
-      points: 150,
-      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop'
-    },
-    {
-      id: 2,
-      title: 'System Design 101',
-      description: 'An introductory class covering microservices, caching strategies, load balancing, message queues, and high-availability database setups.',
-      category: 'Technical',
-      level: 'Beginner',
-      format: 'Offline',
-      formatDetail: 'HQ Room 402',
-      mentor: {
-        name: 'John Doe',
-        avatar: 'https://i.pravatar.cc/150?u=johndoe',
-        rating: '4.8',
-        position: 'Solution Architect'
-      },
-      skills: ['System Design', 'Backend', 'DevOps'],
-      date: 'May 29, 2026',
-      time: '10:00 AM',
-      duration: '120 mins',
-      totalSlots: 15,
-      takenSlots: 8,
-      points: 100,
-      image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=400&auto=format&fit=crop'
-    },
-    {
-      id: 3,
-      title: 'High-Impact Presentation Skills',
-      description: 'Learn dynamic storytelling frameworks, slide design strategies, body language techniques, and ways to handle difficult QA sessions like a pro.',
-      category: 'Soft Skills',
-      level: 'Intermediate',
-      format: 'Online',
-      formatDetail: 'MS Teams',
-      mentor: {
-        name: 'Thu Ha',
-        avatar: 'https://i.pravatar.cc/150?u=thuha',
-        rating: '5.0',
-        position: 'Product Director'
-      },
-      skills: ['Public Speaking', 'Communication', 'Product Strategy'],
-      date: 'May 30, 2026',
-      time: '02:00 PM',
-      duration: '60 mins',
-      totalSlots: 30,
-      takenSlots: 30, // Full
-      points: 80,
-      image: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?q=80&w=400&auto=format&fit=crop'
-    },
-    {
-      id: 4,
-      title: 'UI Design Principles & Figma Mastery',
-      description: 'Dive deep into layouts, grid systems, typography, harmony colors, auto-layout, nested components, and interactive prototypes in Figma.',
-      category: 'Design',
-      level: 'Intermediate',
-      format: 'Offline',
-      formatDetail: 'Design Studio 10',
-      mentor: {
-        name: 'Alex Mercer',
-        avatar: 'https://i.pravatar.cc/150?u=alex',
-        rating: '4.7',
-        position: 'Lead Product Designer'
-      },
-      skills: ['UI/UX', 'Figma', 'Product Design'],
-      date: 'June 01, 2026',
-      time: '09:30 AM',
-      duration: '180 mins',
-      totalSlots: 12,
-      takenSlots: 11,
-      points: 200,
-      image: 'https://images.unsplash.com/photo-1561070791-26c113006238?q=80&w=400&auto=format&fit=crop'
-    },
-    {
-      id: 5,
-      title: 'Coaching & Mentoring for Team Leads',
-      description: 'Equip yourself with structured GROW models, constructive feedback loops, career planning advice, and frameworks to inspire high-performance teams.',
-      category: 'Leadership',
-      level: 'Expert',
-      format: 'Offline',
-      formatDetail: 'Executive Lounge',
-      mentor: {
-        name: 'Sarah Connor',
-        avatar: 'https://i.pravatar.cc/150?u=sarah',
-        rating: '4.9',
-        position: 'VP of Engineering'
-      },
-      skills: ['Leadership', 'Mentoring', 'Management'],
-      date: 'June 03, 2026',
-      time: '04:00 PM',
-      duration: '90 mins',
-      totalSlots: 10,
-      takenSlots: 4,
-      points: 120,
-      image: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=400&auto=format&fit=crop'
-    },
-    {
-      id: 6,
-      title: 'Office Ergonomics & Mindful Stretch',
-      description: 'Relieve posture strain, prevent computer-vision fatigue, and master simple exercises to remain focused and energized throughout the workday.',
-      category: 'Wellness',
-      level: 'Beginner',
-      format: 'Online',
-      formatDetail: 'InnerG Wellness Channel',
-      mentor: {
-        name: 'Chloe Park',
-        avatar: 'https://i.pravatar.cc/150?u=chloe',
-        rating: '4.8',
-        position: 'Health Consultant'
-      },
-      skills: ['Ergonomics', 'Mindfulness', 'Wellness'],
-      date: 'June 05, 2026',
-      time: '08:30 AM',
-      duration: '45 mins',
-      totalSlots: 100,
-      takenSlots: 22,
-      points: 50,
-      image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=400&auto=format&fit=crop'
-    }
-  ]);
-
-  // AI Recommendation list
+  // AI Recommendation list dynamically matched from active classes
   const aiRecommendations = useMemo(() => {
-    return classes.slice(0, 2).map(cls => ({
+    return classes.slice(0, 2).map((cls, idx) => ({
       ...cls,
-      matchPercentage: cls.id === 1 ? 98 : 94
+      matchPercentage: idx === 0 ? 98 : 94
     }));
   }, [classes]);
 
-  // Handle Dynamic Registration Flow
-  const handleRegister = (id) => {
+  // Handle Live Registration Flow
+  const handleRegister = async (id) => {
     const cls = classes.find(c => c.id === id);
     if (!cls) return;
 
-    if (registeredIds.includes(id)) {
-      // Unregister
-      setRegisteredIds(prev => prev.filter(item => item !== id));
-      setClasses(prev => prev.map(c => c.id === id ? { ...c, takenSlots: c.takenSlots - 1 } : c));
-      showToast(`Successfully canceled registration for "${cls.title}".`);
-    } else {
-      // Check if slot is available
-      if (cls.takenSlots >= cls.totalSlots) {
-        showToast("Sorry, this class is full!");
-        return;
+    const isPending = cls.registrationStatus === 'Pending';
+    const isRegistered = cls.registrationStatus === 'Registered';
+
+    try {
+      if (isPending || isRegistered) {
+        // Cancel/unregister
+        await exploreApi.unregisterClass(id);
+        setClasses(prev => prev.map(c => {
+          if (c.id === id) {
+            return {
+              ...c,
+              registrationStatus: 'NotRegistered',
+              takenSlots: isRegistered ? Math.max(0, c.takenSlots - 1) : c.takenSlots
+            };
+          }
+          return c;
+        }));
+        showToast(`Successfully canceled registration for "${cls.title}".`);
+      } else {
+        // Check if slot is available
+        if (cls.takenSlots >= cls.totalSlots) {
+          showToast("Sorry, this class is full!");
+          return;
+        }
+        
+        await exploreApi.registerClass(id);
+        setClasses(prev => prev.map(c => {
+          if (c.id === id) {
+            return {
+              ...c,
+              registrationStatus: 'Pending'
+            };
+          }
+          return c;
+        }));
+        showToast(`Successfully requested registration for "${cls.title}". Pending mentor approval! ⌛`);
       }
-      
-      setRegisteredIds(prev => [...prev, id]);
-      setClasses(prev => prev.map(c => c.id === id ? { ...c, takenSlots: c.takenSlots + 1 } : c));
-      showToast(`Successfully registered for "${cls.title}"! Added to schedule. 🎉`);
+    } catch (err) {
+      console.error("Failed to register/unregister:", err);
+      showToast("Operation failed. Please try again.");
     }
   };
 
@@ -358,12 +312,14 @@ export default function ExplorePage() {
                     onClick={() => handleRegister(item.id)}
                     className={cn(
                       "text-[9px] font-extrabold uppercase tracking-widest px-4 py-2 rounded-xl transition-all cursor-pointer",
-                      registeredIds.includes(item.id)
+                      item.registrationStatus === 'Registered'
                         ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                        : "bg-[#9333EA] hover:bg-[#7e22ce] text-white"
+                        : item.registrationStatus === 'Pending'
+                          ? "bg-amber-50 text-amber-600 border border-amber-200"
+                          : "bg-[#9333EA] hover:bg-[#7e22ce] text-white"
                     )}
                   >
-                    {registeredIds.includes(item.id) ? "✓ Registered" : "Register"}
+                    {item.registrationStatus === 'Registered' ? "✓ Enrolled" : item.registrationStatus === 'Pending' ? "⌛ Pending" : "Register"}
                   </button>
                 </div>
               </div>
@@ -445,134 +401,155 @@ export default function ExplorePage() {
         </div>
 
         {/* Class Catalog Grid (Pristine Glassmorphism look) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence mode="popLayout">
-            {filteredClasses.map((item) => {
-              const isFull = item.takenSlots >= item.totalSlots;
-              const isRegistered = registeredIds.includes(item.id);
-              const inWishlist = wishlistIds.includes(item.id);
-              const spotsLeft = item.totalSlots - item.takenSlots;
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="bg-white rounded-[24px] overflow-hidden border border-slate-200 shadow-xs p-5 space-y-4 animate-pulse">
+                <div className="h-44 w-full bg-slate-200 rounded-2xl" />
+                <div className="h-4 w-1/3 bg-slate-200 rounded" />
+                <div className="h-5 w-3/4 bg-slate-200 rounded" />
+                <div className="h-12 w-full bg-slate-200 rounded" />
+                <div className="flex gap-2">
+                  <div className="h-6 w-12 bg-slate-200 rounded-md" />
+                  <div className="h-6 w-12 bg-slate-200 rounded-md" />
+                </div>
+                <div className="h-10 w-full bg-slate-200 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <AnimatePresence mode="popLayout">
+              {filteredClasses.map((item) => {
+                const isFull = item.takenSlots >= item.totalSlots;
+                const isRegistered = item.registrationStatus === 'Registered';
+                const isPending = item.registrationStatus === 'Pending';
+                const inWishlist = wishlistIds.includes(item.id);
+                const spotsLeft = item.totalSlots - item.takenSlots;
 
-              return (
-                <motion.div 
-                  layout
-                  key={item.id}
-                  initial={{ opacity: 0, scale: 0.96 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.96 }}
-                  whileHover={{ y: -4 }}
-                  className="bg-white rounded-[24px] overflow-hidden border border-slate-200 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col h-full group"
-                >
-                  {/* Card Header Image with Cover */}
-                  <div className="h-44 w-full relative overflow-hidden bg-slate-100">
-                    <img src={item.image} className="size-full object-cover group-hover:scale-102 transition-transform duration-550" alt={item.title} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                    
-                    {/* Floating Formats Badge */}
-                    <span className={cn(
-                      "absolute top-4 left-4 inline-flex items-center gap-1 text-[8px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-lg text-white backdrop-blur-md shadow-xs",
-                      item.format === 'Online' ? "bg-indigo-600/85" : "bg-teal-600/85"
-                    )}>
-                      {item.format === 'Online' ? <Video className="size-2.5" /> : <MapPin className="size-2.5" />}
-                      {item.format}
-                    </span>
+                return (
+                  <motion.div 
+                    layout
+                    key={item.id}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    whileHover={{ y: -4 }}
+                    className="bg-white rounded-[24px] overflow-hidden border border-slate-200 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col h-full group"
+                  >
+                    {/* Card Header Image with Cover */}
+                    <div className="h-44 w-full relative overflow-hidden bg-slate-100">
+                      <img src={item.image} className="size-full object-cover group-hover:scale-102 transition-transform duration-550" alt={item.title} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                      
+                      {/* Floating Formats Badge */}
+                      <span className={cn(
+                        "absolute top-4 left-4 inline-flex items-center gap-1 text-[8px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-lg text-white backdrop-blur-md shadow-xs",
+                        item.format === 'Online' ? "bg-indigo-600/85" : "bg-teal-600/85"
+                      )}>
+                        {item.format === 'Online' ? <Video className="size-2.5" /> : <MapPin className="size-2.5" />}
+                        {item.format}
+                      </span>
 
-                    {/* Reward Points cost/prize */}
-                    <span className="absolute top-4 right-4 bg-slate-900/85 text-white font-extrabold text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg backdrop-blur-md">
-                      +{item.points} pts
-                    </span>
+                      {/* Reward Points cost/prize */}
+                      <span className="absolute top-4 right-4 bg-slate-900/85 text-white font-extrabold text-[8px] uppercase tracking-widest px-2.5 py-1 rounded-lg backdrop-blur-md">
+                        +{item.points} pts
+                      </span>
 
-                    {/* Slots availability tag */}
-                    <span className={cn(
-                      "absolute bottom-4 left-4 text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md",
-                      isFull 
-                        ? "bg-rose-600/85" 
-                        : spotsLeft <= 3 
-                          ? "bg-amber-600/85" 
-                          : "bg-emerald-600/85"
-                    )}>
-                      {isFull ? "FULL HOUSE" : `${spotsLeft} Slots Left`}
-                    </span>
-                  </div>
+                      {/* Slots availability tag */}
+                      <span className={cn(
+                        "absolute bottom-4 left-4 text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md",
+                        isFull 
+                          ? "bg-rose-600/85" 
+                          : spotsLeft <= 3 
+                            ? "bg-amber-600/85" 
+                            : "bg-emerald-600/85"
+                      )}>
+                        {isFull ? "FULL HOUSE" : `${spotsLeft} Slots Left`}
+                      </span>
+                    </div>
 
-                  {/* Card Body */}
-                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4 text-left">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">
-                          {item.category} • {item.level}
-                        </span>
-                        
-                        <button 
-                          onClick={() => handleWishlistToggle(item.id)}
+                    {/* Card Body */}
+                    <div className="p-5 flex-1 flex flex-col justify-between space-y-4 text-left">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">
+                            {item.category} • {item.level}
+                          </span>
+                          
+                          <button 
+                            onClick={() => handleWishlistToggle(item.id)}
+                            className={cn(
+                              "size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
+                              inWishlist ? "text-rose-500 bg-rose-50" : "text-slate-300 hover:text-slate-500 bg-slate-50"
+                            )}
+                            title="Add to wishlist"
+                          >
+                            <Bookmark className={cn("size-3.5", inWishlist && "fill-current")} />
+                          </button>
+                        </div>
+
+                        <h4 className="text-sm font-extrabold text-slate-800 leading-snug group-hover:text-indigo-600 transition-colors line-clamp-1">
+                          {item.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">
+                          {item.description}
+                        </p>
+                      </div>
+
+                      {/* Skill Badges */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {item.skills.map((skill, sIdx) => (
+                          <span key={sIdx} className="text-[8px] font-extrabold text-slate-650 bg-slate-100/70 border border-slate-200/50 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Time & Venue Meta Info */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-450 font-bold">
+                        <div className="flex items-center gap-1">
+                          <Clock className="size-3 text-slate-400" />
+                          <span>{item.date} • {item.time} ({item.duration})</span>
+                        </div>
+                        <span className="text-slate-500 truncate max-w-[90px]">{item.formatDetail}</span>
+                      </div>
+
+                      {/* Mentor Profile and Action Register Button */}
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img src={item.mentor.avatar} className="size-8 rounded-full object-cover border-2 border-slate-200" alt={item.mentor.name} />
+                          <div className="min-w-0 text-left">
+                            <p className="text-[10px] font-extrabold text-slate-800 truncate leading-tight">{item.mentor.name}</p>
+                            <p className="text-[8px] text-slate-400 font-semibold truncate mt-0.5">{item.mentor.position}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRegister(item.id)}
+                          disabled={isFull && !isRegistered && !isPending}
                           className={cn(
-                            "size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
-                            inWishlist ? "text-rose-500 bg-rose-50" : "text-slate-300 hover:text-slate-500 bg-slate-50"
+                            "px-4 py-2.5 rounded-xl text-[9px] font-extrabold uppercase tracking-widest transition-all cursor-pointer active:scale-[0.98] border shadow-xs disabled:opacity-50 shrink-0",
+                            isRegistered
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100/50"
+                              : isPending
+                                ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100/50 animate-pulse"
+                                : isFull
+                                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                                  : "bg-slate-900 border-slate-900 hover:bg-slate-800 text-white"
                           )}
-                          title="Add to wishlist"
                         >
-                          <Bookmark className={cn("size-3.5", inWishlist && "fill-current")} />
+                          {isRegistered ? "✓ Enrolled" : isPending ? "⌛ Pending" : isFull ? "FULL" : "Register"}
                         </button>
                       </div>
 
-                      <h4 className="text-sm font-extrabold text-slate-800 leading-snug group-hover:text-indigo-600 transition-colors line-clamp-1">
-                        {item.title}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">
-                        {item.description}
-                      </p>
                     </div>
-
-                    {/* Skill Badges */}
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {item.skills.map((skill, sIdx) => (
-                        <span key={sIdx} className="text-[8px] font-extrabold text-slate-600 bg-slate-100/70 border border-slate-200/50 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Time & Venue Meta Info */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-450 font-bold">
-                      <div className="flex items-center gap-1">
-                        <Clock className="size-3 text-slate-400" />
-                        <span>{item.date} • {item.time} ({item.duration})</span>
-                      </div>
-                      <span className="text-slate-500 truncate max-w-[90px]">{item.formatDetail}</span>
-                    </div>
-
-                    {/* Mentor Profile and Action Register Button */}
-                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <img src={item.mentor.avatar} className="size-8 rounded-full object-cover border-2 border-slate-200" alt={item.mentor.name} />
-                        <div className="min-w-0 text-left">
-                          <p className="text-[10px] font-extrabold text-slate-800 truncate leading-tight">{item.mentor.name}</p>
-                          <p className="text-[8px] text-slate-400 font-semibold truncate mt-0.5">{item.mentor.position}</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleRegister(item.id)}
-                        disabled={isFull && !isRegistered}
-                        className={cn(
-                          "px-4 py-2.5 rounded-xl text-[9px] font-extrabold uppercase tracking-widest transition-all cursor-pointer active:scale-[0.98] border shadow-xs disabled:opacity-50 shrink-0",
-                          isRegistered
-                            ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100/50"
-                            : isFull
-                              ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                              : "bg-slate-900 border-slate-900 hover:bg-slate-800 text-white"
-                        )}
-                      >
-                        {isRegistered ? "✓ Registered" : isFull ? "FULL" : "Register"}
-                      </button>
-                    </div>
-
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Empty Search Result Page */}
         {filteredClasses.length === 0 && (

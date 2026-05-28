@@ -81,13 +81,13 @@ const AppRoutes = () => (
             } />
 
             <Route path="/wishlist" element={
-                <ProtectedRoute allowedRoles={['mentee', 'hr']}>
+                <ProtectedRoute allowedRoles={['mentee', 'hr', 'mentor']}>
                     <LearningWishlist />
                 </ProtectedRoute>
             } />
 
             <Route path="/members" element={
-                    <MembersPage />
+                <MembersPage />
             } />
 
             <Route path="/schedule" element={
