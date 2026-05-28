@@ -109,9 +109,10 @@ namespace InnerG.Api.Controllers
                     var skillsList = new List<string> { te.Skill?.Name ?? "General" };
 
                     // Date & Time
-                    string dateStr = te.StartDate.ToString("MMM dd, yyyy");
-                    string timeStr = te.StartDate.ToString("hh:mm tt");
-                    string durationStr = $"{(te.EndDate - te.StartDate).TotalMinutes} mins";
+                    string dateStr = te.StartDate.ToString("MMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture);
+                    string timeStr = te.StartDate.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+                    double totalMins = (te.EndDate - te.StartDate).TotalMinutes;
+                    string durationStr = totalMins > 1440 ? $"{(te.EndDate - te.StartDate).TotalDays:0} days" : $"{totalMins:0} mins";
 
                     // Trainer Position
                     string trainerPos = te.IsExternal ? "External Expert" : "Lead Mentor";
@@ -248,6 +249,144 @@ namespace InnerG.Api.Controllers
                 await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Successfully cancelled registration." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("{eventId}")]
+        public async Task<IActionResult> GetExploreClassDetail(Guid eventId)
+        {
+            try
+            {
+                var companyId = GetCurrentCompanyId();
+                var userId = GetCurrentUserId();
+
+                if (companyId == Guid.Empty)
+                {
+                    return BadRequest(new { message = "Company context is missing from token." });
+                }
+
+                var te = await _context.TrainingEvents
+                    .IgnoreQueryFilters()
+                    .Where(t => t.Id == eventId && t.CompanyId == companyId)
+                    .Include(t => t.Skill)
+                    .Include(t => t.Trainer)
+                        .ThenInclude(tr => tr.User)
+                    .Include(t => t.Enrollments)
+                    .Include(t => t.Sessions)
+                        .ThenInclude(s => s.MeetingRoom)
+                    .FirstOrDefaultAsync();
+
+                if (te == null)
+                {
+                    return NotFound(new { message = "Class not found." });
+                }
+
+                // Check enrollment status of the current user
+                var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
+                string regStatus = "NotRegistered";
+                if (userEnrollment != null)
+                {
+                    regStatus = userEnrollment.Status == EnrollmentStatus.Confirmed ? "Registered" :
+                                userEnrollment.Status == EnrollmentStatus.Pending ? "Pending" : "NotRegistered";
+                }
+
+                // Format and FormatDetail resolution based on the first session
+                var firstSession = te.Sessions.OrderBy(s => s.StartTime).FirstOrDefault();
+                string format = "Online";
+                string formatDetail = "Online Session";
+
+                if (firstSession != null)
+                {
+                    if (firstSession.MeetingRoom != null)
+                    {
+                        format = "Offline";
+                        formatDetail = firstSession.MeetingRoom.Name;
+                    }
+                    else if (!string.IsNullOrEmpty(firstSession.Notes) && firstSession.Notes.StartsWith("Physical Room: "))
+                    {
+                        format = "Offline";
+                        formatDetail = firstSession.Notes.Replace("Physical Room: ", "");
+                    }
+                    else if (!string.IsNullOrEmpty(firstSession.MeetingLink))
+                    {
+                        format = "Online";
+                        formatDetail = "Online Meeting";
+                    }
+                    else if (te.Sessions.Any(s => s.MeetingRoomId.HasValue))
+                    {
+                        format = "Offline";
+                        formatDetail = "Physical Room";
+                    }
+                }
+
+                // Skills associated
+                var skillsList = new List<string> { te.Skill?.Name ?? "General" };
+
+                // Category normalization
+                string rawCategory = te.Skill?.Category ?? "General";
+                string normalizedCategory = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(rawCategory.Trim().ToLower());
+                if (normalizedCategory == "Soft Skill" || normalizedCategory == "Soft Skills")
+                {
+                    normalizedCategory = "Soft Skills";
+                }
+
+                // Process Sessions
+                var sessionDtos = te.Sessions.OrderBy(s => s.StartTime).Select(s => {
+                    string sFormat = "Online";
+                    string sLoc = s.MeetingLink ?? "TBA";
+                    if (s.MeetingRoom != null) {
+                        sFormat = "Offline";
+                        sLoc = s.MeetingRoom.Name;
+                    } else if (!string.IsNullOrEmpty(s.Notes) && s.Notes.StartsWith("Physical Room: ")) {
+                        sFormat = "Offline";
+                        sLoc = s.Notes.Replace("Physical Room: ", "");
+                    }
+                    
+                    return new TrainingSessionDto {
+                        Id = s.Id,
+                        Title = s.Title,
+                        StartTime = s.StartTime.ToString("hh:mm tt, MMM dd", System.Globalization.CultureInfo.InvariantCulture),
+                        EndTime = s.EndTime.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture),
+                        Duration = (s.EndTime - s.StartTime).TotalMinutes > 1440 ? $"{(s.EndTime - s.StartTime).TotalDays:0} days" : $"{(s.EndTime - s.StartTime).TotalMinutes:0} mins",
+                        Format = sFormat,
+                        LocationOrLink = sLoc
+                    };
+                }).ToList();
+
+                var detailDto = new ExploreClassDetailDto
+                {
+                    Id = te.Id,
+                    Title = te.Title,
+                    Description = te.Description ?? string.Empty,
+                    Category = normalizedCategory,
+                    Level = "Intermediate",
+                    Format = format,
+                    FormatDetail = formatDetail,
+                    Mentor = new ExploreMentorDto
+                    {
+                        Name = te.Trainer?.FullName ?? "Unknown Mentor",
+                        Avatar = te.Trainer?.User?.AvatarUrl ?? $"https://api.dicebear.com/7.x/adventurer/svg?seed={te.Trainer?.FullName ?? "Mentor"}",
+                        Rating = "4.9",
+                        Position = te.IsExternal ? "External Expert" : "Lead Mentor"
+                    },
+                    Skills = skillsList,
+                    Date = te.StartDate.ToString("MMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture),
+                    Time = te.StartDate.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture),
+                    Duration = (te.EndDate - te.StartDate).TotalMinutes > 1440 ? $"{(te.EndDate - te.StartDate).TotalDays:0} days" : $"{(te.EndDate - te.StartDate).TotalMinutes:0} mins",
+                    TotalSlots = te.MaxParticipants ?? 20,
+                    TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed),
+                    Points = te.RewardPoints,
+                    Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
+                    RegistrationStatus = regStatus,
+                    EventStatus = te.Status.ToString(),
+                    Sessions = sessionDtos
+                };
+
+                return Ok(detailDto);
             }
             catch (Exception ex)
             {

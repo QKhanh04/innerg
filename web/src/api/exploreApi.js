@@ -17,5 +17,11 @@ export const exploreApi = {
   unregisterClass: async (eventId) => {
     const response = await api.delete(`/explore/${eventId}/unregister`);
     return response.data;
+  },
+
+  // Get details for a specific class/workshop
+  getClassDetail: async (eventId) => {
+    const response = await api.get(`/explore/${eventId}`);
+    return response.data;
   }
 };

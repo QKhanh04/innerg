@@ -292,7 +292,7 @@ namespace InnerG.Api.Services.Implementations
                 MaxParticipants = request.MaxSlots,
                 IsExternal = false,
                 RewardPoints = request.Points,
-                CoverImageUrl = "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=600&auto=format&fit=crop"
+                CoverImageUrl = string.IsNullOrWhiteSpace(request.CoverImageUrl) ? "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=600&auto=format&fit=crop" : request.CoverImageUrl
             };
 
             await _unitOfWork.Repository<TrainingEvent>().AddAsync(trainingEvent);
