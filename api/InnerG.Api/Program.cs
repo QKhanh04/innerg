@@ -184,6 +184,8 @@ builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IMentorService, MentorService>();
+builder.Services.AddScoped<IResourceHubService, ResourceHubService>();
 
 builder.Services.AddHostedService<UserSessionCleanupService>();
 
@@ -209,6 +211,7 @@ using (var scope = app.Services.CreateScope())
     await context.Database.MigrateAsync();
     await UserNameNormalizationSeeder.NormalizeAsync(context);
     await DataSeeder.SeedAsync(scope.ServiceProvider);
+    await DemoBusinessDataSeeder.SeedAsync(scope.ServiceProvider);
 }
 
 app.UseHttpsRedirection();

@@ -10,8 +10,6 @@ namespace InnerG.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Commented out to fix "column already exists" error during auto-migration
-            
             migrationBuilder.AddColumn<double>(
                 name: "AvgRating",
                 table: "Trainers",
@@ -39,7 +37,10 @@ namespace InnerG.Api.Migrations
                 type: "integer",
                 nullable: false,
                 defaultValue: 0);
+<<<<<<< HEAD
 
+=======
+>>>>>>> 29e95a9290ea4fdcb6d0bfb5f63729e448469c51
         }
 
         /// <inheritdoc />
