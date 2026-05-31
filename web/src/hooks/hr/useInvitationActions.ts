@@ -12,11 +12,11 @@ export function useInvitationActions() {
   const createMutation = useMutation({
     mutationFn: (data: CreateInvitePayload) => invitationsApi.createSingle(data),
     onSuccess: (_data, vars) => {
-      toast.success(`Đã gửi lời mời đến ${vars.email}`);
+      toast.success(`Invitation sent to ${vars.email}`);
       invalidate();
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.error?.message || 'Gửi lời mời thất bại';
+      const msg = err?.response?.data?.error?.message || 'Failed to send invitation';
       toast.error(msg);
     },
   });
@@ -24,11 +24,11 @@ export function useInvitationActions() {
   const resendMutation = useMutation({
     mutationFn: (id: string) => invitationsApi.resend(id),
     onSuccess: () => {
-      toast.success('Đã gửi lại lời mời');
+      toast.success('Invitation resent');
       invalidate();
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.error?.message || 'Gửi lại thất bại';
+      const msg = err?.response?.data?.error?.message || 'Failed to resend';
       toast.error(msg);
     },
   });
@@ -36,14 +36,38 @@ export function useInvitationActions() {
   const revokeMutation = useMutation({
     mutationFn: (id: string) => invitationsApi.revoke(id),
     onSuccess: () => {
-      toast.success('Đã thu hồi lời mời');
+      toast.success('Invitation revoked');
       invalidate();
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.error?.message || 'Thu hồi thất bại';
+      const msg = err?.response?.data?.error?.message || 'Failed to revoke';
       toast.error(msg);
     },
   });
 
-  return { createMutation, resendMutation, revokeMutation };
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => invitationsApi.remove(id),
+    onSuccess: () => {
+      toast.success('Invitation deleted');
+      invalidate();
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error?.message || 'Failed to delete';
+      toast.error(msg);
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => invitationsApi.bulkRemove(ids),
+    onSuccess: () => {
+      toast.success('Selected invitations deleted');
+      invalidate();
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error?.message || 'Failed to delete selected';
+      toast.error(msg);
+    },
+  });
+
+  return { createMutation, resendMutation, revokeMutation, deleteMutation, bulkDeleteMutation };
 }

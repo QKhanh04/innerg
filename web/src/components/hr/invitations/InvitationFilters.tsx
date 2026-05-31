@@ -18,7 +18,7 @@ export default function InvitationFilters({ search, status, onSearchChange, onSt
                 <input
                     type="text"
                     className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#13ecb6] focus:border-[#13ecb6] sm:text-sm transition-all"
-                    placeholder="Tìm theo email hoặc họ tên..."
+                    placeholder="Search by email or full name..."
                     value={search}
                     onChange={(e) => onSearchChange(e.target.value)}
                 />

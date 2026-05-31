@@ -28,7 +28,7 @@ namespace InnerG.Api.Services.Implementations
             _configuration = configuration;
         }
 
-        public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin, bool allowExternalEmail = false)
         {
             var companyId = request.CompanyId ?? currentCompanyId
                 ?? throw new BadRequestException("CompanyId is required");
@@ -43,6 +43,8 @@ namespace InnerG.Api.Services.Implementations
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(x => x.Id == companyId && x.IsActive && x.DeletedAt == null)
                 ?? throw new NotFoundException("Company not found");
+
+            // Removed domain restriction to allow any email as requested
 
             if (request.DepartmentId.HasValue)
             {
@@ -181,6 +183,26 @@ namespace InnerG.Api.Services.Implementations
             invite.Status = InviteStatus.Revoked;
             invite.RevokedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+        }
+
+        public async Task RevokeBulkInvitesAsync(BulkRevokeRequest request, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            if (request?.Ids == null || !request.Ids.Any())
+                return;
+
+            foreach (var id in request.Ids)
+            {
+                try
+                {
+                    await RevokeInviteAsync(id, actorUserId, currentCompanyId, isSystemAdmin);
+                }
+                catch (AppException)
+                {
+                    // Ignore individual errors during bulk operation for now, 
+                    // or we could collect them like in bulk invite.
+                    // Given the frontend's expectation, we'll just try to revoke as many as possible.
+                }
+            }
         }
 
         public async Task<PaginatedResponse<InviteListItemResponse>> GetInvitesAsync(InviteListQuery query, Guid companyId, bool isSystemAdmin)

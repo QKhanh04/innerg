@@ -9,7 +9,10 @@ namespace InnerG.Api.Models
         FindingTrainer,
         Scheduled,
         Completed,
-        Rejected
+        Rejected,
+        NeedsExternalExpert,
+        ExternalProcessing,
+        Deferred
     }
 
     public enum WishlistUrgency

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { X, Award, BookOpen, Star, Loader2, Target, Calendar } from 'lucide-react';
+import { X, Award, BookOpen, Star, Loader2, Target, Calendar, User } from 'lucide-react';
 import { useMemberDetail } from '../../hooks/useMemberDetail';
 import { cn } from '../../lib/utils';
 
-export default function MemberDetailDrawer({ userId, onClose }) {
+export default function MemberDetailDrawer({ userId, onClose }: { userId: string; onClose: () => void }) {
     const { data: member, isLoading, error } = useMemberDetail(userId);
     const [activeTab, setActiveTab] = useState('overview');
 
@@ -24,7 +24,7 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                             )}
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800">{member?.name || 'Đang tải...'}</h2>
+                            <h2 className="text-lg font-bold text-slate-800">{member?.name || 'Loading...'}</h2>
                             <p className="text-sm text-slate-500 font-medium">{member?.email}</p>
 
                             {member && (
@@ -35,7 +35,7 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                                     )}>
                                         {member.status}
                                     </span>
-                                    {member.roles?.map(role => (
+                                    {member.roles?.map((role: string) => (
                                         <span key={role} className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-blue-50 border border-blue-100 text-blue-600">
                                             {role}
                                         </span>
@@ -53,9 +53,9 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                 {member && (
                     <div className="px-6 pt-4 border-b border-slate-100 flex gap-6">
                         {[
-                            { id: 'overview', label: 'Tổng quan' },
-                            { id: 'history', label: 'Lịch sử học tập' },
-                            { id: 'skills', label: 'Kỹ năng' },
+                            { id: 'overview', label: 'Overview' },
+                            { id: 'history', label: 'Learning History' },
+                            { id: 'skills', label: 'Skills' },
                             ...(member.roles?.includes('MENTOR') ? [{ id: 'mentor', label: 'Mentor Profile' }] : [])
                         ].map(tab => (
                             <button
@@ -80,13 +80,13 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                     {isLoading && (
                         <div className="flex flex-col items-center justify-center p-10 h-full text-slate-400 gap-3">
                             <Loader2 className="w-6 h-6 animate-spin text-[#13ecb6]" />
-                            <p className="text-sm font-semibold">Đang tải dữ liệu hồ sơ...</p>
+                            <p className="text-sm font-semibold">Loading profile data...</p>
                         </div>
                     )}
 
                     {error && (
                         <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100">
-                            Lỗi tải dữ liệu. Bạn có thể không có quyền xem thông tin này.
+                            Error loading data. You may not have permission to view this information.
                         </div>
                     )}
 
@@ -94,32 +94,32 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                         <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Phòng ban</p>
-                                    <p className="text-sm font-semibold text-slate-800">{member.department?.name || 'Chưa thiết lập'}</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Department</p>
+                                    <p className="text-sm font-semibold text-slate-800">{member.department?.name || 'Not set'}</p>
                                 </div>
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Chức vụ</p>
-                                    <p className="text-sm font-semibold text-slate-800">{member.position || 'Chưa thiết lập'}</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Position</p>
+                                    <p className="text-sm font-semibold text-slate-800">{member.position || 'Not set'}</p>
                                 </div>
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tổng điểm InnerG</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Total InnerG Points</p>
                                     <p className="text-sm font-semibold text-[#13ecb6] flex items-center gap-1.5">
                                         <Star className="w-4 h-4 fill-current" /> {member.learningPoints}
                                     </p>
                                 </div>
                                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày tham gia</p>
-                                    <p className="text-sm font-semibold text-slate-800">{new Date(member.joinedAt).toLocaleDateString('vi-VN')}</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Joined Date</p>
+                                    <p className="text-sm font-semibold text-slate-800">{new Date(member.joinedAt).toLocaleDateString('en-US')}</p>
                                 </div>
                             </div>
 
                             <div>
                                 <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
-                                    <Award className="w-4 h-4 text-emerald-500" /> Huy hiệu đạt được
+                                    <Award className="w-4 h-4 text-emerald-500" /> Badges Earned
                                 </h3>
                                 {member.badges?.length > 0 ? (
                                     <div className="flex flex-wrap gap-3">
-                                        {member.badges.map((badge, idx) => (
+                                        {member.badges.map((badge: any, idx: number) => (
                                             <div key={idx} className="flex items-center gap-2 bg-white px-3 py-2 border border-slate-200 rounded-lg shadow-sm">
                                                 <span className="text-sm font-semibold text-slate-700">{badge.name}</span>
                                             </div>
@@ -127,7 +127,7 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                                     </div>
                                 ) : (
                                     <p className="text-xs text-slate-500 bg-white p-4 border border-slate-200 rounded-xl text-center">
-                                        Người dùng này chưa đạt được huy hiệu nào.
+                                        This user has not earned any badges yet.
                                     </p>
                                 )}
                             </div>
@@ -137,16 +137,16 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                     {member && activeTab === 'history' && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between text-sm">
-                                <span className="font-bold text-slate-800">Tổng giờ học:</span>
+                                <span className="font-bold text-slate-800">Total Learning Hours:</span>
                                 <span className="text-emerald-600 font-extrabold">{member.totalLearningHours}h</span>
                             </div>
 
                             {member.learningHistory?.length > 0 ? (
-                                member.learningHistory.map((h, idx) => (
+                                member.learningHistory.map((h: any, idx: number) => (
                                     <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                         <h4 className="text-sm font-bold text-slate-800">{h.classTitle}</h4>
                                         <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-slate-500">
-                                            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(h.scheduledAt).toLocaleDateString('vi-VN')}</span>
+                                            <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {new Date(h.scheduledAt).toLocaleDateString('en-US')}</span>
                                             <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> Mentor: {h.mentorName}</span>
                                         </div>
                                     </div>
@@ -154,7 +154,7 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                             ) : (
                                 <div className="bg-white p-8 rounded-xl text-center border border-slate-200">
                                     <BookOpen className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                                    <p className="text-sm text-slate-500 font-medium">Chưa có lịch sử học tập.</p>
+                                    <p className="text-sm text-slate-500 font-medium">No learning history yet.</p>
                                 </div>
                             )}
                         </div>
@@ -163,7 +163,7 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                     {member && activeTab === 'skills' && (
                         <div className="grid gap-3">
                             {member.skills?.length > 0 ? (
-                                member.skills.map((skill, idx) => (
+                                member.skills.map((skill: any, idx: number) => (
                                     <div key={idx} className="bg-white px-4 py-3 border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
                                         <span className="text-sm font-semibold text-slate-700">{skill.skillName}</span>
                                         <span className={cn(
@@ -177,7 +177,7 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                             ) : (
                                 <div className="bg-white p-8 rounded-xl text-center border border-slate-200">
                                     <Target className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                                    <p className="text-sm text-slate-500 font-medium">Chưa có kỹ năng nào được ghi nhận.</p>
+                                    <p className="text-sm text-slate-500 font-medium">No skills recorded yet.</p>
                                 </div>
                             )}
                         </div>
@@ -187,25 +187,25 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                         <div className="space-y-4">
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-6">
                                 <div>
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Đánh giá TB</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Avg. Rating</p>
                                     <p className="text-xl font-extrabold text-slate-800 flex items-center gap-1">
                                         {member.trainerProfile.avgRating} <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
                                     </p>
                                 </div>
                                 <div className="w-px h-10 bg-slate-100" />
                                 <div>
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Lớp đã dạy</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Classes Taught</p>
                                     <p className="text-xl font-extrabold text-slate-800">{member.trainerProfile.totalClassesTaught}</p>
                                 </div>
                                 <div className="w-px h-10 bg-slate-100" />
                                 <div>
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Học viên</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Students</p>
                                     <p className="text-xl font-extrabold text-[#13ecb6]">{member.trainerProfile.totalStudents}</p>
                                 </div>
                             </div>
 
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                                <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Trạng thái Mentor</p>
+                                <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Mentor Status</p>
                                 <span className={cn(
                                     "px-3 py-1.5 rounded-lg text-xs font-bold",
                                     member.trainerProfile.mentorStatus === 'ACTIVE' ? "bg-emerald-100 text-emerald-700" :
@@ -216,9 +216,9 @@ export default function MemberDetailDrawer({ userId, onClose }) {
                                 </span>
 
                                 <div className="mt-5">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Giới thiệu (Bio)</p>
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Bio</p>
                                     <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100 min-h-[4rem]">
-                                        {member.trainerProfile.bio || 'Chưa cập nhật giới thiệu.'}
+                                        {member.trainerProfile.bio || 'No bio updated yet.'}
                                     </p>
                                 </div>
                             </div>

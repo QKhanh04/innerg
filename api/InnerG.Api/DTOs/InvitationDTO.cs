@@ -19,6 +19,11 @@ namespace InnerG.Api.DTOs
         public IList<CreateInviteRequest> Invites { get; set; } = new List<CreateInviteRequest>();
     }
 
+    public class BulkRevokeRequest
+    {
+        public IList<Guid> Ids { get; set; } = new List<Guid>();
+    }
+
     public class BulkInviteResponse
     {
         public int SuccessCount { get; set; }

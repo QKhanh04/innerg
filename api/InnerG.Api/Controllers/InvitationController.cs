@@ -107,6 +107,22 @@ namespace InnerG.Api.Controllers
             return NoContent();
         }
 
+        [HttpPost("bulk-delete")]
+        public async Task<IActionResult> BulkDeleteInvitesAsync([FromBody] BulkRevokeRequest request)
+        {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(currentUserId))
+                return Unauthorized();
+
+            await _invitationService.RevokeBulkInvitesAsync(
+                request,
+                currentUserId,
+                GetCurrentCompanyId(),
+                IsSystemAdmin());
+
+            return NoContent();
+        }
+
         [HttpPost("validate-file")]
         public async Task<IActionResult> ValidateInviteFileAsync([FromForm] IFormFile file)
         {

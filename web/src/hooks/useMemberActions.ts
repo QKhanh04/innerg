@@ -3,55 +3,55 @@ import { membersApi } from '../api/memberApi';
 import toast from 'react-hot-toast';
 
 const ERROR_MESSAGES = {
-  CANNOT_MODIFY_SELF: 'Không thể thao tác trên tài khoản của chính bạn.',
-  CANNOT_MODIFY_ADMIN: 'Không thể thay đổi tài khoản Admin.',
-  USER_NOT_ACTIVE: 'Tài khoản phải đang hoạt động.',
-  USER_ALREADY_HAS_MENTOR_ROLE: 'Nhân viên này đã là Mentor.',
-  MENTOR_HAS_UPCOMING_CLASSES: 'Không thể thu hồi, còn lớp học sắp diễn ra.',
-  USER_NOT_FOUND: 'Không tìm thấy nhân viên.',
+  CANNOT_MODIFY_SELF: 'Cannot perform action on your own account.',
+  CANNOT_MODIFY_ADMIN: 'Cannot modify Admin account.',
+  USER_NOT_ACTIVE: 'Account must be active.',
+  USER_ALREADY_HAS_MENTOR_ROLE: 'This employee is already a Mentor.',
+  MENTOR_HAS_UPCOMING_CLASSES: 'Cannot revoke, there are upcoming classes.',
+  USER_NOT_FOUND: 'Employee not found.',
 };
 
-const handleMutationError = (error) => {
-  const code = error.response?.data?.error?.code;
-  const message = ERROR_MESSAGES[code] || error.response?.data?.error?.message || 'Có lỗi xảy ra, vui lòng thử lại.';
+const handleMutationError = (error: any) => {
+  const code = error.response?.data?.error?.code as keyof typeof ERROR_MESSAGES;
+  const message = ERROR_MESSAGES[code] || error.response?.data?.error?.message || 'An error occurred, please try again.';
   toast.error(message);
 };
 
 export const useMemberActions = () => {
   const queryClient = useQueryClient();
 
-  const handleSuccess = (message) => {
+  const handleSuccess = (message: string) => {
     toast.success(message);
     queryClient.invalidateQueries({ queryKey: ['members'] });
   };
 
-  const updateMutation = useMutation({
+  const updateMutation = useMutation<void, any, { userId: string; data: any }>({
     mutationFn: ({ userId, data }) => membersApi.update(userId, data),
-    onSuccess: () => handleSuccess('Cập nhật nhân viên thành công.'),
+    onSuccess: () => handleSuccess('Member updated successfully.'),
     onError: handleMutationError
   });
 
-  const assignMentorMutation = useMutation({
+  const assignMentorMutation = useMutation<void, any, string>({
     mutationFn: (userId) => membersApi.assignMentor(userId),
-    onSuccess: () => handleSuccess('Gán role Mentor thành công.'),
+    onSuccess: () => handleSuccess('Mentor role assigned successfully.'),
     onError: handleMutationError
   });
 
-  const revokeMentorMutation = useMutation({
+  const revokeMentorMutation = useMutation<void, any, string>({
     mutationFn: (userId) => membersApi.revokeMentor(userId),
-    onSuccess: () => handleSuccess('Thu hồi role Mentor thành công.'),
+    onSuccess: () => handleSuccess('Mentor role revoked successfully.'),
     onError: handleMutationError
   });
 
-  const updateStatusMutation = useMutation({
+  const updateStatusMutation = useMutation<void, any, { userId: string; status: string }>({
     mutationFn: ({ userId, status }) => membersApi.updateStatus(userId, status),
-    onSuccess: () => handleSuccess('Cập nhật trạng thái thành công.'),
+    onSuccess: () => handleSuccess('Status updated successfully.'),
     onError: handleMutationError
   });
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useMutation<void, any, string>({
     mutationFn: (userId) => membersApi.delete(userId),
-    onSuccess: () => handleSuccess('Xóa nhân viên thành công.'),
+    onSuccess: () => handleSuccess('Member deleted successfully.'),
     onError: handleMutationError
   });
 

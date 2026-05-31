@@ -52,7 +52,7 @@ namespace InnerG.Api.Data.Seed
                 new SeedUserDefinition("hr@innerg.com", "Human Resources", new[] { AuthRoles.HR }),
                 new SeedUserDefinition("mentor@innerg.com", "Mentor User", new[] { AuthRoles.Mentor }),
                 new SeedUserDefinition("mentee@innerg.com", "Mentee User", new[] { AuthRoles.Mentee }),
-                new SeedUserDefinition("minhduy16082005@gmail.com", "Duy Nguyen", new[] { AuthRoles.HR })
+                new SeedUserDefinition("minhduy16082005@gmail.com", "Duy Nguyen", new[] { AuthRoles.HR }),
                 new SeedUserDefinition("dangcongquockhanh@gmail.com", "Dang Cong Quoc Khanh", new[] { AuthRoles.Mentee }),
                 new SeedUserDefinition("khanhhoakt2k4@gmail.com", "Khanh Hoa", new[] { AuthRoles.Mentee })
             };
@@ -251,7 +251,7 @@ namespace InnerG.Api.Data.Seed
 
             var user = await userManager.Users
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.CompanyId == company.Id && x.Email == normalizedEmail && x.DeletedAt == null);
+                .FirstOrDefaultAsync(x => x.Email == normalizedEmail);
 
             if (user == null)
             {
@@ -275,6 +275,18 @@ namespace InnerG.Api.Data.Seed
             else
             {
                 var changed = false;
+
+                if (user.CompanyId != company.Id)
+                {
+                    user.CompanyId = company.Id;
+                    changed = true;
+                }
+
+                if (user.DeletedAt != null)
+                {
+                    user.DeletedAt = null;
+                    changed = true;
+                }
 
                 if (!string.Equals(user.UserName, expectedUserName, StringComparison.Ordinal))
                 {

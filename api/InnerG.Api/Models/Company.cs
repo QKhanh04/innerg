@@ -13,6 +13,9 @@ namespace InnerG.Api.Models
         public string Language { get; set; } = "vi";
         public bool IsActive { get; set; } = true;
 
+        [System.ComponentModel.DataAnnotations.Schema.Column(TypeName = "jsonb")]
+        public string? BusinessSettingsJson { get; set; }
+
         // Navigation properties
         public virtual ICollection<AppUser> Users { get; set; } = new List<AppUser>();
         public virtual ICollection<Invite> Invites { get; set; } = new List<Invite>();

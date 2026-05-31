@@ -34,5 +34,13 @@ export const membersApi = {
   delete: async (userId) => {
     const response = await api.delete(`/hr/members/${userId}`);
     return response.data;
-  }
+  },
+
+  exportCsv: async (filters = {}) => {
+    const response = await api.get('/hr/members/export', {
+      params: filters,
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };

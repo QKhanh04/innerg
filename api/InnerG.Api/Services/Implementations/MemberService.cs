@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using InnerG.Api.Data;
 using InnerG.Api.DTOs;
 using InnerG.Api.Exceptions;
+using InnerG.Api.Helpers;
 using InnerG.Api.Models;
 using InnerG.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Identity;
@@ -16,15 +18,39 @@ namespace InnerG.Api.Services.Implementations
     {
         private readonly AppDbContext _context;
         private readonly UserManager<AppUser> _userManager;
-        
-        // Stub methods for external services not fully implemented in scope
-        private Task RevokeAllSessionsStubAsync(Guid userId) => Task.CompletedTask;
-        private Task SendNotificationStubAsync(Guid userId, string type, string message) => Task.CompletedTask;
+        private readonly INotificationService _notificationService;
 
-        public MemberService(AppDbContext context, UserManager<AppUser> userManager)
+        public MemberService(
+            AppDbContext context,
+            UserManager<AppUser> userManager,
+            INotificationService notificationService)
         {
             _context = context;
             _userManager = userManager;
+            _notificationService = notificationService;
+        }
+
+        private async Task RevokeAllSessionsAsync(Guid userId)
+        {
+            var sessions = await _context.UserSessions
+                .Where(s => s.UserId == userId && s.IsActive)
+                .ToListAsync();
+            foreach (var session in sessions)
+                session.IsActive = false;
+            if (sessions.Count > 0)
+                await _context.SaveChangesAsync();
+        }
+
+        private async Task EnsureCanModifyUserAsync(AppUser user, Guid companyId, Guid currentUserId)
+        {
+            if (user.Id == currentUserId)
+                throw new BusinessException("CANNOT_MODIFY_SELF", "Không thể thao tác trên tài khoản của chính bạn.", 403);
+
+            if (user.CompanyId != companyId)
+                throw new BusinessException("FORBIDDEN", "Không có quyền truy cập nhân viên này.", 403);
+
+            if (await _userManager.IsInRoleAsync(user, AuthRoles.SystemAdmin))
+                throw new BusinessException("CANNOT_MODIFY_ADMIN", "Không thể thay đổi tài khoản System Admin.", 403);
         }
 
         public async Task<PaginatedResponse<MemberResponse>> GetMembersAsync(MemberListQuery query, Guid companyId)
@@ -126,6 +152,7 @@ namespace InnerG.Api.Services.Implementations
                 .Include(u => u.UserSkills).ThenInclude(us => us.Skill)
                 .Include(u => u.Badges).ThenInclude(ub => ub.Badge)
                 .Include(u => u.Enrollments).ThenInclude(e => e.TrainingEvent)
+                .Include(u => u.PointsLedger)
                 .FirstOrDefaultAsync(u => u.Id == userId && u.CompanyId == companyId);
 
             if (user == null)
@@ -191,30 +218,29 @@ namespace InnerG.Api.Services.Implementations
 
         public async Task UpdateMemberAsync(Guid userId, Guid companyId, Guid currentUserId, UpdateMemberRequest request)
         {
-            if (userId == currentUserId)
-                throw new BusinessException("CANNOT_MODIFY_SELF", "Không thể thao tác trên tài khoản của chính bạn.", 403);
-
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
                 throw new BusinessException("USER_NOT_FOUND", "Không tìm thấy nhân viên.", 404);
 
-            if (await _userManager.IsInRoleAsync(user, "Admin") || await _userManager.IsInRoleAsync(user, "SuperAdmin"))
-                throw new BusinessException("CANNOT_MODIFY_ADMIN", "Không thể thay đổi tài khoản Admin.", 403);
+            await EnsureCanModifyUserAsync(user, companyId, currentUserId);
 
+            if (!string.IsNullOrWhiteSpace(request.FullName)) user.FullName = request.FullName;
             if (request.DepartmentId.HasValue) user.DepartmentId = request.DepartmentId.Value;
             if (request.Position != null) user.JobTitle = request.Position;
+            if (request.PhoneInternal != null) user.PhoneInternal = request.PhoneInternal;
+            if (request.AvatarUrl != null) user.AvatarUrl = request.AvatarUrl;
+            user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
         }
 
         public async Task AssignMentorRoleAsync(Guid userId, Guid companyId, Guid currentUserId)
         {
-            if (userId == currentUserId)
-                throw new BusinessException("CANNOT_MODIFY_SELF", "Không thể thao tác trên tài khoản của chính bạn.", 403);
-
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
                 throw new BusinessException("USER_NOT_FOUND", "Không tìm thấy nhân viên.", 404);
+
+            await EnsureCanModifyUserAsync(user, companyId, currentUserId);
 
             if (!user.IsActive)
                 throw new BusinessException("USER_NOT_ACTIVE", "Tài khoản phải đang hoạt động.", 400);
@@ -250,7 +276,11 @@ namespace InnerG.Api.Services.Implementations
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
 
-                await SendNotificationStubAsync(userId, "ROLE_ASSIGNED", "Bạn đã được gán role Mentor");
+                await _notificationService.SendAsync(userId, "ROLE_ASSIGNED",
+                    "Bạn đã được gán role Mentor", "Bạn đã được gán role Mentor");
+
+                await HrAuditHelper.LogAsync(_context, companyId, currentUserId,
+                    "AppUser", userId, "RoleAssign", null, new { Role = AuthRoles.Mentor });
             }
             catch
             {
@@ -261,12 +291,11 @@ namespace InnerG.Api.Services.Implementations
 
         public async Task RevokeMentorRoleAsync(Guid userId, Guid companyId, Guid currentUserId)
         {
-            if (userId == currentUserId)
-                throw new BusinessException("CANNOT_MODIFY_SELF", "Không thể thao tác trên tài khoản của chính bạn.", 403);
-
             var user = await _context.Users.Include(u => u.TrainerProfiles).FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
                 throw new BusinessException("USER_NOT_FOUND", "Không tìm thấy nhân viên.", 404);
+
+            await EnsureCanModifyUserAsync(user, companyId, currentUserId);
 
             var trainer = user.TrainerProfiles.FirstOrDefault();
             if (trainer != null)
@@ -282,6 +311,7 @@ namespace InnerG.Api.Services.Implementations
                     throw new BusinessException("MENTOR_HAS_UPCOMING_CLASSES", "Không thể thu hồi role Mentor vì còn lớp học sắp diễn ra.", 400);
                 }
 
+                trainer.IsActive = false;
                 trainer.MentorStatus = "INACTIVE";
                 await _context.SaveChangesAsync();
             }
@@ -290,48 +320,68 @@ namespace InnerG.Api.Services.Implementations
             {
                 await _userManager.RemoveFromRoleAsync(user, AuthRoles.Mentor);
             }
+
+            await HrAuditHelper.LogAsync(_context, companyId, currentUserId,
+                "AppUser", userId, "RoleRevoke", null, new { Role = AuthRoles.Mentor });
         }
 
         public async Task UpdateMemberStatusAsync(Guid userId, Guid companyId, Guid currentUserId, UpdateMemberStatusRequest request)
         {
-            if (userId == currentUserId)
-                throw new BusinessException("CANNOT_MODIFY_SELF", "Không thể thao tác trên tài khoản của chính bạn.", 403);
-
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
                 throw new BusinessException("USER_NOT_FOUND", "Không tìm thấy nhân viên.", 404);
 
-            if (await _userManager.IsInRoleAsync(user, "Admin") || await _userManager.IsInRoleAsync(user, "SuperAdmin"))
-                throw new BusinessException("CANNOT_MODIFY_ADMIN", "Không thể thay đổi tài khoản Admin.", 403);
+            await EnsureCanModifyUserAsync(user, companyId, currentUserId);
 
             bool newActive = request.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase);
-            
+
             if (user.IsActive && !newActive)
             {
-                await RevokeAllSessionsStubAsync(userId);
+                await RevokeAllSessionsAsync(userId);
+                await _notificationService.SendAsync(userId, "ACCOUNT_DEACTIVATED",
+                    "Tài khoản đã bị vô hiệu hóa",
+                    "Tài khoản của bạn đã bị vô hiệu hóa bởi HR.",
+                    NotificationChannel.Email);
+                await HrAuditHelper.LogAsync(_context, companyId, currentUserId,
+                    "AppUser", userId, "Deactivate", new { user.IsActive }, new { IsActive = false });
             }
-            
+
             user.IsActive = newActive;
+            user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
         }
 
         public async Task DeleteMemberAsync(Guid userId, Guid companyId, Guid currentUserId)
         {
-            if (userId == currentUserId)
-                throw new BusinessException("CANNOT_MODIFY_SELF", "Không thể thao tác trên tài khoản của chính bạn.", 403);
-
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)
                 throw new BusinessException("USER_NOT_FOUND", "Không tìm thấy nhân viên.", 404);
 
-            if (await _userManager.IsInRoleAsync(user, "Admin") || await _userManager.IsInRoleAsync(user, "SuperAdmin"))
-                throw new BusinessException("CANNOT_MODIFY_ADMIN", "Không thể thay đổi tài khoản Admin.", 403);
+            await EnsureCanModifyUserAsync(user, companyId, currentUserId);
 
             user.IsActive = false;
             user.DeletedAt = DateTime.UtcNow;
-            
+            user.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
-            await RevokeAllSessionsStubAsync(userId);
+            await RevokeAllSessionsAsync(userId);
+
+            await HrAuditHelper.LogAsync(_context, companyId, currentUserId,
+                "AppUser", userId, "Delete", null, new { user.DeletedAt });
+        }
+
+        public async Task<byte[]> ExportMembersCsvAsync(MemberListQuery query, Guid companyId)
+        {
+            query.PageSize = 10000;
+            query.Page = 1;
+            var result = await GetMembersAsync(query, companyId);
+            var sb = new StringBuilder();
+            sb.AppendLine("Id,Name,Email,Department,Position,Roles,Status,JoinedAt,LearningPoints");
+            foreach (var m in result.Data)
+            {
+                sb.AppendLine($"{m.Id},\"{m.Name}\",\"{m.Email}\",\"{m.Department?.Name}\",\"{m.Position}\",\"{string.Join(';', m.Roles)}\",{m.Status},{m.JoinedAt:O},{m.LearningPoints}");
+            }
+            return Encoding.UTF8.GetBytes(sb.ToString());
         }
 
         private string GetStatus(AppUser user)

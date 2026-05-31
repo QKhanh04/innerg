@@ -19,7 +19,7 @@ export function useBulkInvite() {
       setStep('preview');
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.error?.message || 'Lỗi kiểm tra file';
+      const msg = err?.response?.data?.error?.message || 'File validation error';
       toast.error(msg);
     },
   });
@@ -36,7 +36,7 @@ export function useBulkInvite() {
       queryClient.invalidateQueries({ queryKey: ['invitations'] });
     },
     onError: (err: any) => {
-      const msg = err?.response?.data?.error?.message || 'Gửi hàng loạt thất bại';
+      const msg = err?.response?.data?.error?.message || 'Bulk send failed';
       toast.error(msg);
     },
   });

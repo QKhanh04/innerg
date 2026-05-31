@@ -40,4 +40,12 @@ export const invitationsApi = {
     const response = await api.post('/hr/invitations/bulk', { invites });
     return response.data;
   },
+
+  remove: async (id: string) => {
+    await api.delete(`/hr/invitations/${id}`);
+  },
+
+  bulkRemove: async (ids: string[]) => {
+    await api.post('/hr/invitations/bulk-delete', { ids });
+  },
 };

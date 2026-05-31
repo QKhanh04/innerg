@@ -23,7 +23,7 @@ export default function BulkInviteModal({ onClose }: Props) {
         const validExts = ['.csv', '.xlsx', '.xls'];
         const lowerName = file.name.toLowerCase();
         if (!validExts.some((ext) => lowerName.endsWith(ext))) {
-            toast.error('Vui lòng chọn file .csv hoặc .xlsx');
+            toast.error('Please select a .csv or .xlsx file');
             return;
         }
 
@@ -51,9 +51,9 @@ export default function BulkInviteModal({ onClose }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 flex-shrink-0">
                     <h2 className="text-xl font-extrabold text-[#0a192f]">
-                        {step === 'upload' && 'Import từ CSV / Excel'}
-                        {step === 'preview' && 'Kiểm tra dữ liệu'}
-                        {step === 'result' && 'Kết quả gửi lời mời'}
+                        {step === 'upload' && 'Import from CSV / Excel'}
+                        {step === 'preview' && 'Data Preview'}
+                        {step === 'result' && 'Send Results'}
                     </h2>
                     <button onClick={handleClose} className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 transition-colors">
                         <X className="w-5 h-5" />
@@ -123,7 +123,7 @@ export default function BulkInviteModal({ onClose }: Props) {
                                         <ul className="space-y-3">
                                             {validateResult.invalid.map((inv, idx) => (
                                                 <li key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-sm p-3 bg-slate-50 rounded-xl border border-slate-100 gap-2">
-                                                    <span className="font-medium text-slate-700">Row {inv.row}: <span className="text-slate-900">{inv.email || '(trống)'}</span></span>
+                                                    <span className="font-medium text-slate-700">Row {inv.row}: <span className="text-slate-900">{inv.email || '(empty)'}</span></span>
                                                     <span className="text-red-600 bg-red-100/50 px-2 py-1 rounded text-xs font-semibold">{inv.errorMessage}</span>
                                                 </li>
                                             ))}

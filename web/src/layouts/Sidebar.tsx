@@ -12,7 +12,8 @@ import {
   Zap,
   BarChart3,
   BookOpen,
-  ShieldCheck
+  ShieldCheck,
+  Bell
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useRole, Role } from '../lib/RoleContext';
@@ -22,11 +23,16 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Home Feed', path: '/dashboard', roles: ['mentee'] },
   { icon: BarChart3, label: 'Analytics', path: '/analytics', roles: ['hr'] },
   { icon: Users, label: 'Members', path: '/members', roles: ['hr'] },
+  { icon: User, label: 'Invitations', path: '/invitations', roles: ['hr'] },
+  { icon: Heart, label: 'HR Wishlists', path: '/hr/wishlists', roles: ['hr'] },
+  { icon: FolderOpen, label: 'Moderation', path: '/hr/moderation', roles: ['hr'] },
+  { icon: Users, label: 'Departments', path: '/hr/departments', roles: ['hr'] },
+  { icon: Bell, label: 'Notifications', path: '/hr/notifications', roles: ['hr'] },
   { icon: LayoutDashboard, label: 'Mentor Dashboard', path: '/mentor', roles: ['mentor'] },
-  { icon: BookOpen, label: 'Create Class', path: '/mentor/create', roles: ['mentor', 'hr'] },
-  { icon: Search, label: 'Explore / Marketplace', path: '/explore', roles: ['mentee', 'mentor', 'hr'] },
+  { icon: BookOpen, label: 'Create Class', path: '/mentor/create', roles: ['mentor'] },
+  { icon: Search, label: 'Explore / Marketplace', path: '/explore', roles: ['mentee', 'mentor'] },
   { icon: Calendar, label: 'My Schedule', path: '/schedule', roles: ['mentee', 'mentor'] },
-  { icon: Heart, label: 'Learning Wishlist', path: '/wishlist', roles: ['mentee', 'hr', 'mentor'] },
+  { icon: Heart, label: 'Learning Wishlist', path: '/wishlist', roles: ['mentee', 'mentor'] },
   { icon: FolderOpen, label: 'Resource Hub', path: '/resources', roles: ['mentee', 'mentor', 'hr', 'admin'] },
   { icon: User, label: 'Profile', path: '/profile', roles: ['mentee', 'mentor', 'hr', 'admin'] },
 ];

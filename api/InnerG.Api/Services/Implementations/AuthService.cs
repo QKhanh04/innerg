@@ -164,9 +164,6 @@ namespace InnerG.Api.Services.Implementations
                 HrInvite = invite
             };
         }
-
-<<<<<<< HEAD
-=======
         public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin, bool allowExternalEmail = false)
         {
             var companyId = request.CompanyId ?? currentCompanyId
@@ -304,7 +301,6 @@ namespace InnerG.Api.Services.Implementations
             invite.RevokedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
         }
->>>>>>> 29e95a9290ea4fdcb6d0bfb5f63729e448469c51
 
         public async Task<InvitePreviewResponse> GetInviteAsync(string token)
         {
@@ -748,6 +744,20 @@ namespace InnerG.Api.Services.Implementations
                 .Include(x => x.Company)
                 .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && x.DeletedAt == null && x.Company.IsActive && x.Company.DeletedAt == null)
                 ?? throw new UnauthorizedException("User not found");
+        }
+
+        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var query = _context.Invites
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .Where(x => x.Id == inviteId);
+
+            if (!isSystemAdmin && currentCompanyId.HasValue)
+                query = query.Where(x => x.CompanyId == currentCompanyId.Value);
+
+            return await query.FirstOrDefaultAsync()
+                ?? throw new NotFoundException("Invite not found");
         }
 
         private async Task<Invite> FindInviteByTokenAsync(string token)

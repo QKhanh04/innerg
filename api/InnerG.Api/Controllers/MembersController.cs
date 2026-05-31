@@ -40,6 +40,13 @@ namespace InnerG.Api.Controllers
             return Ok(result);
         }
 
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportMembers([FromQuery] MemberListQuery query)
+        {
+            var csv = await _memberService.ExportMembersCsvAsync(query, GetCurrentCompanyId());
+            return File(csv, "text/csv", "members.csv");
+        }
+
         [HttpGet("{userId:guid}")]
         public async Task<IActionResult> GetMemberDetail(Guid userId)
         {
