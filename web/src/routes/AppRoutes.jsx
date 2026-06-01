@@ -15,6 +15,12 @@ import CompanyDetail from '../pages/admin/CompanyDetail/CompanyDetail';
 import Dashboard from '../pages/mentee/Dashboard/Dashboard';
 import LearningWishlist from '../pages/mentee/LearningWishlist/LearningWishlist';
 import MembersPage from '../pages/hr/MembersPage/MembersPage';
+import InvitationsPage from '../pages/hr/invitations/InvitationsPage';
+import AnalyticsPage from '../pages/hr/AnalyticsPage/AnalyticsPage';
+import HrWishlistsPage from '../pages/hr/HrWishlistsPage/HrWishlistsPage';
+import DepartmentsPage from '../pages/hr/DepartmentsPage/DepartmentsPage';
+import ModerationPage from '../pages/hr/ModerationPage/ModerationPage';
+import NotificationsPage from '../pages/hr/NotificationsPage/NotificationsPage';
 import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
 import Explore from '../pages/common/Explore/Explore';
@@ -87,8 +93,46 @@ const AppRoutes = () => (
                 </ProtectedRoute>
             } />
 
+            <Route path="/analytics" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <AnalyticsPage />
+                </ProtectedRoute>
+            } />
+
             <Route path="/members" element={
-                <MembersPage />
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <MembersPage />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/hr/wishlists" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <HrWishlistsPage />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/hr/departments" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <DepartmentsPage />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/hr/moderation" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <ModerationPage />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/hr/notifications" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <NotificationsPage />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/invitations" element={
+                <ProtectedRoute allowedRoles={['hr']}>
+                    <InvitationsPage />
+                </ProtectedRoute>
             } />
 
             <Route path="/schedule" element={

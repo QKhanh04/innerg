@@ -34,6 +34,18 @@ namespace InnerG.Api.Services.Implementations
             return SendHtmlEmailAsync(toEmail, subject, html);
         }
 
+        public async Task SendEmailAsync(string to, string subject, string body, bool isHtml = true)
+        {
+            if (isHtml)
+                await SendHtmlEmailAsync(to, subject, body);
+            else
+            {
+                // Simple plain text send if needed, but SendHtmlEmailAsync currently handles html
+                // For now, reuse SendHtmlEmailAsync as it's the core sender
+                await SendHtmlEmailAsync(to, subject, body);
+            }
+        }
+
         private async Task SendHtmlEmailAsync(string toEmail, string subject, string html)
         {
             var host = _config["SMTP_HOST"] ?? throw new ConfigurationException("SMTP_HOST");
@@ -52,6 +64,7 @@ namespace InnerG.Api.Services.Implementations
 
             try
             {
+                Console.WriteLine($"[EmailService] Preparing to send email to {toEmail} via {host}:{port}");
                 var message = new MailMessage
                 {
                     Subject = subject,
@@ -64,15 +77,25 @@ namespace InnerG.Api.Services.Implementations
 
                 using var smtp = new SmtpClient(host, port)
                 {
+                    UseDefaultCredentials = false,
                     Credentials = new NetworkCredential(username, password),
-                    EnableSsl = enableSsl
+                    EnableSsl = enableSsl,
+                    DeliveryMethod = SmtpDeliveryMethod.Network,
+                    Timeout = 30000 // 30 seconds
                 };
 
                 await smtp.SendMailAsync(message);
+                Console.WriteLine($"[EmailService] SMTP send completed for {toEmail}");
             }
             catch (SmtpException ex)
             {
+                Console.WriteLine($"[EmailService] SmtpException for {toEmail}: {ex.Message}");
                 throw new ExternalServiceException($"Failed to send email: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EmailService] General exception for {toEmail}: {ex.Message}");
+                throw;
             }
         }
     }

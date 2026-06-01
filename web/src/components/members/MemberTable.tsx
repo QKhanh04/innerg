@@ -10,12 +10,12 @@ export default function MemberTable({ members, isLoading }) {
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[250px]">Nhân viên</th>
-                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[150px]">Phòng ban & Chức vụ</th>
+                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[250px]">Members</th>
+                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[150px]">Department & Position</th>
                             <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest text-center min-w-[150px]">Roles</th>
-                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[120px]">Trạng thái</th>
-                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[100px]">Tham gia</th>
-                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest text-right">Hành động</th>
+                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[120px]">Status</th>
+                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest min-w-[100px]">Joined</th>
+                            <th className="px-6 py-4 text-[10px] font-extrabold text-slate-400 uppercase tracking-widest text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -85,7 +85,7 @@ export default function MemberTable({ members, isLoading }) {
                         {(!members || members.length === 0) && !isLoading && (
                             <tr>
                                 <td colSpan={6} className="px-6 py-12 text-center text-sm font-medium text-slate-500">
-                                    Không tìm thấy nhân viên nào.
+                                    Not Found Any Staff.
                                 </td>
                             </tr>
                         )}

@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 import EditMemberModal from './EditMemberModal';
 import MemberDetailDrawer from './MemberDetailDrawer';
 
-export default function MemberActionMenu({ member }) {
+export default function MemberActionMenu({ member }: { member: any }) {
     const [isOpen, setIsOpen] = useState(false);
     const [showEdit, setShowEdit] = useState(false);
     const [showDetail, setShowDetail] = useState(false);
@@ -15,7 +15,7 @@ export default function MemberActionMenu({ member }) {
 
     const handleAssignMentor = () => {
         if (isMentor) {
-            if (window.confirm("Thu hồi role Mentor. Bạn có chắc chắn? Nếu còn lớp học sắp diễn ra, hệ thống sẽ chặn hành động này.")) {
+            if (window.confirm("Revoke Mentor role. Are you sure? If there are upcoming classes, the system will block this action.")) {
                 revokeMentor(member.id);
             }
         } else {
@@ -27,8 +27,8 @@ export default function MemberActionMenu({ member }) {
     const handleToggleStatus = () => {
         const isActivating = member.status !== 'ACTIVE';
         const msg = isActivating
-            ? "Kích hoạt tài khoản này?"
-            : "Người dùng sẽ không thể đăng nhập. Dữ liệu giữ nguyên. Xác nhận vô hiệu hóa?";
+            ? "Activate this account?"
+            : "The user will not be able to log in. Data remains intact. Confirm deactivation?";
 
         if (window.confirm(msg)) {
             updateStatus({ userId: member.id, status: isActivating ? 'ACTIVE' : 'INACTIVE' });
@@ -37,7 +37,7 @@ export default function MemberActionMenu({ member }) {
     };
 
     const handleDelete = () => {
-        if (window.confirm("Tài khoản sẽ bị ẩn. Lịch sử học tập vẫn được lưu. Xác nhận xóa?")) {
+        if (window.confirm("Account will be hidden. Learning history is preserved. Confirm delete?")) {
             deleteMember(member.id);
         }
         setIsOpen(false);
@@ -65,14 +65,14 @@ export default function MemberActionMenu({ member }) {
                                 onClick={() => { setIsOpen(false); setShowDetail(true); }}
                                 className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                             >
-                                <User className="w-4 h-4 text-slate-400" /> Xem hồ sơ
+                                <User className="w-4 h-4 text-slate-400" /> View Profile
                             </button>
 
                             <button
                                 onClick={() => { setIsOpen(false); setShowEdit(true); }}
                                 className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                             >
-                                <Edit2 className="w-4 h-4 text-slate-400" /> Chỉnh sửa
+                                <Edit2 className="w-4 h-4 text-slate-400" /> Edit
                             </button>
 
                             <div className="h-px bg-slate-100 my-1 mx-2" />
@@ -82,7 +82,7 @@ export default function MemberActionMenu({ member }) {
                                 className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                             >
                                 <Shield className={cn("w-4 h-4", isMentor ? "text-amber-500" : "text-emerald-500")} />
-                                {isMentor ? "Thu hồi Mentor" : "Gán Mentor"}
+                                {isMentor ? "Revoke Mentor" : "Assign Mentor"}
                             </button>
 
                             <button
@@ -90,9 +90,9 @@ export default function MemberActionMenu({ member }) {
                                 className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                             >
                                 {member.status === 'ACTIVE' ? (
-                                    <><PowerOff className="w-4 h-4 text-orange-500" /> Vô hiệu hóa</>
+                                    <><PowerOff className="w-4 h-4 text-orange-500" /> Deactivate</>
                                 ) : (
-                                    <><Power className="w-4 h-4 text-emerald-500" /> Kích hoạt</>
+                                    <><Power className="w-4 h-4 text-emerald-500" /> Activate</>
                                 )}
                             </button>
 
@@ -102,7 +102,7 @@ export default function MemberActionMenu({ member }) {
                                 onClick={handleDelete}
                                 className="w-full text-left px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"
                             >
-                                <Trash2 className="w-4 h-4" /> Xóa tài khoản
+                                <Trash2 className="w-4 h-4" /> Delete Account
                             </button>
                         </div>
                     </>

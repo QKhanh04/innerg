@@ -18,7 +18,6 @@ namespace InnerG.Api.Services.Implementations
     public class AuthService : IAuthService
     {
         private const string GoogleProvider = "Google";
-
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ITokenService _tokenService;
@@ -26,6 +25,7 @@ namespace InnerG.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthService> _logger;
+        private readonly IInvitationService _invitationService;
 
         public AuthService(
             UserManager<AppUser> userManager,
@@ -35,7 +35,8 @@ namespace InnerG.Api.Services.Implementations
             AppDbContext context,
             IEmailService emailService,
             IConfiguration configuration,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IInvitationService invitationService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -44,6 +45,7 @@ namespace InnerG.Api.Services.Implementations
             _emailService = emailService;
             _configuration = configuration;
             _logger = logger;
+            _invitationService = invitationService;
         }
 
         public async Task<AuthResponse> BootstrapCompanyAsync(BootstrapCompanyRequest request)
@@ -121,7 +123,7 @@ namespace InnerG.Api.Services.Implementations
             _context.Companies.Add(company);
             await _context.SaveChangesAsync();
 
-            var invite = await CreateInviteAsync(
+            var invite = await _invitationService.CreateInviteAsync(
                 new CreateInviteRequest
                 {
                     CompanyId = company.Id,
@@ -162,7 +164,6 @@ namespace InnerG.Api.Services.Implementations
                 HrInvite = invite
             };
         }
-
         public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin, bool allowExternalEmail = false)
         {
             var companyId = request.CompanyId ?? currentCompanyId
@@ -745,6 +746,20 @@ namespace InnerG.Api.Services.Implementations
                 ?? throw new UnauthorizedException("User not found");
         }
 
+        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var query = _context.Invites
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .Where(x => x.Id == inviteId);
+
+            if (!isSystemAdmin && currentCompanyId.HasValue)
+                query = query.Where(x => x.CompanyId == currentCompanyId.Value);
+
+            return await query.FirstOrDefaultAsync()
+                ?? throw new NotFoundException("Invite not found");
+        }
+
         private async Task<Invite> FindInviteByTokenAsync(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
@@ -758,19 +773,6 @@ namespace InnerG.Api.Services.Implementations
                 ?? throw new NotFoundException("Invite not found");
         }
 
-        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var invite = await _context.Invites
-                .IgnoreQueryFilters()
-                .Include(x => x.Company)
-                .FirstOrDefaultAsync(x => x.Id == inviteId)
-                ?? throw new NotFoundException("Invite not found");
-
-            if (!isSystemAdmin && currentCompanyId != invite.CompanyId)
-                throw new ForbiddenException("You cannot manage invites outside your current company");
-
-            return invite;
-        }
 
         private async Task ExpireInviteIfNeededAsync(Invite invite)
         {

@@ -84,8 +84,11 @@ namespace InnerG.Api.DTOs
 
     public class UpdateMemberRequest
     {
+        public string? FullName { get; set; }
         public Guid? DepartmentId { get; set; }
         public string? Position { get; set; }
+        public string? PhoneInternal { get; set; }
+        public string? AvatarUrl { get; set; }
     }
 
     public class UpdateMemberStatusRequest

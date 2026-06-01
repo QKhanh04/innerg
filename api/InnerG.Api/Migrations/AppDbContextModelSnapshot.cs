@@ -283,6 +283,9 @@ namespace InnerG.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BusinessSettingsJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 

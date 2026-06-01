@@ -13,5 +13,6 @@ namespace InnerG.Api.Services.Interfaces
         Task RevokeMentorRoleAsync(Guid userId, Guid companyId, Guid currentUserId);
         Task UpdateMemberStatusAsync(Guid userId, Guid companyId, Guid currentUserId, UpdateMemberStatusRequest request);
         Task DeleteMemberAsync(Guid userId, Guid companyId, Guid currentUserId);
+        Task<byte[]> ExportMembersCsvAsync(MemberListQuery query, Guid companyId);
     }
 }

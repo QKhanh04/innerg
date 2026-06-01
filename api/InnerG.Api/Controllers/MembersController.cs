@@ -11,6 +11,7 @@ namespace InnerG.Api.Controllers
 {
     [ApiController]
     [Route("api/hr/members")]
+    [Authorize(Roles = "HR")]
     public class MembersController : ControllerBase
     {
         private readonly IMemberService _memberService;
@@ -37,6 +38,13 @@ namespace InnerG.Api.Controllers
         {
             var result = await _memberService.GetMembersAsync(query, GetCurrentCompanyId());
             return Ok(result);
+        }
+
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportMembers([FromQuery] MemberListQuery query)
+        {
+            var csv = await _memberService.ExportMembersCsvAsync(query, GetCurrentCompanyId());
+            return File(csv, "text/csv", "members.csv");
         }
 
         [HttpGet("{userId:guid}")]

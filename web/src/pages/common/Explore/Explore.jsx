@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Sparkles, 
-  BookOpen, 
-  Users, 
-  Clock, 
-  MapPin, 
-  Video, 
-  ChevronRight, 
-  Check, 
-  Star, 
-  Award, 
+import {
+  Search,
+  Filter,
+  Sparkles,
+  BookOpen,
+  Users,
+  Clock,
+  MapPin,
+  Video,
+  ChevronRight,
+  Check,
+  Star,
+  Award,
   AlertCircle,
   Bookmark,
   ArrowRight,
@@ -35,7 +35,7 @@ export default function ExplorePage() {
   const [selectedLevel, setSelectedLevel] = useState('All');
   const [selectedFormat, setSelectedFormat] = useState('All');
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
-  
+
   // Live loading and dataset states
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,7 @@ export default function ExplorePage() {
       return [];
     }
   });
-  
+
   const isMounted = useRef(true);
 
   // Dynamic statistics calculated from live data
@@ -61,14 +61,18 @@ export default function ExplorePage() {
     };
   }, [classes]);
 
-  const showToast = (message) => {
-    const lowerMsg = message.toLowerCase();
-    if (lowerMsg.includes('failed') || lowerMsg.includes('error') || lowerMsg.includes('full')) {
-      toastService.error(message);
-    } else if (lowerMsg.includes('success') || lowerMsg.includes('register') || lowerMsg.includes('added') || message.includes('🎉') || message.includes('❤️') || message.includes('⌛')) {
-      toastService.success(message);
-    } else {
-      toastService.info(message);
+  const showToast = (type, message) => {
+    switch (type) {
+      case 'success':
+        toastService.success(message);
+        break;
+      case 'error':
+        toastService.error(message);
+        break;
+      case 'info':
+      default:
+        toastService.info(message);
+        break;
     }
   };
 
@@ -162,14 +166,14 @@ export default function ExplorePage() {
           }
           return c;
         }));
-        showToast(`Successfully canceled registration for "${cls.title}".`);
+        showToast('success', `Successfully canceled registration for "${cls.title}".`);
       } else {
         // Check if slot is available
         if (cls.takenSlots >= cls.totalSlots) {
-          showToast("Sorry, this class is full!");
+          showToast('error', "Sorry, this class is full!");
           return;
         }
-        
+
         await exploreApi.registerClass(id);
         setClasses(prev => prev.map(c => {
           if (c.id === id) {
@@ -180,11 +184,11 @@ export default function ExplorePage() {
           }
           return c;
         }));
-        showToast(`Successfully requested registration for "${cls.title}". Pending mentor approval! ⌛`);
+        showToast('success', `Successfully requested registration for "${cls.title}". Pending mentor approval! ⌛`);
       }
     } catch (err) {
       console.error("Failed to register/unregister:", err);
-      showToast("Operation failed. Please try again.");
+      showToast('error', "Operation failed. Please try again.");
     }
   };
 
@@ -192,40 +196,40 @@ export default function ExplorePage() {
   const handleWishlistToggle = (id) => {
     if (wishlistIds.includes(id)) {
       setWishlistIds(prev => prev.filter(item => item !== id));
-      showToast("Removed from learning wishlist.");
+      showToast('success', "Removed from learning wishlist.");
     } else {
       setWishlistIds(prev => [...prev, id]);
-      showToast("Added to learning wishlist! ❤️");
+      showToast('success', "Added to learning wishlist! ❤️");
     }
   };
 
   // Search & Filtering Logic
   const filteredClasses = useMemo(() => {
     return classes.filter(cls => {
-      const matchesSearch = 
+      const matchesSearch =
         cls.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cls.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cls.mentor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cls.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()));
-        
+
       const matchesCategory = selectedCategory === 'All' || cls.category === selectedCategory;
       const matchesLevel = selectedLevel === 'All' || cls.level === selectedLevel;
       const matchesFormat = selectedFormat === 'All' || cls.format === selectedFormat;
       const matchesAvailability = !showOnlyAvailable || cls.takenSlots < cls.totalSlots;
-      
+
       return matchesSearch && matchesCategory && matchesLevel && matchesFormat && matchesAvailability;
     });
   }, [classes, searchQuery, selectedCategory, selectedLevel, selectedFormat, showOnlyAvailable]);
 
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto pb-16">
-      
+
       {/* 1. HERO BANNER WITH GRADIENT & STATS */}
       <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-violet-950 rounded-3xl p-8 lg:p-10 shadow-xl border border-indigo-500/25 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-8">
         {/* Glowing Background Orbs */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#00C896]/5 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] -ml-24 -mb-24 pointer-events-none" />
-        
+
         <div className="space-y-4 max-w-2xl text-left relative z-10">
           <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#00C896] uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
             <Sparkles className="size-3.5" />
@@ -237,7 +241,7 @@ export default function ExplorePage() {
           <p className="text-slate-350 text-sm leading-relaxed max-w-xl">
             Explore company-internal mentoring sessions, workshops, peer learning groups, and earn learning rewards points while growing your career.
           </p>
-          
+
           {/* Quick Metrics */}
           <div className="flex gap-6 pt-2">
             <div>
@@ -258,8 +262,8 @@ export default function ExplorePage() {
         {/* Dynamic CTA for Mentor Role to Teach */}
         {(role === 'mentor' || role === 'hr') && (
           <div className="shrink-0 relative z-10">
-            <button 
-              onClick={() => showToast("Redirecting to Create Class form...")}
+            <button
+              onClick={() => showToast('info', "Redirecting to Create Class form...")}
               className="bg-gradient-to-r from-[#00C896] to-[#00B083] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] font-extrabold px-6 py-3.5 rounded-2xl text-xs uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-[#00C896]/20 flex items-center gap-2"
             >
               <Plus className="size-4.5 stroke-[3]" />
@@ -283,7 +287,7 @@ export default function ExplorePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {aiRecommendations.map((item) => (
-            <motion.div 
+            <motion.div
               key={item.id}
               whileHover={{ y: -2 }}
               className="bg-gradient-to-br from-purple-50/30 via-white to-white p-5 rounded-3xl border border-purple-200/50 shadow-xs flex flex-col sm:flex-row gap-5 relative overflow-hidden group"
@@ -311,7 +315,7 @@ export default function ExplorePage() {
                     <img src={item.mentor.avatar} className="size-5 rounded-full object-cover" alt={item.mentor.name} />
                     <span className="text-[10px] text-slate-600 font-bold">{item.mentor.name}</span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => handleRegister(item.id)}
                     className={cn(
                       "text-[9px] font-extrabold uppercase tracking-widest px-4 py-2 rounded-xl transition-all cursor-pointer",
@@ -333,14 +337,14 @@ export default function ExplorePage() {
 
       {/* 3. DYNAMIC CLASS DIRECTORY WITH FILTER CONTROL PANEL */}
       <section className="bg-white rounded-3xl border border-slate-250/60 shadow-sm p-6 lg:p-8 space-y-6">
-        
+
         {/* Search & Filter Top Bar */}
         <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4.5 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search classes, skills, mentors, rooms..." 
+            <input
+              type="text"
+              placeholder="Search classes, skills, mentors, rooms..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-sm rounded-2xl outline-none transition-all placeholder:text-slate-400 text-slate-800"
@@ -350,11 +354,11 @@ export default function ExplorePage() {
           <div className="flex flex-wrap items-center gap-3">
             {/* Show Available Switch */}
             <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 select-none hover:bg-slate-100/50 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={showOnlyAvailable} 
+              <input
+                type="checkbox"
+                checked={showOnlyAvailable}
                 onChange={(e) => setShowOnlyAvailable(e.target.checked)}
-                className="accent-indigo-600 rounded" 
+                className="accent-indigo-600 rounded"
               />
               Show Open Only
             </label>
@@ -362,7 +366,7 @@ export default function ExplorePage() {
             {/* Level Selector */}
             <div className="flex items-center gap-1.5 bg-slate-50 px-3.5 py-2.5 rounded-2xl border border-slate-200">
               <SlidersHorizontal className="size-3.5 text-slate-400" />
-              <select 
+              <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-650 outline-none cursor-pointer"
@@ -374,7 +378,7 @@ export default function ExplorePage() {
             {/* Format Selector */}
             <div className="flex items-center gap-1.5 bg-slate-50 px-3.5 py-2.5 rounded-2xl border border-slate-200">
               <Video className="size-3.5 text-slate-400" />
-              <select 
+              <select
                 value={selectedFormat}
                 onChange={(e) => setSelectedFormat(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-650 outline-none cursor-pointer"
@@ -393,8 +397,8 @@ export default function ExplorePage() {
               onClick={() => setSelectedCategory(cat)}
               className={cn(
                 "px-5 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-widest transition-all cursor-pointer shrink-0 border",
-                selectedCategory === cat 
-                  ? "bg-slate-900 border-slate-900 text-white shadow-xs" 
+                selectedCategory === cat
+                  ? "bg-slate-900 border-slate-900 text-white shadow-xs"
                   : "bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300"
               )}
             >
@@ -431,7 +435,7 @@ export default function ExplorePage() {
                 const spotsLeft = item.totalSlots - item.takenSlots;
 
                 return (
-                  <motion.div 
+                  <motion.div
                     layout
                     key={item.id}
                     initial={{ opacity: 0, scale: 0.96 }}
@@ -445,7 +449,7 @@ export default function ExplorePage() {
                     <div className="h-44 w-full relative overflow-hidden bg-slate-100">
                       <img src={item.image} className="size-full object-cover group-hover:scale-102 transition-transform duration-550" alt={item.title} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                      
+
                       {/* Floating Formats Badge */}
                       <span className={cn(
                         "absolute top-4 left-4 inline-flex items-center gap-1 text-[8px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-lg text-white backdrop-blur-md shadow-xs",
@@ -463,10 +467,10 @@ export default function ExplorePage() {
                       {/* Slots availability tag */}
                       <span className={cn(
                         "absolute bottom-4 left-4 text-[9px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md",
-                        isFull 
-                          ? "bg-rose-600/85" 
-                          : spotsLeft <= 3 
-                            ? "bg-amber-600/85" 
+                        isFull
+                          ? "bg-rose-600/85"
+                          : spotsLeft <= 3
+                            ? "bg-amber-600/85"
                             : "bg-emerald-600/85"
                       )}>
                         {isFull ? "FULL HOUSE" : `${spotsLeft} Slots Left`}
@@ -481,14 +485,14 @@ export default function ExplorePage() {
                             {item.category} • {item.level}
                           </span>
                           <div className="flex items-center gap-1.5">
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); navigate(`/explore/${item.id}`); }}
                               className="size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50"
                               title="View Details"
                             >
                               <Info className="size-3.5" />
                             </button>
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); handleWishlistToggle(item.id); }}
                               className={cn(
                                 "size-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
@@ -569,7 +573,7 @@ export default function ExplorePage() {
             <AlertCircle className="size-10 text-slate-300 mx-auto" />
             <p className="text-slate-700 text-sm font-bold">No classes found matching your search</p>
             <p className="text-slate-400 text-xs">Try selecting a different category or clearing search filters.</p>
-            <button 
+            <button
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('All');
