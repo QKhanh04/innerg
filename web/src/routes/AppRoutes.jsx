@@ -165,6 +165,12 @@ const AppRoutes = () => (
                 </ProtectedRoute>
             } />
 
+            <Route path="/mentor/edit/:id" element={
+                <ProtectedRoute allowedRoles={['mentor', 'hr']}>
+                    <CreateClass />
+                </ProtectedRoute>
+            } />
+
             <Route path="/mentor" element={
                 <ProtectedRoute allowedRoles={['mentor']}>
                     <MentorDashboard />

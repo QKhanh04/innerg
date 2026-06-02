@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using InnerG.Api.Models;
 using InnerG.Api.DTOs.Mentor;
 using InnerG.Api.Repositories.Interfaces;
@@ -14,10 +15,17 @@ namespace InnerG.Api.Services.Implementations
     public class MentorService : IMentorService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly INotificationService _notificationService;
+        private readonly UserManager<AppUser> _userManager;
 
-        public MentorService(IUnitOfWork unitOfWork)
+        public MentorService(
+            IUnitOfWork unitOfWork,
+            INotificationService notificationService,
+            UserManager<AppUser> userManager)
         {
             _unitOfWork = unitOfWork;
+            _notificationService = notificationService;
+            _userManager = userManager;
         }
 
         private async Task<Trainer> GetTrainerByUserIdAsync(Guid userId)
@@ -284,7 +292,7 @@ namespace InnerG.Api.Services.Implementations
                 Title = request.Title,
                 Description = request.Description,
                 Type = eventType,
-                Status = TrainingEventStatus.Published, // Auto-publish
+                Status = TrainingEventStatus.PendingApproval, // Pending Approval by HR
                 SkillId = skill.Id,
                 TrainerId = trainer.Id,
                 StartDate = startDate,
@@ -342,7 +350,187 @@ namespace InnerG.Api.Services.Implementations
 
             await _unitOfWork.CommitAsync();
 
+            try
+            {
+                var hrUsers = await _userManager.GetUsersInRoleAsync(AuthRoles.HR);
+                var hrUserIdsOfCompany = hrUsers
+                    .Where(u => u.CompanyId == trainer.CompanyId && u.IsActive)
+                    .Select(u => u.Id)
+                    .ToList();
+
+                if (hrUserIdsOfCompany.Any())
+                {
+                    await _notificationService.SendToManyAsync(
+                        hrUserIdsOfCompany,
+                        "CLASS_PENDING_APPROVAL",
+                        "Yêu cầu duyệt lớp học mới",
+                        $"Mentor {trainer.FullName} đã tạo một lớp học mới \"{trainingEvent.Title}\" đang chờ bạn duyệt.",
+                        referenceType: "TrainingEvent",
+                        referenceId: trainingEvent.Id
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to send HR notifications: {ex.Message}");
+            }
+
             return trainingEvent.Id;
+        }
+
+        public async Task<bool> UpdateClassAsync(Guid userId, Guid classId, CreateClassRequest request)
+        {
+            var trainer = await GetTrainerByUserIdAsync(userId);
+
+            var trainingEvent = await _unitOfWork.Repository<TrainingEvent>().GetQueryable()
+                .Where(e => e.Id == classId && e.TrainerId == trainer.Id)
+                .Include(e => e.Sessions)
+                .FirstOrDefaultAsync();
+
+            if (trainingEvent == null)
+                return false;
+
+            // Only allow editing if status is Draft or PendingApproval
+            if (trainingEvent.Status != TrainingEventStatus.Draft && trainingEvent.Status != TrainingEventStatus.PendingApproval)
+            {
+                throw new InvalidOperationException("You can only edit classes that are Draft or Pending Approval.");
+            }
+
+            // Find or create Skill
+            var skillName = request.Skills?.FirstOrDefault() ?? "General";
+            var skill = await _unitOfWork.Repository<Skill>().GetQueryable()
+                .FirstOrDefaultAsync(s => s.Name.ToLower() == skillName.ToLower());
+
+            if (skill == null)
+            {
+                skill = new Skill
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = trainer.CompanyId,
+                    Name = skillName,
+                    Category = request.Category,
+                    IsSystem = false,
+                    IsActive = true
+                };
+                await _unitOfWork.Repository<Skill>().AddAsync(skill);
+                await _unitOfWork.CommitAsync();
+            }
+
+            // Parse Date & Time
+            DateTime startDate;
+            if (!DateTime.TryParse($"{request.Date} {request.Time}", out startDate))
+            {
+                startDate = DateTime.UtcNow.AddDays(1);
+            }
+            else
+            {
+                startDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            }
+
+            if (startDate <= DateTime.UtcNow)
+            {
+                throw new ArgumentException("The scheduled class time must be in the future. Please select a future date and time slot.");
+            }
+
+            DateTime endDate = startDate.AddMinutes(request.Duration);
+
+            // Determine Event Type
+            TrainingEventType eventType = TrainingEventType.Workshop;
+            if (request.Category.Equals("Course", StringComparison.OrdinalIgnoreCase))
+                eventType = TrainingEventType.Course;
+            else if (request.Category.Equals("Seminar", StringComparison.OrdinalIgnoreCase))
+                eventType = TrainingEventType.Seminar;
+
+            // Update Training Event
+            trainingEvent.Title = request.Title;
+            trainingEvent.Description = request.Description;
+            trainingEvent.Type = eventType;
+            trainingEvent.SkillId = skill.Id;
+            trainingEvent.StartDate = startDate;
+            trainingEvent.EndDate = endDate;
+            trainingEvent.MaxParticipants = request.MaxSlots;
+            trainingEvent.RewardPoints = request.Points;
+            if (!string.IsNullOrWhiteSpace(request.CoverImageUrl))
+            {
+                trainingEvent.CoverImageUrl = request.CoverImageUrl;
+            }
+
+            await _unitOfWork.Repository<TrainingEvent>().UpdateAsync(trainingEvent);
+
+            // Update primary Session
+            var session = trainingEvent.Sessions.FirstOrDefault();
+            if (session != null)
+            {
+                session.Title = $"{request.Title} - Core Session";
+                session.StartTime = startDate;
+                session.EndTime = endDate;
+                session.MeetingLink = request.Format == "Online" ? request.MeetingLink : null;
+                session.Notes = request.Format == "Offline" ? $"Physical Room: {request.Location}" : "Online Session";
+                await _unitOfWork.Repository<TrainingSession>().UpdateAsync(session);
+            }
+
+            // Clean up existing resources and recreate them
+            var existingResources = await _unitOfWork.Repository<Resource>().GetQueryable()
+                .Where(r => r.TrainingEventId == trainingEvent.Id)
+                .ToListAsync();
+            foreach (var res in existingResources)
+            {
+                await _unitOfWork.Repository<Resource>().DeleteAsync(res);
+            }
+
+            if (request.Resources != null && request.Resources.Count > 0)
+            {
+                foreach (var resReq in request.Resources)
+                {
+                    ResourceType resType = ResourceType.Document;
+                    if (resReq.Type.Equals("Video", StringComparison.OrdinalIgnoreCase))
+                        resType = ResourceType.Video;
+                    else if (resReq.Type.Equals("Link", StringComparison.OrdinalIgnoreCase))
+                        resType = ResourceType.Link;
+
+                    var resource = new Resource
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = trainer.CompanyId,
+                        TrainingEventId = trainingEvent.Id,
+                        Title = resReq.Title,
+                        Description = resReq.Description,
+                        Type = resType,
+                        Url = resReq.Url,
+                        FileType = resReq.FileType,
+                        FileSizeBytes = resReq.FileSizeBytes,
+                        IsPublic = true
+                    };
+                    await _unitOfWork.Repository<Resource>().AddAsync(resource);
+                }
+            }
+
+            await _unitOfWork.CommitAsync();
+            return true;
+        }
+
+        public async Task<bool> CancelClassAsync(Guid userId, Guid classId)
+        {
+            var trainer = await GetTrainerByUserIdAsync(userId);
+
+            var trainingEvent = await _unitOfWork.Repository<TrainingEvent>().GetQueryable()
+                .Where(e => e.Id == classId && e.TrainerId == trainer.Id)
+                .FirstOrDefaultAsync();
+
+            if (trainingEvent == null)
+                return false;
+
+            // Only allow cancellation if status is PendingApproval or Draft
+            if (trainingEvent.Status != TrainingEventStatus.PendingApproval && trainingEvent.Status != TrainingEventStatus.Draft)
+            {
+                throw new InvalidOperationException("You can only cancel classes that are Draft or Pending Approval.");
+            }
+
+            trainingEvent.Status = TrainingEventStatus.Cancelled;
+            await _unitOfWork.Repository<TrainingEvent>().UpdateAsync(trainingEvent);
+            await _unitOfWork.CommitAsync();
+
+            return true;
         }
     }
 }

@@ -56,5 +56,17 @@ export const mentorApi = {
   createClass: async (classData) => {
     const response = await api.post('/Mentor/classes', classData);
     return response.data;
+  },
+
+  // Cập nhật lớp học
+  updateClass: async (classId, classData) => {
+    const response = await api.put(`/Mentor/classes/${classId}`, classData);
+    return response.data;
+  },
+
+  // Hủy yêu cầu duyệt lớp
+  cancelClass: async (classId) => {
+    const response = await api.post(`/Mentor/classes/${classId}/cancel`);
+    return response.data;
   }
 };

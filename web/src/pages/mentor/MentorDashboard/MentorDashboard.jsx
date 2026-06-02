@@ -26,7 +26,9 @@ import {
   QrCode,
   Scan,
   Copy,
-  Volume2
+  Volume2,
+  Edit2,
+  Ban
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
@@ -55,10 +57,57 @@ export default function MentorDashboard() {
 
   const toggleAttendance = (idx) => {
     setRollCallList(prev => prev.map((std, i) => i === idx ? { ...std, attended: !std.attended } : std));
-  };  // Data States
+  };
+
+  const handleCancelClass = async (classId, classTitle) => {
+    if (!window.confirm(`Are you sure you want to cancel the class "${classTitle}"?`)) {
+      return;
+    }
+
+    try {
+      await mentorApi.cancelClass(classId);
+      showToast(`Successfully cancelled class "${classTitle}" 🎉`);
+      
+      // Refresh classes list
+      const classesRes = await mentorApi.getHostedClasses();
+      setClasses(classesRes);
+    } catch (error) {
+      console.error('Failed to cancel class:', error);
+      const errMsg = error.response?.data?.message || 'Failed to cancel class. Please try again.';
+      showToast(errMsg);
+    }
+  };
+
+  const getEventStatus = (status) => {
+    if (status === 0 || status === 'Draft') return 'Draft';
+    if (status === 1 || status === 'PendingApproval' || status === 'Pending') return 'PendingApproval';
+    if (status === 2 || status === 'Published') return 'Published';
+    if (status === 3 || status === 'Cancelled') return 'Cancelled';
+    return 'Completed';
+  };
+
+  const getEventType = (type) => {
+    if (type === 0 || type === 'Course') return 'Course';
+    if (type === 1 || type === 'Workshop') return 'Workshop';
+    if (type === 2 || type === 'Seminar') return 'Seminar';
+    return 'SharingSession';
+  };
+
+  // Data States
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [classes, setClasses] = useState([]);
+  const [activeTab, setActiveTab] = useState('All');
+
+  const filteredClasses = useMemo(() => {
+    if (activeTab === 'All') return classes;
+    if (activeTab === 'Draft') return classes.filter(c => getEventStatus(c.status) === 'Draft');
+    if (activeTab === 'Pending Approval') return classes.filter(c => getEventStatus(c.status) === 'PendingApproval');
+    if (activeTab === 'Published') return classes.filter(c => getEventStatus(c.status) === 'Published');
+    if (activeTab === 'Cancelled') return classes.filter(c => getEventStatus(c.status) === 'Cancelled');
+    if (activeTab === 'Completed') return classes.filter(c => getEventStatus(c.status) === 'Completed');
+    return classes;
+  }, [classes, activeTab]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [availability, setAvailability] = useState([
     { dayOfWeek: 'Monday', isAvailable: true, timeSlots: [{ startTime: '09:00', endTime: '11:00' }] },
@@ -450,6 +499,40 @@ export default function MentorDashboard() {
               </h3>
             </div>
 
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-100">
+              {['All', 'Draft', 'Pending Approval', 'Published', 'Cancelled', 'Completed'].map(tab => {
+                let count = 0;
+                if (tab === 'All') count = classes.length;
+                else if (tab === 'Draft') count = classes.filter(c => getEventStatus(c.status) === 'Draft').length;
+                else if (tab === 'Pending Approval') count = classes.filter(c => getEventStatus(c.status) === 'PendingApproval').length;
+                else if (tab === 'Published') count = classes.filter(c => getEventStatus(c.status) === 'Published').length;
+                else if (tab === 'Cancelled') count = classes.filter(c => getEventStatus(c.status) === 'Cancelled').length;
+                else if (tab === 'Completed') count = classes.filter(c => getEventStatus(c.status) === 'Completed').length;
+
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-full text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5",
+                      activeTab === tab
+                        ? "bg-slate-900 text-white shadow-sm"
+                        : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                    )}
+                  >
+                    <span>{tab}</span>
+                    <span className={cn(
+                      "text-[9px] px-1.5 py-0.5 rounded-full",
+                      activeTab === tab ? "bg-white/20 text-white" : "bg-slate-200 text-slate-650"
+                    )}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {isLoading && [1, 2].map((i) => (
                 <div key={i} className="bg-white border border-slate-100 rounded-2xl overflow-hidden h-64 animate-pulse">
@@ -461,12 +544,18 @@ export default function MentorDashboard() {
                   </div>
                 </div>
               ))}
-              {!isLoading && classes.map((cls) => {
+              {!isLoading && filteredClasses.map((cls) => {
                 const spotsLeft = (cls.maxParticipants || 0) - cls.registeredCount;
                 const isFull = spotsLeft <= 0 && cls.maxParticipants !== null;
 
-                const formatString = cls.type === 0 ? 'Course' : cls.type === 1 ? 'Workshop' : cls.type === 2 ? 'Seminar' : 'SharingSession';
-                const statusString = cls.status === 0 ? 'DRAFT' : cls.status === 1 ? 'PENDING' : cls.status === 2 ? 'PUBLISHED' : cls.status === 3 ? 'CANCELLED' : 'COMPLETED';
+                const isDraft = getEventStatus(cls.status) === 'Draft';
+                const isPending = getEventStatus(cls.status) === 'PendingApproval';
+                const isPublished = getEventStatus(cls.status) === 'Published';
+                const isCancelled = getEventStatus(cls.status) === 'Cancelled';
+                const isCompleted = getEventStatus(cls.status) === 'Completed';
+
+                const formatString = getEventType(cls.type);
+                const statusString = isDraft ? 'DRAFT' : isPending ? 'PENDING' : isPublished ? 'PUBLISHED' : isCancelled ? 'CANCELLED' : 'COMPLETED';
 
                 return (
                   <div 
@@ -487,7 +576,11 @@ export default function MentorDashboard() {
 
                       <span className={cn(
                         "absolute bottom-3 left-3 text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-lg text-white backdrop-blur-md",
-                        statusString === 'PUBLISHED' ? "bg-emerald-600/85" : "bg-slate-650/85"
+                        isDraft ? "bg-blue-600/85" :
+                        isPending ? "bg-amber-600/85" :
+                        isPublished ? "bg-emerald-600/85" :
+                        isCancelled ? "bg-rose-600/85" :
+                        "bg-slate-650/85"
                       )}>
                         {statusString}
                       </span>
@@ -518,18 +611,60 @@ export default function MentorDashboard() {
                       </div>
 
                       <div className="flex gap-2 pt-1">
-                        <button 
-                          onClick={() => setActiveLaunchSession(cls)}
-                          className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
-                        >
-                          <ExternalLink className="size-3" />
-                          Launch Session
-                        </button>
+                        {(isDraft || isPending) ? (
+                          <>
+                            <button 
+                              onClick={() => navigate(`/mentor/edit/${cls.id}`)}
+                              className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                            >
+                              <Edit2 className="size-3" />
+                              Edit Class
+                            </button>
+                            {isPending && (
+                              <button 
+                                onClick={() => handleCancelClass(cls.id, cls.title)}
+                                className="bg-white hover:bg-rose-50 border border-rose-250 text-rose-650 font-extrabold px-3 py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                              >
+                                <Ban className="size-3" />
+                                Cancel
+                              </button>
+                            )}
+                          </>
+                        ) : isPublished ? (
+                          <button 
+                            onClick={() => setActiveLaunchSession(cls)}
+                            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                          >
+                            <ExternalLink className="size-3" />
+                            Launch Session
+                          </button>
+                        ) : isCancelled ? (
+                          <button 
+                            disabled
+                            className="flex-1 bg-slate-100 text-slate-400 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed"
+                          >
+                            Cancelled
+                          </button>
+                        ) : (
+                          <button 
+                            disabled
+                            className="flex-1 bg-emerald-50 text-emerald-600 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed"
+                          >
+                            Completed
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
                 );
               })}
+
+              {!isLoading && filteredClasses.length === 0 && (
+                <div className="col-span-full py-12 text-center space-y-3">
+                  <BookOpen className="size-10 text-slate-300 mx-auto" />
+                  <p className="text-xs font-bold text-slate-500">No classes found in this tab.</p>
+                </div>
+              )}
             </div>
           </section>
 

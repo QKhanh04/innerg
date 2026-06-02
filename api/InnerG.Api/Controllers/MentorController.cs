@@ -165,5 +165,39 @@ namespace InnerG.Api.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [HttpPut("classes/{id:guid}")]
+        public async Task<IActionResult> UpdateClass(Guid id, [FromBody] CreateClassRequest request)
+        {
+            try
+            {
+                var success = await _mentorService.UpdateClassAsync(GetCurrentUserId(), id, request);
+                if (success)
+                    return Ok(new { message = "Class updated successfully." });
+
+                return NotFound(new { message = "Class not found or not in draft/pending status." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("classes/{id:guid}/cancel")]
+        public async Task<IActionResult> CancelClass(Guid id)
+        {
+            try
+            {
+                var success = await _mentorService.CancelClassAsync(GetCurrentUserId(), id);
+                if (success)
+                    return Ok(new { message = "Class cancelled successfully." });
+
+                return NotFound(new { message = "Class not found or cannot be cancelled." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }

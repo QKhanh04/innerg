@@ -30,6 +30,7 @@ namespace InnerG.Api.DTOs
         public string EventStatus { get; set; } = string.Empty; // "Draft", "Published", etc. for Mentor/HR
 
         public List<TrainingSessionDto> Sessions { get; set; } = new List<TrainingSessionDto>();
+        public List<ExploreResourceDto> Resources { get; set; } = new List<ExploreResourceDto>();
     }
 
     public class TrainingSessionDto
@@ -41,5 +42,16 @@ namespace InnerG.Api.DTOs
         public string Duration { get; set; } = string.Empty;
         public string Format { get; set; } = string.Empty;
         public string LocationOrLink { get; set; } = string.Empty;
+    }
+
+    public class ExploreResourceDto
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty; // "Document", "Video", "Link"
+        public string Url { get; set; } = string.Empty;
+        public string FileType { get; set; } = string.Empty;
+        public long? FileSizeBytes { get; set; }
     }
 }

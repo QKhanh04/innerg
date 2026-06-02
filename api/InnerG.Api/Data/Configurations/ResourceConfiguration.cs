@@ -12,7 +12,7 @@ namespace InnerG.Api.Data.Configurations
                    .HasConversion<string>();
 
             builder.HasOne(x => x.TrainingEvent)
-                   .WithMany()
+                   .WithMany(t => t.Resources)
                    .HasForeignKey(x => x.TrainingEventId)
                    .OnDelete(DeleteBehavior.Cascade);
         }
