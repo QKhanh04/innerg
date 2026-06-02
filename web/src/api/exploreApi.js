@@ -23,5 +23,20 @@ export const exploreApi = {
   getClassDetail: async (eventId) => {
     const response = await api.get(`/explore/${eventId}`);
     return response.data;
+  },
+
+  // Get mentee dashboard aggregated data
+  getMenteeDashboard: async () => {
+    const response = await api.get('/explore/mentee-dashboard');
+    return response.data;
+  },
+
+  // Get personal schedule (timeline/calendar events)
+  getPersonalSchedule: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    const response = await api.get('/schedule', { params });
+    return response.data;
   }
 };

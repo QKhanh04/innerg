@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 export type Role = 'mentee' | 'mentor' | 'hr' | 'admin';
 
 interface User {
+  userId: string | null;
   name: string;
   position: string;
   avatar: string;
@@ -32,6 +33,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
     const primaryAppRole = authUser?.appRoles?.[0] || 'Mentee';
 
     return {
+      userId: authUser?.userId || null,
       name: authUser?.fullName || authUser?.email || 'InnerG User',
       position: primaryAppRole,
       avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(authUser?.email || authUser?.fullName || 'innerg-user')}`,

@@ -29,6 +29,7 @@ namespace InnerG.Api.DTOs
 
     public class ExploreMentorDto
     {
+        public Guid UserId { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Avatar { get; set; } = string.Empty;
         public string Rating { get; set; } = "4.8";

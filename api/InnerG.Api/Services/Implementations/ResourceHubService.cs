@@ -42,7 +42,8 @@ namespace InnerG.Api.Services.Implementations
                 .Include(r => r.TrainingEvent)
                     .ThenInclude(te => te.Skill)
                 .Where(r => r.CompanyId == companyId && 
-                            r.TrainingEvent.Status != TrainingEventStatus.Draft)
+                            (r.TrainingEvent.Status == TrainingEventStatus.Published || 
+                             r.TrainingEvent.Status == TrainingEventStatus.Completed))
                 .OrderByDescending(r => r.TrainingEvent.StartDate)
                 .ToListAsync();
 
@@ -64,7 +65,7 @@ namespace InnerG.Api.Services.Implementations
                 bool isEnrolled = enrolledSet.Contains(te.Id);
                 
                 // USER'S NEW REQUIREMENT: "sau buổi workshop đó thì tài nguyên được xem và tải bởi tất cả mọi người luôn (là public ấy)"
-                bool isWorkshopFinished = te.Status == TrainingEventStatus.Completed || te.EndDate <= now;
+                bool isWorkshopFinished = te.Status == TrainingEventStatus.Completed || te.EndDate <= DateTime.UtcNow || te.EndDate <= DateTime.Now;
 
                 bool hasAccess = r.IsPublic || isTrainer || isHrOrAdmin || isEnrolled || isWorkshopFinished;
 

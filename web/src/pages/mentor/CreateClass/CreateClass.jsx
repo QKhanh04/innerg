@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, 
   Sparkles, 
@@ -26,8 +26,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { mentorApi } from '../../../api/mentorApi';
+import { exploreApi } from '../../../api/exploreApi';
 import { toastService } from '../../../services/toastService';
 
 export default function CreateClassPage() {
@@ -49,11 +50,107 @@ export default function CreateClassPage() {
     coverImageUrl: ''
   });
 
+  const { id } = useParams();
+  const isEditMode = !!id;
+  const [isDataLoading, setIsDataLoading] = useState(isEditMode);
+
   const [skills, setSkills] = useState(['React', 'Frontend']);
   const [skillInput, setSkillInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [aiOptimizing, setAiOptimizing] = useState(false);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const fetchClassDetails = async () => {
+      try {
+        setIsDataLoading(true);
+        const detail = await exploreApi.getClassDetail(id);
+
+        let category = 'Technical';
+        if (detail.category === 'Course' || detail.category === 0) category = 'Course';
+        else if (detail.category === 'Seminar' || detail.category === 2) category = 'Seminar';
+        else category = 'Workshop';
+
+        const format = detail.format || 'Online';
+        const meetingLink = format === 'Online' ? (detail.sessions?.[0]?.locationOrLink || '') : '';
+        const location = format === 'Offline' ? (detail.sessions?.[0]?.locationOrLink || '') : '';
+
+        // Extract Date & Time from detail
+        let rawDate = '';
+        let rawTime = '';
+        if (detail.date) {
+          const dateStr = `${detail.date} ${detail.time}`;
+          const parsedDate = new Date(dateStr);
+          if (!isNaN(parsedDate.getTime())) {
+            const year = parsedDate.getFullYear();
+            const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(parsedDate.getDate()).padStart(2, '0');
+            rawDate = `${year}-${month}-${day}`;
+
+            const hours = String(parsedDate.getHours()).padStart(2, '0');
+            const minutes = String(parsedDate.getMinutes()).padStart(2, '0');
+            rawTime = `${hours}:${minutes}`;
+          }
+        }
+
+        // Parse duration: e.g. "60 mins" or "2 hours"
+        let durationMins = 60;
+        if (detail.duration) {
+          const match = detail.duration.match(/(\d+)\s*(min|hour|day)/i);
+          if (match) {
+            const val = parseInt(match[1], 10);
+            const unit = match[2].toLowerCase();
+            if (unit === 'min') durationMins = val;
+            else if (unit === 'hour') durationMins = val * 60;
+            else if (unit === 'day') durationMins = val * 1440;
+          }
+        }
+
+        setFormData({
+          title: detail.title || '',
+          description: detail.description || '',
+          category: category,
+          level: detail.level || 'Beginner',
+          format: format,
+          meetingLink: meetingLink,
+          location: location,
+          date: rawDate,
+          time: rawTime,
+          duration: durationMins,
+          maxSlots: detail.totalSlots || 15,
+          points: detail.points || 100,
+          department: detail.department || 'All',
+          coverImageUrl: detail.image || ''
+        });
+
+        if (detail.skills) {
+          setSkills(detail.skills);
+        }
+
+        if (detail.resources) {
+          setResources(detail.resources.map(r => ({
+            title: r.title,
+            description: r.description,
+            type: r.type,
+            url: r.url,
+            fileType: r.fileType,
+            fileSizeBytes: r.fileSizeBytes
+          })));
+        }
+
+      } catch (error) {
+        console.error('Failed to load class details:', error);
+        toastService.error('Failed to fetch class details for editing.');
+        navigate('/mentor');
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+
+    fetchClassDetails();
+  }, [id, isEditMode, navigate]);
 
   // Learning Resources & Attachments States
   const [resources, setResources] = useState([]);
@@ -267,23 +364,37 @@ export default function CreateClassPage() {
     setIsSubmitting(true);
     
     try {
-      await mentorApi.createClass({
-        ...formData,
-        title: cleanTitle,
-        description: cleanDesc,
-        duration: durationVal,
-        maxSlots: maxSlotsVal,
-        points: pointsVal,
-        skills,
-        resources,
-        coverImageUrl: formData.coverImageUrl.trim() || null
-      });
+      if (isEditMode) {
+        await mentorApi.updateClass(id, {
+          ...formData,
+          title: cleanTitle,
+          description: cleanDesc,
+          duration: durationVal,
+          maxSlots: maxSlotsVal,
+          points: pointsVal,
+          skills,
+          resources,
+          coverImageUrl: formData.coverImageUrl.trim() || null
+        });
+      } else {
+        await mentorApi.createClass({
+          ...formData,
+          title: cleanTitle,
+          description: cleanDesc,
+          duration: durationVal,
+          maxSlots: maxSlotsVal,
+          points: pointsVal,
+          skills,
+          resources,
+          coverImageUrl: formData.coverImageUrl.trim() || null
+        });
+      }
       setIsSubmitting(false);
       setShowSuccessModal(true);
     } catch (error) {
       setIsSubmitting(false);
       console.error(error);
-      const errMsg = error.response?.data?.message || "Failed to create class. Please try again.";
+      const errMsg = error.response?.data?.message || `Failed to ${isEditMode ? "update" : "create"} class. Please try again.`;
       toastService.error(errMsg);
     }
   };
@@ -291,9 +402,18 @@ export default function CreateClassPage() {
   // Capacity visual feedback tags helper
   const getCapacityLabel = (slots) => {
     if (slots <= 10) return { text: "Intimate Mentorship (1-10 slots)", color: "text-amber-600 bg-amber-50" };
-    if (slots <= 30) return { text: "Interactive Workshop (11-30 slots)", color: "text-indigo-600 bg-indigo-50" };
+    if (slots <= 30) return { text: "Interactive Workshop (11-30 slots)", color: "text-indigo-650 bg-indigo-50" };
     return { text: "Company-wide Seminar (30+ slots)", color: "text-emerald-600 bg-emerald-50" };
   };
+
+  if (isDataLoading) {
+    return (
+      <div className="min-h-[400px] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="size-10 text-[#00C896] animate-spin" />
+        <p className="text-slate-500 font-medium text-sm">Loading class details...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-[1200px] mx-auto pb-16">
@@ -303,10 +423,10 @@ export default function CreateClassPage() {
         <div className="space-y-1">
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
             <BookOpen className="size-8 text-[#00C896]" />
-            Host a Class
+            {isEditMode ? "Edit Class Details" : "Host a Class"}
           </h1>
           <p className="text-slate-500 text-sm font-medium">
-            Create internal training sessions, workshops, peer learning groups, or mentoring sessions.
+            {isEditMode ? "Modify details for your scheduled or draft training session." : "Create internal training sessions, workshops, peer learning groups, or mentoring sessions."}
           </p>
         </div>
         
@@ -851,7 +971,7 @@ export default function CreateClassPage() {
               disabled={isSubmitting}
               className="w-full bg-gradient-to-r from-[#00C896] to-[#00B083] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] py-3.5 rounded-2xl font-extrabold text-xs uppercase tracking-widest transition-all shadow-md shadow-[#00C896]/10 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? "Creating class..." : "Create Training Class"}
+              {isSubmitting ? (isEditMode ? "Saving changes..." : "Creating class...") : (isEditMode ? "Save Changes" : "Create Training Class")}
               <ArrowRight className="size-4 stroke-[3.5]" />
             </button>
 
@@ -876,9 +996,14 @@ export default function CreateClassPage() {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Training Class Created!</h3>
+                <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  {isEditMode ? "Class Details Updated!" : "Class Request Submitted!"}
+                </h3>
                 <p className="text-slate-500 text-xs leading-relaxed">
-                  Your workshop <strong>"{formData.title}"</strong> is successfully created and published onto the public Skill Marketplace feed. Mentees can now register immediately.
+                  {isEditMode 
+                    ? <>Your class <strong>"{formData.title}"</strong> has been successfully updated.</>
+                    : <>Your class <strong>"{formData.title}"</strong> is successfully submitted. It will be reviewed by the HR department and published onto the marketplace once approved.</>
+                  }
                 </p>
               </div>
 
@@ -901,38 +1026,40 @@ export default function CreateClassPage() {
                 <button 
                   onClick={() => {
                     setShowSuccessModal(false);
-                    navigate('/schedule'); // Redirect to schedule to see the new class
+                    navigate('/mentor');
                   }}
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3.5 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98]"
                 >
-                  View on My Schedule
+                  Go to Mentor Dashboard
                 </button>
-                <button 
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    // Reset fields
-                    setFormData({
-                      title: '',
-                      description: '',
-                      category: 'Technical',
-                      level: 'Beginner',
-                      format: 'Online',
-                      meetingLink: '',
-                      location: '',
-                      date: '',
-                      time: '',
-                      duration: 60,
-                      maxSlots: 15,
-                      points: 100,
-                      department: 'All',
-                      coverImageUrl: ''
-                    });
-                    setSkills([]);
-                  }}
-                  className="w-full bg-white hover:bg-slate-50 text-slate-600 border border-slate-250 py-3.5 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98]"
-                >
-                  Create another class
-                </button>
+                {!isEditMode && (
+                  <button 
+                    onClick={() => {
+                      setShowSuccessModal(false);
+                      // Reset fields
+                      setFormData({
+                        title: '',
+                        description: '',
+                        category: 'Technical',
+                        level: 'Beginner',
+                        format: 'Online',
+                        meetingLink: '',
+                        location: '',
+                        date: '',
+                        time: '',
+                        duration: 60,
+                        maxSlots: 15,
+                        points: 100,
+                        department: 'All',
+                        coverImageUrl: ''
+                      });
+                      setSkills([]);
+                    }}
+                    className="w-full bg-white hover:bg-slate-50 text-slate-600 border border-slate-250 py-3.5 rounded-2xl text-[10px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98]"
+                  >
+                    Create another class
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>
