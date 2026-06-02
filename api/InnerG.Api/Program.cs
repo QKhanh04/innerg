@@ -201,6 +201,9 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IMentorService, MentorService>();
 builder.Services.AddScoped<IResourceHubService, ResourceHubService>();
 builder.Services.AddScoped<IExploreService, ExploreService>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
+builder.Services.AddScoped<IWishlistService, WishlistService>();
+builder.Services.AddScoped<IIntegrationService, IntegrationService>();
 
 builder.Services.AddHostedService<UserSessionCleanupService>();
 
