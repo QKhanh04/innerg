@@ -200,6 +200,7 @@ builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepositor
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IMentorService, MentorService>();
 builder.Services.AddScoped<IResourceHubService, ResourceHubService>();
+builder.Services.AddScoped<IExploreService, ExploreService>();
 
 builder.Services.AddHostedService<UserSessionCleanupService>();
 
