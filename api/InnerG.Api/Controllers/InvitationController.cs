@@ -114,8 +114,24 @@ namespace InnerG.Api.Controllers
             if (string.IsNullOrEmpty(currentUserId))
                 return Unauthorized();
 
-            await _invitationService.RevokeBulkInvitesAsync(
+            await _invitationService.DeleteBulkInvitesAsync(
                 request,
+                currentUserId,
+                GetCurrentCompanyId(),
+                IsSystemAdmin());
+
+            return NoContent();
+        }
+
+        [HttpDelete("{inviteId:guid}")]
+        public async Task<IActionResult> DeleteInviteAsync(Guid inviteId)
+        {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(currentUserId))
+                return Unauthorized();
+
+            await _invitationService.DeleteInviteAsync(
+                inviteId,
                 currentUserId,
                 GetCurrentCompanyId(),
                 IsSystemAdmin());

@@ -198,9 +198,32 @@ namespace InnerG.Api.Services.Implementations
                 }
                 catch (AppException)
                 {
-                    // Ignore individual errors during bulk operation for now, 
-                    // or we could collect them like in bulk invite.
-                    // Given the frontend's expectation, we'll just try to revoke as many as possible.
+                    // Ignore individual errors during bulk operation
+                }
+            }
+        }
+
+        public async Task DeleteInviteAsync(Guid inviteId, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var invite = await GetInviteForMutationAsync(inviteId, currentCompanyId, isSystemAdmin);
+            invite.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteBulkInvitesAsync(BulkRevokeRequest request, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            if (request?.Ids == null || !request.Ids.Any())
+                return;
+
+            foreach (var id in request.Ids)
+            {
+                try
+                {
+                    await DeleteInviteAsync(id, actorUserId, currentCompanyId, isSystemAdmin);
+                }
+                catch (AppException)
+                {
+                    // Ignore individual errors during bulk operation
                 }
             }
         }
