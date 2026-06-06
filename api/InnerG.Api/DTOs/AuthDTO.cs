@@ -57,37 +57,11 @@ namespace InnerG.Api.DTOs
         public string Language { get; set; } = "vi";
         public string HrEmail { get; set; } = string.Empty;
         public string? HrFullName { get; set; }
+        public bool AllowExternalHrEmail { get; set; }
     }
 
-    public class CreateInviteRequest
-    {
-        public Guid? CompanyId { get; set; }
-        public string Email { get; set; } = string.Empty;
-        public string? FullName { get; set; }
-        public Guid? DepartmentId { get; set; }
-        public string? Position { get; set; }
-        public IList<string> Roles { get; set; } = new List<string>();
-    }
 
-    public class BulkInviteRequest
-    {
-        public IList<CreateInviteRequest> Invites { get; set; } = new List<CreateInviteRequest>();
-    }
 
-    public class BulkInviteResponse
-    {
-        public int SuccessCount { get; set; }
-        public int ErrorCount { get; set; }
-        public IList<InviteResponse> SuccessfulInvites { get; set; } = new List<InviteResponse>();
-        public IList<BulkInviteError> Errors { get; set; } = new List<BulkInviteError>();
-    }
-
-    public class BulkInviteError
-    {
-        public int Row { get; set; }
-        public string Email { get; set; } = string.Empty;
-        public string Error { get; set; } = string.Empty;
-    }
 
     public class WorkspaceOption
     {
@@ -119,6 +93,8 @@ namespace InnerG.Api.DTOs
         public DateTime ExpiresAt { get; set; }
         public IList<string> Roles { get; set; } = new List<string>();
         public string InviteLink { get; set; } = string.Empty;
+        public bool EmailSent { get; set; }
+        public string EmailDeliveryMessage { get; set; } = string.Empty;
     }
 
     public class CompanyResponse

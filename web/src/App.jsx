@@ -30,7 +30,7 @@ function App() {
           <RoleProvider>
             <BrowserRouter>
               <AxiosInterceptorSetup />
-              <Toaster />
+              <Toaster position="top-right" reverseOrder={false} />
               <AppRoutes />
             </BrowserRouter>
           </RoleProvider>

@@ -23,7 +23,15 @@ namespace InnerG.Api.Models
         public string? Bio { get; set; }
         public string? ExpertiseDescription { get; set; }
         public bool IsActive { get; set; } = true;
+        
+        // Mentor Fields
+        public double AvgRating { get; set; } = 0;
+        public int TotalClassesTaught { get; set; } = 0;
+        public int TotalStudents { get; set; } = 0;
+        public string MentorStatus { get; set; } = "PENDING_VERIFICATION";
 
+        // Availability Config JSON
+        public string? AvailabilityConfig { get; set; }
         // Navigation properties
         public virtual AppUser? User { get; set; }
         public virtual ICollection<TrainerSkill> TrainerSkills { get; set; } = new List<TrainerSkill>();

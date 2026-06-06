@@ -3,60 +3,71 @@ import { toast } from "react-hot-toast";
 
 const styles = {
   success: {
-    icon: <Check className="w-5 h-5 text-white" />,
-    iconBg: "bg-green-500",
-    title: "Success!",
-    titleColor: "text-green-500",
-    progress: "bg-green-500",
+    icon: <Check className="w-5 h-5 text-[#0F1F3D] stroke-[3]" />,
+    iconBg: "bg-gradient-to-br from-emerald-400 to-[#00C896] shadow-[0_0_12px_#00C896]",
+    title: "Success",
+    titleColor: "text-emerald-400 font-extrabold uppercase tracking-wider text-[10px]",
+    progress: "bg-[#00C896] shadow-[0_0_8px_#00C896]",
+    cardBorder: "border border-emerald-500/25",
+    cardShadow: "shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_20px_rgba(16,185,129,0.15)]",
   },
   error: {
-    icon: <X className="w-5 h-5 text-white" />,
-    iconBg: "bg-red-500",
-    title: "Error!",
-    titleColor: "text-red-500",
-    progress: "bg-red-500",
+    icon: <X className="w-5 h-5 text-white stroke-[3]" />,
+    iconBg: "bg-gradient-to-br from-rose-500 to-red-600 shadow-[0_0_12px_#EF4444]",
+    title: "Error",
+    titleColor: "text-rose-400 font-extrabold uppercase tracking-wider text-[10px]",
+    progress: "bg-rose-500 shadow-[0_0_8px_#EF4444]",
+    cardBorder: "border border-rose-500/25",
+    cardShadow: "shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_20px_rgba(239,68,68,0.15)]",
   },
   info: {
-    icon: <Info className="w-5 h-5 text-white" />,
-    iconBg: "bg-blue-500",
-    title: "Info",
-    titleColor: "text-blue-500",
-    progress: "bg-blue-500",
+    icon: <Info className="w-5 h-5 text-white stroke-[2.5]" />,
+    iconBg: "bg-gradient-to-br from-sky-400 to-blue-500 shadow-[0_0_12px_#3B82F6]",
+    title: "Update",
+    titleColor: "text-sky-400 font-extrabold uppercase tracking-wider text-[10px]",
+    progress: "bg-sky-500 shadow-[0_0_8px_#3B82F6]",
+    cardBorder: "border border-sky-500/25",
+    cardShadow: "shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_20px_rgba(59,130,246,0.15)]",
   },
   warning: {
-    icon: <AlertTriangle className="w-5 h-5 text-white" />,
-    iconBg: "bg-yellow-500",
-    title: "Warning!",
-    titleColor: "text-yellow-500",
-    progress: "bg-yellow-500",
+    icon: <AlertTriangle className="w-5 h-5 text-[#0F1F3D] stroke-[2.5]" />,
+    iconBg: "bg-gradient-to-br from-amber-400 to-yellow-500 shadow-[0_0_12px_#F59E0B]",
+    title: "Warning",
+    titleColor: "text-amber-400 font-extrabold uppercase tracking-wider text-[10px]",
+    progress: "bg-amber-500 shadow-[0_0_8px_#F59E0B]",
+    cardBorder: "border border-amber-500/25",
+    cardShadow: "shadow-[0_20px_50px_rgba(0,0,0,0.45),0_0_20px_rgba(245,158,11,0.15)]",
   },
 };
 
 export const showToast = (type = "success", message, duration = 3000) => {
-  const config = styles[type];
+  const config = styles[type] || styles.success;
 
   toast.custom(
     (t) => (
       <div
         className={`
           relative
-          flex items-center gap-3
-          w-80
-          bg-white
-          rounded-3xl
-          shadow-[0_8px_30px_rgb(0,0,0,0.12)]
-          px-3 py-2
+          flex items-start gap-3.5
+          w-[360px] md:w-[380px]
+          bg-slate-900/95
+          backdrop-blur-md
+          rounded-2xl
+          px-4.5 py-4
           overflow-hidden
           transition-all duration-300 ease-out
+          ${config.cardBorder}
+          ${config.cardShadow}
           ${t.visible ? "animate-slideIn" : "animate-slideOut"}
         `}
       >
-        {/* Icon circle */}
+        {/* Glowing Badge Circle */}
         <div
           className={`
             flex items-center justify-center 
             w-9 h-9
             rounded-full 
+            shrink-0
             ${config.iconBg}
           `}
         >
@@ -64,25 +75,25 @@ export const showToast = (type = "success", message, duration = 3000) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
-          <p className={`font-semibold text-base ${config.titleColor} mb-0.5`}>
+        <div className="flex-1 min-w-0 pr-2">
+          <p className={`font-black text-xs ${config.titleColor} tracking-widest uppercase mb-1`}>
             {config.title}
           </p>
-          <p className="text-gray-600 text-sm leading-relaxed">
+          <p className="text-slate-100 text-sm font-semibold leading-snug">
             {message}
           </p>
         </div>
 
-        {/* Close button - căn giữa theo chiều dọc */}
+        {/* Close Button */}
         <button
           onClick={() => toast.dismiss(t.id)}
-          className=" text-gray-400 hover:text-gray-600 transition-colors p-1"
+          className="text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl p-1.5 transition-all shrink-0 -mt-1 -mr-1"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 stroke-[2.5]" />
         </button>
 
-        {/* Progress bar */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100 overflow-hidden">
+        {/* Floating animated progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-950/40 overflow-hidden">
           <div
             className={`h-full ${config.progress}`}
             style={{
@@ -99,9 +110,3 @@ export const showToast = (type = "success", message, duration = 3000) => {
     }
   );
 };
-
-// // Helper functions
-// export const toastSuccess = (message) => showToast("success", message);
-// export const toastError = (message) => showToast("error", message);
-// export const toastInfo = (message) => showToast("info", message);
-// export const toastWarning = (message) => showToast("warning", message);

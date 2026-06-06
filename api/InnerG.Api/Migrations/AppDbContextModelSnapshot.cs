@@ -283,6 +283,9 @@ namespace InnerG.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BusinessSettingsJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1386,6 +1389,12 @@ namespace InnerG.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AvailabilityConfig")
+                        .HasColumnType("text");
+
+                    b.Property<double>("AvgRating")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("Bio")
                         .HasColumnType("text");
 
@@ -1411,11 +1420,21 @@ namespace InnerG.Api.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("MentorStatus")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("OrganizationName")
                         .HasColumnType("text");
 
                     b.Property<string>("Phone")
                         .HasColumnType("text");
+
+                    b.Property<int>("TotalClassesTaught")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalStudents")
+                        .HasColumnType("integer");
 
                     b.Property<string>("TrainerType")
                         .IsRequired()
@@ -2341,7 +2360,7 @@ namespace InnerG.Api.Migrations
             modelBuilder.Entity("InnerG.Api.Models.Resource", b =>
                 {
                     b.HasOne("InnerG.Api.Models.TrainingEvent", "TrainingEvent")
-                        .WithMany()
+                        .WithMany("Resources")
                         .HasForeignKey("TrainingEventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2796,6 +2815,8 @@ namespace InnerG.Api.Migrations
             modelBuilder.Entity("InnerG.Api.Models.TrainingEvent", b =>
                 {
                     b.Navigation("Enrollments");
+
+                    b.Navigation("Resources");
 
                     b.Navigation("Sessions");
 

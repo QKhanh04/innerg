@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Google.Apis.Auth;
 using InnerG.Api.Data;
 using InnerG.Api.DTOs;
@@ -17,7 +18,6 @@ namespace InnerG.Api.Services.Implementations
     public class AuthService : IAuthService
     {
         private const string GoogleProvider = "Google";
-
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ITokenService _tokenService;
@@ -25,6 +25,7 @@ namespace InnerG.Api.Services.Implementations
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthService> _logger;
+        private readonly IInvitationService _invitationService;
 
         public AuthService(
             UserManager<AppUser> userManager,
@@ -34,7 +35,8 @@ namespace InnerG.Api.Services.Implementations
             AppDbContext context,
             IEmailService emailService,
             IConfiguration configuration,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IInvitationService invitationService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -43,6 +45,7 @@ namespace InnerG.Api.Services.Implementations
             _emailService = emailService;
             _configuration = configuration;
             _logger = logger;
+            _invitationService = invitationService;
         }
 
         public async Task<AuthResponse> BootstrapCompanyAsync(BootstrapCompanyRequest request)
@@ -75,7 +78,7 @@ namespace InnerG.Api.Services.Implementations
             var user = new AppUser
             {
                 CompanyId = company.Id,
-                UserName = BuildUserName(hrEmail, company.Id),
+                UserName = await GenerateUniqueUserNameAsync(hrEmail),
                 Email = hrEmail,
                 FullName = request.HrFullName.Trim(),
                 EmailConfirmed = true,
@@ -100,7 +103,7 @@ namespace InnerG.Api.Services.Implementations
             if (!Guid.TryParse(systemAdminUserId, out var inviterId))
                 throw new UnauthorizedException();
 
-            if (!EmailMatchesDomain(hrEmail, domain))
+            if (!request.AllowExternalHrEmail && !EmailMatchesDomain(hrEmail, domain))
                 throw new BadRequestException("HR email must belong to the company domain");
 
             if (await _context.Companies.IgnoreQueryFilters().AnyAsync(x => x.Domain == domain && x.DeletedAt == null))
@@ -114,13 +117,13 @@ namespace InnerG.Api.Services.Implementations
                 Domain = domain,
                 Timezone = request.Timezone.Trim(),
                 Language = request.Language.Trim(),
-                IsActive = true
+                IsActive = false
             };
 
             _context.Companies.Add(company);
             await _context.SaveChangesAsync();
 
-            var invite = await CreateInviteAsync(
+            var invite = await _invitationService.CreateInviteAsync(
                 new CreateInviteRequest
                 {
                     CompanyId = company.Id,
@@ -130,7 +133,28 @@ namespace InnerG.Api.Services.Implementations
                 },
                 inviterId.ToString(),
                 currentCompanyId: null,
-                isSystemAdmin: true);
+                isSystemAdmin: true,
+                allowExternalEmail: request.AllowExternalHrEmail);
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                CompanyId = company.Id,
+                UserId = inviterId,
+                EntityType = "Company",
+                EntityId = company.Id,
+                Action = "Create",
+                NewValueJson = JsonSerializer.Serialize(new
+                {
+                    company.Name,
+                    company.Domain,
+                    company.Timezone,
+                    company.Language,
+                    HrEmail = hrEmail,
+                    request.AllowExternalHrEmail
+                })
+            });
+
+            await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
 
@@ -140,8 +164,7 @@ namespace InnerG.Api.Services.Implementations
                 HrInvite = invite
             };
         }
-
-        public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin, bool allowExternalEmail = false)
         {
             var companyId = request.CompanyId ?? currentCompanyId
                 ?? throw new BadRequestException("CompanyId is required");
@@ -154,8 +177,11 @@ namespace InnerG.Api.Services.Implementations
 
             var company = await _context.Companies
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.Id == companyId && x.IsActive && x.DeletedAt == null)
+                .FirstOrDefaultAsync(x => x.Id == companyId && x.DeletedAt == null)
                 ?? throw new NotFoundException("Company not found");
+
+            if (!company.IsActive && !(isSystemAdmin && request.Roles.Any(x => string.Equals(x, AuthRoles.HR, StringComparison.OrdinalIgnoreCase))))
+                throw new BadRequestException("Company is pending onboarding and can only receive the first HR invite");
 
             if (request.DepartmentId.HasValue)
             {
@@ -168,7 +194,7 @@ namespace InnerG.Api.Services.Implementations
             }
 
             var email = NormalizeEmail(request.Email);
-            if (!EmailMatchesDomain(email, company.Domain))
+            if (!allowExternalEmail && !EmailMatchesDomain(email, company.Domain))
                 throw new BadRequestException("Invite email must belong to the company domain");
 
             if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.Email == email && x.DeletedAt == null))
@@ -203,7 +229,7 @@ namespace InnerG.Api.Services.Implementations
             await _context.SaveChangesAsync();
 
             var inviteLink = BuildInviteLink(rawToken);
-            await _emailService.SendInviteAsync(
+            var emailDelivery = await TrySendInviteEmailAsync(
                 email,
                 $"You're invited to join {company.Name} on InnerG",
                 $"""
@@ -213,7 +239,7 @@ namespace InnerG.Api.Services.Implementations
                 <a href="{inviteLink}">Accept invite</a>
                 """);
 
-            return ToInviteResponse(invite, company, rawToken);
+            return ToInviteResponse(invite, company, rawToken, emailDelivery.Sent, emailDelivery.Message);
         }
 
         public async Task<BulkInviteResponse> CreateBulkInvitesAsync(BulkInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
@@ -257,12 +283,12 @@ namespace InnerG.Api.Services.Implementations
             await _context.SaveChangesAsync();
 
             var inviteLink = BuildInviteLink(rawToken);
-            await _emailService.SendInviteAsync(
+            var emailDelivery = await TrySendInviteEmailAsync(
                 invite.Email,
                 $"You're invited to join {invite.Company.Name} on InnerG",
                 $"""<h3>You're invited to InnerG</h3><p>Please click the link below to activate your account.</p><a href="{inviteLink}">Accept invite</a>""");
 
-            return ToInviteResponse(invite, invite.Company, rawToken);
+            return ToInviteResponse(invite, invite.Company, rawToken, emailDelivery.Sent, emailDelivery.Message);
         }
 
         public async Task RevokeInviteAsync(Guid inviteId, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
@@ -311,7 +337,7 @@ namespace InnerG.Api.Services.Implementations
             {
                 CompanyId = invite.CompanyId,
                 DepartmentId = invite.DepartmentId,
-                UserName = BuildUserName(invite.Email, invite.CompanyId),
+                UserName = await GenerateUniqueUserNameAsync(invite.Email),
                 Email = invite.Email,
                 FullName = request.FullName.Trim(),
                 AvatarUrl = request.AvatarUrl,
@@ -327,6 +353,12 @@ namespace InnerG.Api.Services.Implementations
             await AddRolesAsync(user, invite.Roles);
             invite.Status = InviteStatus.Accepted;
             invite.AcceptedAt = DateTime.UtcNow;
+
+            if (invite.Roles.Any(x => string.Equals(x, AuthRoles.HR, StringComparison.OrdinalIgnoreCase)) && !invite.Company.IsActive)
+            {
+                invite.Company.IsActive = true;
+                invite.Company.UpdatedAt = DateTime.UtcNow;
+            }
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -714,6 +746,20 @@ namespace InnerG.Api.Services.Implementations
                 ?? throw new UnauthorizedException("User not found");
         }
 
+        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var query = _context.Invites
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .Where(x => x.Id == inviteId);
+
+            if (!isSystemAdmin && currentCompanyId.HasValue)
+                query = query.Where(x => x.CompanyId == currentCompanyId.Value);
+
+            return await query.FirstOrDefaultAsync()
+                ?? throw new NotFoundException("Invite not found");
+        }
+
         private async Task<Invite> FindInviteByTokenAsync(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
@@ -727,19 +773,6 @@ namespace InnerG.Api.Services.Implementations
                 ?? throw new NotFoundException("Invite not found");
         }
 
-        private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)
-        {
-            var invite = await _context.Invites
-                .IgnoreQueryFilters()
-                .Include(x => x.Company)
-                .FirstOrDefaultAsync(x => x.Id == inviteId)
-                ?? throw new NotFoundException("Invite not found");
-
-            if (!isSystemAdmin && currentCompanyId != invite.CompanyId)
-                throw new ForbiddenException("You cannot manage invites outside your current company");
-
-            return invite;
-        }
 
         private async Task ExpireInviteIfNeededAsync(Invite invite)
         {
@@ -780,7 +813,7 @@ namespace InnerG.Api.Services.Implementations
             return normalized ?? throw new BadRequestException($"Invalid company role: {role}");
         }
 
-        private InviteResponse ToInviteResponse(Invite invite, Company company, string rawToken)
+        private InviteResponse ToInviteResponse(Invite invite, Company company, string rawToken, bool emailSent = false, string? emailDeliveryMessage = null)
         {
             return new InviteResponse
             {
@@ -791,7 +824,9 @@ namespace InnerG.Api.Services.Implementations
                 Status = invite.Status,
                 ExpiresAt = invite.ExpiresAt,
                 Roles = invite.Roles.ToList(),
-                InviteLink = BuildInviteLink(rawToken)
+                InviteLink = BuildInviteLink(rawToken),
+                EmailSent = emailSent,
+                EmailDeliveryMessage = emailDeliveryMessage ?? (emailSent ? "Invite email sent" : "Invite email was not sent")
             };
         }
 
@@ -863,9 +898,47 @@ namespace InnerG.Api.Services.Implementations
             return email.Trim().ToLowerInvariant();
         }
 
+        private async Task<(bool Sent, string Message)> TrySendInviteEmailAsync(string toEmail, string subject, string html)
+        {
+            try
+            {
+                await _emailService.SendInviteAsync(toEmail, subject, html);
+                return (true, "Invite email sent");
+            }
+            catch (ConfigurationException ex)
+            {
+                _logger.LogWarning(ex, "Invite email skipped because SMTP is not configured for {Email}", toEmail);
+                return (false, "SMTP is not configured. Use the invite link manually or configure SMTP to send email.");
+            }
+            catch (ExternalServiceException ex)
+            {
+                _logger.LogWarning(ex, "Invite email could not be sent to {Email}", toEmail);
+                return (false, "Invite email could not be sent. Use the invite link manually or retry after checking SMTP.");
+            }
+        }
+
         private static string NormalizeDomain(string domain)
         {
-            return domain.Trim().TrimStart('@').ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(domain))
+                return string.Empty;
+
+            var normalized = domain.Trim().ToLowerInvariant();
+
+            if (normalized.Contains("://", StringComparison.Ordinal))
+            {
+                if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && !string.IsNullOrWhiteSpace(uri.Host))
+                    normalized = uri.Host;
+            }
+
+            normalized = normalized.TrimStart('@');
+
+            if (normalized.StartsWith("www.", StringComparison.Ordinal))
+                normalized = normalized[4..];
+
+            if (normalized.Contains('@', StringComparison.Ordinal))
+                normalized = normalized[(normalized.LastIndexOf('@') + 1)..];
+
+            return normalized.Trim().TrimEnd('/');
         }
 
         private static bool EmailMatchesDomain(string email, string domain)
@@ -874,9 +947,22 @@ namespace InnerG.Api.Services.Implementations
             return email.EndsWith($"@{normalizedDomain}", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string BuildUserName(string email, Guid companyId)
+        private async Task<string> GenerateUniqueUserNameAsync(string email)
         {
-            return $"{NormalizeEmail(email)}.{companyId:N}";
+            var baseUserName = NormalizeEmail(email);
+            if (string.IsNullOrWhiteSpace(baseUserName))
+                baseUserName = $"user-{Guid.NewGuid():N}";
+
+            var candidate = baseUserName;
+            var suffix = 2;
+
+            while (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.NormalizedUserName == candidate.ToUpperInvariant()))
+            {
+                candidate = $"{baseUserName}-{suffix}";
+                suffix++;
+            }
+
+            return candidate;
         }
     }
 }
