@@ -7,4 +7,9 @@ api-build-temp/
 *.log
 *.err.log
 
+# Local environment files
+*.env
+*.env.*
+!.env.example
+
 admin.md
