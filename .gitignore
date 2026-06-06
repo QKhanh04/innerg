@@ -6,3 +6,5 @@ api-build-temp/
 # Run logs
 *.log
 *.err.log
+
+admin.md

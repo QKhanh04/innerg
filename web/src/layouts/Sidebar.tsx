@@ -7,26 +7,47 @@ import {
   FolderOpen,
   Heart,
   User,
+  Users,
   Settings,
   Zap,
   BarChart3,
   BookOpen,
-  ShieldCheck
+  ShieldCheck,
+  Bell,
+  Building2,
+  CreditCard,
+  FileClock,
+  Shield,
+  Cog
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useRole, Role } from '../lib/RoleContext';
 
 const navItems = [
-  { icon: ShieldCheck, label: 'Admin Dashboard', path: '/admin', roles: ['admin'] },
   { icon: LayoutDashboard, label: 'Home Feed', path: '/dashboard', roles: ['mentee'] },
   { icon: BarChart3, label: 'Analytics', path: '/analytics', roles: ['hr'] },
+  { icon: Users, label: 'Members', path: '/members', roles: ['hr'] },
+  { icon: User, label: 'Invitations', path: '/invitations', roles: ['hr'] },
+  { icon: Heart, label: 'HR Wishlists', path: '/hr/wishlists', roles: ['hr'] },
+  { icon: FolderOpen, label: 'Moderation', path: '/hr/moderation', roles: ['hr'] },
+  { icon: Users, label: 'Departments', path: '/hr/departments', roles: ['hr'] },
+  { icon: Bell, label: 'Notifications', path: '/hr/notifications', roles: ['hr'] },
   { icon: LayoutDashboard, label: 'Mentor Dashboard', path: '/mentor', roles: ['mentor'] },
-  { icon: BookOpen, label: 'Create Class', path: '/mentor/create', roles: ['mentor', 'hr'] },
-  { icon: Search, label: 'Explore / Marketplace', path: '/explore', roles: ['mentee', 'mentor', 'hr'] },
+  { icon: BookOpen, label: 'Create Class', path: '/mentor/create', roles: ['mentor'] },
+  { icon: Search, label: 'Explore / Marketplace', path: '/explore', roles: ['mentee', 'mentor'] },
   { icon: Calendar, label: 'My Schedule', path: '/schedule', roles: ['mentee', 'mentor'] },
-  { icon: Heart, label: 'Learning Wishlist', path: '/wishlist', roles: ['mentee', 'hr'] },
+  { icon: Heart, label: 'Learning Wishlist', path: '/wishlist', roles: ['mentee', 'mentor'] },
   { icon: FolderOpen, label: 'Resource Hub', path: '/resources', roles: ['mentee', 'mentor', 'hr', 'admin'] },
   { icon: User, label: 'Profile', path: '/profile', roles: ['mentee', 'mentor', 'hr', 'admin'] },
+];
+
+const adminModuleItems = [
+  { icon: ShieldCheck, label: 'Overview', path: '/admin' },
+  { icon: Building2, label: 'Companies', path: '/admin/companies' },
+  { icon: CreditCard, label: 'Subscriptions', path: '/admin/subscriptions' },
+  { icon: FileClock, label: 'Audit', path: '/admin/audit' },
+  { icon: Shield, label: 'Moderation', path: '/admin/moderation' },
+  { icon: Cog, label: 'Platform', path: '/admin/platform' },
 ];
 
 export function Sidebar() {
@@ -35,6 +56,15 @@ export function Sidebar() {
   const { role, setRole, user } = useRole();
 
   const visibleNavItems = navItems.filter((item) => item.roles.includes(role));
+  const adminUtilityItems = visibleNavItems.filter((item) => item.path === '/resources' || item.path === '/profile');
+
+  const isNavActive = (path: string) => {
+    if (path === '/admin') {
+      return location.pathname === '/admin';
+    }
+
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   const handleRoleChange = (newRole: Role) => {
     setRole(newRole);
@@ -72,8 +102,61 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        {visibleNavItems.map((item) => {
-          const isActive = location.pathname === item.path;
+        {role === 'admin' ? (
+          <>
+            <div className="px-3 pb-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Admin</p>
+            </div>
+            {adminModuleItems.map((item) => {
+              const isActive = isNavActive(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                    isActive
+                      ? "bg-primary/10 text-primary font-bold border-l-4 border-primary rounded-l-none -ml-4 pl-7"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  )}
+                >
+                  <item.icon className={cn("size-5", isActive && "fill-primary/20")} />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+
+            {adminUtilityItems.length > 0 ? (
+              <>
+                <div className="mx-3 my-3 border-t border-slate-100" />
+                <div className="px-3 pb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">General</p>
+                </div>
+                {adminUtilityItems.map((item) => {
+                  const isActive = isNavActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                        isActive
+                          ? "bg-primary/10 text-primary font-bold border-l-4 border-primary rounded-l-none -ml-4 pl-7"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      )}
+                    >
+                      <item.icon className={cn("size-5", isActive && "fill-primary/20")} />
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </>
+            ) : null}
+          </>
+        ) : null}
+
+        {role !== 'admin' ? visibleNavItems.map((item) => {
+          const isActive = isNavActive(item.path);
           return (
             <Link
               key={item.path}
@@ -89,26 +172,10 @@ export function Sidebar() {
               <span className="text-sm font-medium">{item.label}</span>
             </Link>
           );
-        })}
+        }) : null}
       </nav>
 
       <div className="p-4 border-t border-slate-100 space-y-3">
-        <div className="px-3">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">
-            Dev Mode: Switch Role
-          </label>
-          <select
-            value={role}
-            onChange={(e) => handleRoleChange(e.target.value as Role)}
-            className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2"
-          >
-            <option value="mentee">Mentee (Learner)</option>
-            <option value="mentor">Mentor (Teacher)</option>
-            <option value="hr">HR</option>
-            <option value="admin">System Admin</option>
-          </select>
-        </div>
-
         <Link
           to="/settings"
           className="flex items-center gap-3 px-3 py-2.5 text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
