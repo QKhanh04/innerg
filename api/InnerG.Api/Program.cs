@@ -27,7 +27,18 @@ using Scalar.AspNetCore;
    LOAD ENV (FAIL FAST)
    ========================= */
 
-Env.Load(); // load .env trước TẤT CẢ
+var envCandidates = new[]
+{
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+    Path.Combine(AppContext.BaseDirectory, ".env"),
+    Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".env"))
+};
+
+var envPath = envCandidates.FirstOrDefault(File.Exists);
+if (envPath is not null)
+{
+    Env.Load(envPath);
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
