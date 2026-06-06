@@ -51,16 +51,28 @@ namespace InnerG.Api.Data.Seed
                 await context.SaveChangesAsync();
             }
 
-            var seedUsers = new[]
-            {
-                new SeedUserDefinition("systemadmin@innerg.com", "System Administrator", null, new[] { AuthRoles.SystemAdmin }),
-                new SeedUserDefinition("hr@innerg.com", "Human Resources", company.Id, new[] { AuthRoles.HR }),
-                new SeedUserDefinition("mentor@innerg.com", "Mentor User", company.Id, new[] { AuthRoles.Mentor }),
-                new SeedUserDefinition("mentee@innerg.com", "Mentee User", company.Id, new[] { AuthRoles.Mentee }),
-                new SeedUserDefinition("minhduy16082005@gmail.com", "Duy Nguyen", company.Id, new[] { AuthRoles.HR }),
-                new SeedUserDefinition("dangcongquockhanh@gmail.com", "Dang Cong Quoc Khanh", null, new[] { AuthRoles.SystemAdmin }),
-                new SeedUserDefinition("khanhhoakt2k4@gmail.com", "Khanh Hoa", company.Id, new[] { AuthRoles.Mentee })
-            };
+            var seedUsers = new List<SeedUserDefinition>();
+
+            if (!string.IsNullOrEmpty(configuration["SEED_SYSADMIN_EMAIL"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_SYSADMIN_EMAIL"], configuration["SEED_SYSADMIN_NAME"] ?? "System Administrator", null, new[] { AuthRoles.SystemAdmin }));
+
+            if (!string.IsNullOrEmpty(configuration["SEED_HR_EMAIL"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_HR_EMAIL"], configuration["SEED_HR_NAME"] ?? "Human Resources", company.Id, new[] { AuthRoles.HR }));
+
+            if (!string.IsNullOrEmpty(configuration["SEED_MENTOR_EMAIL"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_MENTOR_EMAIL"], configuration["SEED_MENTOR_NAME"] ?? "Mentor User", company.Id, new[] { AuthRoles.Mentor }));
+
+            if (!string.IsNullOrEmpty(configuration["SEED_MENTEE_EMAIL"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_MENTEE_EMAIL"], configuration["SEED_MENTEE_NAME"] ?? "Mentee User", company.Id, new[] { AuthRoles.Mentee }));
+
+            if (!string.IsNullOrEmpty(configuration["SEED_USER_DUY"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_USER_DUY"], configuration["SEED_NAME_DUY"] ?? "InnerG User", company.Id, new[] { AuthRoles.HR }));
+
+            if (!string.IsNullOrEmpty(configuration["SEED_USER_KHANH"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_USER_KHANH"], configuration["SEED_NAME_KHANH"] ?? "InnerG User", null, new[] { AuthRoles.SystemAdmin }));
+
+            if (!string.IsNullOrEmpty(configuration["SEED_USER_HOA"]))
+                seedUsers.Add(new SeedUserDefinition(configuration["SEED_USER_HOA"], configuration["SEED_NAME_HOA"] ?? "InnerG User", company.Id, new[] { AuthRoles.Mentee }));
 
             foreach (var seedUser in seedUsers)
                 await EnsureSeedUserAsync(userManager, seedUser, seedPassword);
