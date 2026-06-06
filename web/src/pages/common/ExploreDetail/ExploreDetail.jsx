@@ -14,7 +14,7 @@ import { toastService } from '../../../services/toastService';
 export default function ExploreDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { role } = useRole();
+  const { role, user } = useRole();
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -93,7 +93,8 @@ export default function ExploreDetail() {
   const isFull = detail.takenSlots >= detail.totalSlots;
   const isRegistered = detail.registrationStatus === 'Registered';
   const isPending = detail.registrationStatus === 'Pending';
-  const canRegister = role === 'mentee';
+  const canRegister = ['mentee', 'mentor', 'hr'].includes(role);
+  const isInstructor = detail.mentor?.userId === user?.userId;
 
   return (
     <div className="max-w-[1200px] mx-auto pb-20 space-y-8 px-4 sm:px-6">
@@ -303,7 +304,14 @@ export default function ExploreDetail() {
 
             {/* Role-based Actions */}
             <div className="pt-2">
-              {canRegister ? (
+              {isInstructor ? (
+                <div className="bg-indigo-50 text-indigo-700 border border-indigo-150 rounded-[20px] p-5 text-center space-y-3 shadow-xs">
+                   <User className="size-8 text-indigo-650 mx-auto" />
+                   <p className="text-sm font-bold text-indigo-800 leading-relaxed">
+                     You are teaching this class
+                   </p>
+                </div>
+              ) : canRegister ? (
                 isRegistered ? (
                   <div className="space-y-4">
                     <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-2xl p-4 flex items-center justify-center gap-3 text-base font-bold shadow-sm">
@@ -350,7 +358,7 @@ export default function ExploreDetail() {
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-center space-y-3">
                    <AlertCircle className="size-6 text-slate-400 mx-auto" />
                    <p className="text-sm font-semibold text-slate-600 leading-relaxed">
-                     Registration is available for Mentee roles only.
+                     Registration is not available for your role.
                    </p>
                 </div>
               )}

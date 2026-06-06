@@ -1,14 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using InnerG.Api.Models;
-using InnerG.Api.Data;
 using InnerG.Api.DTOs;
+using InnerG.Api.Services.Interfaces;
 
 namespace InnerG.Api.Controllers
 {
@@ -17,11 +14,11 @@ namespace InnerG.Api.Controllers
     [Authorize]
     public class ExploreController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IExploreService _exploreService;
 
-        public ExploreController(AppDbContext context)
+        public ExploreController(IExploreService exploreService)
         {
-            _context = context;
+            _exploreService = exploreService;
         }
 
         private Guid GetCurrentUserId()
@@ -49,111 +46,8 @@ namespace InnerG.Api.Controllers
                     return BadRequest(new { message = "Company context is missing from token." });
                 }
 
-                // Load all published or completed training events in the user's company
-                var trainingEvents = await _context.TrainingEvents
-                    .IgnoreQueryFilters()
-                    .Where(te => te.CompanyId == companyId && 
-                                 (te.Status == TrainingEventStatus.Published || te.Status == TrainingEventStatus.Completed))
-                    .Include(te => te.Skill)
-                    .Include(te => te.Trainer)
-                        .ThenInclude(tr => tr.User)
-                    .Include(te => te.Enrollments)
-                    .Include(te => te.Sessions)
-                        .ThenInclude(s => s.MeetingRoom)
-                    .OrderBy(te => te.StartDate)
-                    .ToListAsync();
-
-                var dtoList = new List<ExploreClassDto>();
-
-                foreach (var te in trainingEvents)
-                {
-                    // Check enrollment status of the current user
-                    var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
-                    string regStatus = "NotRegistered";
-                    if (userEnrollment != null)
-                    {
-                        regStatus = userEnrollment.Status == EnrollmentStatus.Confirmed ? "Registered" :
-                                    userEnrollment.Status == EnrollmentStatus.Pending ? "Pending" : "NotRegistered";
-                    }
-
-                    // Format and FormatDetail resolution
-                    var firstSession = te.Sessions.OrderBy(s => s.StartTime).FirstOrDefault();
-                    string format = "Online";
-                    string formatDetail = "Online Session";
-
-                    if (firstSession != null)
-                    {
-                        if (firstSession.MeetingRoom != null)
-                        {
-                            format = "Offline";
-                            formatDetail = firstSession.MeetingRoom.Name;
-                        }
-                        else if (!string.IsNullOrEmpty(firstSession.Notes) && firstSession.Notes.StartsWith("Physical Room: "))
-                        {
-                            format = "Offline";
-                            formatDetail = firstSession.Notes.Replace("Physical Room: ", "");
-                        }
-                        else if (!string.IsNullOrEmpty(firstSession.MeetingLink))
-                        {
-                            format = "Online";
-                            formatDetail = "Online Meeting";
-                        }
-                        else if (te.Sessions.Any(s => s.MeetingRoomId.HasValue))
-                        {
-                            format = "Offline";
-                            formatDetail = "Physical Room";
-                        }
-                    }
-
-                    // Skills associated
-                    var skillsList = new List<string> { te.Skill?.Name ?? "General" };
-
-                    // Date & Time
-                    string dateStr = te.StartDate.ToString("MMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture);
-                    string timeStr = te.StartDate.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture);
-                    double totalMins = (te.EndDate - te.StartDate).TotalMinutes;
-                    string durationStr = totalMins > 1440 ? $"{(te.EndDate - te.StartDate).TotalDays:0} days" : $"{totalMins:0} mins";
-
-                    // Trainer Position
-                    string trainerPos = te.IsExternal ? "External Expert" : "Lead Mentor";
-
-                    // Category normalization to prevent "Soft Skill" vs "Soft Skills" duplicates
-                    string rawCategory = te.Skill?.Category ?? "General";
-                    string normalizedCategory = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(rawCategory.Trim().ToLower());
-                    if (normalizedCategory == "Soft Skill" || normalizedCategory == "Soft Skills")
-                    {
-                        normalizedCategory = "Soft Skills";
-                    }
-
-                    dtoList.Add(new ExploreClassDto
-                    {
-                        Id = te.Id,
-                        Title = te.Title,
-                        Description = te.Description ?? string.Empty,
-                        Category = normalizedCategory,
-                        Level = "Intermediate", // Default level, or parsed from title/skill
-                        Format = format,
-                        FormatDetail = formatDetail,
-                        Mentor = new ExploreMentorDto
-                        {
-                            Name = te.Trainer?.FullName ?? "Unknown Mentor",
-                            Avatar = te.Trainer?.User?.AvatarUrl ?? $"https://api.dicebear.com/7.x/adventurer/svg?seed={te.Trainer?.FullName ?? "Mentor"}",
-                            Rating = "4.9",
-                            Position = trainerPos
-                        },
-                        Skills = skillsList,
-                        Date = dateStr,
-                        Time = timeStr,
-                        Duration = durationStr,
-                        TotalSlots = te.MaxParticipants ?? 20,
-                        TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed),
-                        Points = te.RewardPoints,
-                        Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
-                        RegistrationStatus = regStatus
-                    });
-                }
-
-                return Ok(dtoList);
+                var classes = await _exploreService.GetExploreClassesAsync(companyId, userId);
+                return Ok(classes);
             }
             catch (Exception ex)
             {
@@ -174,48 +68,16 @@ namespace InnerG.Api.Controllers
                     return BadRequest(new { message = "Company context is missing from token." });
                 }
 
-                // Check if class exists
-                var te = await _context.TrainingEvents
-                    .IgnoreQueryFilters()
-                    .Include(t => t.Enrollments)
-                    .FirstOrDefaultAsync(t => t.Id == eventId && t.CompanyId == companyId);
-
-                if (te == null)
-                {
-                    return NotFound(new { message = "Class not found." });
-                }
-
-                // Check existing enrollment
-                var existing = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
-                if (existing != null)
-                {
-                    if (existing.Status == EnrollmentStatus.Confirmed || existing.Status == EnrollmentStatus.Pending)
-                    {
-                        return BadRequest(new { message = "You are already registered or pending registration for this class." });
-                    }
-                    
-                    // Reactivate cancelled/rejected enrollment
-                    existing.Status = EnrollmentStatus.Pending;
-                    existing.EnrollmentDate = DateTime.UtcNow;
-                    _context.Enrollments.Update(existing);
-                }
-                else
-                {
-                    // Create new pending enrollment
-                    var enrollment = new Enrollment
-                    {
-                        Id = Guid.NewGuid(),
-                        CompanyId = companyId,
-                        UserId = userId,
-                        TrainingEventId = eventId,
-                        Status = EnrollmentStatus.Pending,
-                        EnrollmentDate = DateTime.UtcNow
-                    };
-                    await _context.Enrollments.AddAsync(enrollment);
-                }
-
-                await _context.SaveChangesAsync();
-                return Ok(new { message = "Registration request sent successfully. Pending approval by Mentor! ⌛" });
+                var result = await _exploreService.RegisterClassAsync(companyId, userId, eventId);
+                return Ok(new { message = result });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -236,17 +98,11 @@ namespace InnerG.Api.Controllers
                     return BadRequest(new { message = "Company context is missing from token." });
                 }
 
-                var enrollment = await _context.Enrollments
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(e => e.TrainingEventId == eventId && e.UserId == userId && e.CompanyId == companyId);
-
-                if (enrollment == null)
+                var success = await _exploreService.UnregisterClassAsync(companyId, userId, eventId);
+                if (!success)
                 {
                     return NotFound(new { message = "Enrollment not found." });
                 }
-
-                _context.Enrollments.Remove(enrollment);
-                await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Successfully cancelled registration." });
             }
@@ -269,124 +125,35 @@ namespace InnerG.Api.Controllers
                     return BadRequest(new { message = "Company context is missing from token." });
                 }
 
-                var te = await _context.TrainingEvents
-                    .IgnoreQueryFilters()
-                    .Where(t => t.Id == eventId && t.CompanyId == companyId)
-                    .Include(t => t.Skill)
-                    .Include(t => t.Trainer)
-                        .ThenInclude(tr => tr.User)
-                    .Include(t => t.Enrollments)
-                    .Include(t => t.Sessions)
-                        .ThenInclude(s => s.MeetingRoom)
-                    .FirstOrDefaultAsync();
-
+                var te = await _exploreService.GetExploreClassDetailAsync(companyId, userId, eventId);
                 if (te == null)
                 {
                     return NotFound(new { message = "Class not found." });
                 }
 
-                // Check enrollment status of the current user
-                var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
-                string regStatus = "NotRegistered";
-                if (userEnrollment != null)
+                return Ok(te);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpGet("mentee-dashboard")]
+        public async Task<IActionResult> GetMenteeDashboard()
+        {
+            try
+            {
+                var companyId = GetCurrentCompanyId();
+                var userId = GetCurrentUserId();
+
+                if (companyId == Guid.Empty)
                 {
-                    regStatus = userEnrollment.Status == EnrollmentStatus.Confirmed ? "Registered" :
-                                userEnrollment.Status == EnrollmentStatus.Pending ? "Pending" : "NotRegistered";
+                    return BadRequest(new { message = "Company context is missing from token." });
                 }
 
-                // Format and FormatDetail resolution based on the first session
-                var firstSession = te.Sessions.OrderBy(s => s.StartTime).FirstOrDefault();
-                string format = "Online";
-                string formatDetail = "Online Session";
-
-                if (firstSession != null)
-                {
-                    if (firstSession.MeetingRoom != null)
-                    {
-                        format = "Offline";
-                        formatDetail = firstSession.MeetingRoom.Name;
-                    }
-                    else if (!string.IsNullOrEmpty(firstSession.Notes) && firstSession.Notes.StartsWith("Physical Room: "))
-                    {
-                        format = "Offline";
-                        formatDetail = firstSession.Notes.Replace("Physical Room: ", "");
-                    }
-                    else if (!string.IsNullOrEmpty(firstSession.MeetingLink))
-                    {
-                        format = "Online";
-                        formatDetail = "Online Meeting";
-                    }
-                    else if (te.Sessions.Any(s => s.MeetingRoomId.HasValue))
-                    {
-                        format = "Offline";
-                        formatDetail = "Physical Room";
-                    }
-                }
-
-                // Skills associated
-                var skillsList = new List<string> { te.Skill?.Name ?? "General" };
-
-                // Category normalization
-                string rawCategory = te.Skill?.Category ?? "General";
-                string normalizedCategory = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(rawCategory.Trim().ToLower());
-                if (normalizedCategory == "Soft Skill" || normalizedCategory == "Soft Skills")
-                {
-                    normalizedCategory = "Soft Skills";
-                }
-
-                // Process Sessions
-                var sessionDtos = te.Sessions.OrderBy(s => s.StartTime).Select(s => {
-                    string sFormat = "Online";
-                    string sLoc = s.MeetingLink ?? "TBA";
-                    if (s.MeetingRoom != null) {
-                        sFormat = "Offline";
-                        sLoc = s.MeetingRoom.Name;
-                    } else if (!string.IsNullOrEmpty(s.Notes) && s.Notes.StartsWith("Physical Room: ")) {
-                        sFormat = "Offline";
-                        sLoc = s.Notes.Replace("Physical Room: ", "");
-                    }
-                    
-                    return new TrainingSessionDto {
-                        Id = s.Id,
-                        Title = s.Title,
-                        StartTime = s.StartTime.ToString("hh:mm tt, MMM dd", System.Globalization.CultureInfo.InvariantCulture),
-                        EndTime = s.EndTime.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture),
-                        Duration = (s.EndTime - s.StartTime).TotalMinutes > 1440 ? $"{(s.EndTime - s.StartTime).TotalDays:0} days" : $"{(s.EndTime - s.StartTime).TotalMinutes:0} mins",
-                        Format = sFormat,
-                        LocationOrLink = sLoc
-                    };
-                }).ToList();
-
-                var detailDto = new ExploreClassDetailDto
-                {
-                    Id = te.Id,
-                    Title = te.Title,
-                    Description = te.Description ?? string.Empty,
-                    Category = normalizedCategory,
-                    Level = "Intermediate",
-                    Format = format,
-                    FormatDetail = formatDetail,
-                    Mentor = new ExploreMentorDto
-                    {
-                        Name = te.Trainer?.FullName ?? "Unknown Mentor",
-                        Avatar = te.Trainer?.User?.AvatarUrl ?? $"https://api.dicebear.com/7.x/adventurer/svg?seed={te.Trainer?.FullName ?? "Mentor"}",
-                        Rating = "4.9",
-                        Position = te.IsExternal ? "External Expert" : "Lead Mentor"
-                    },
-                    Skills = skillsList,
-                    Date = te.StartDate.ToString("MMM dd, yyyy", System.Globalization.CultureInfo.InvariantCulture),
-                    Time = te.StartDate.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture),
-                    Duration = (te.EndDate - te.StartDate).TotalMinutes > 1440 ? $"{(te.EndDate - te.StartDate).TotalDays:0} days" : $"{(te.EndDate - te.StartDate).TotalMinutes:0} mins",
-                    TotalSlots = te.MaxParticipants ?? 20,
-                    TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed),
-                    Points = te.RewardPoints,
-                    Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
-                    RegistrationStatus = regStatus,
-                    EventStatus = te.Status.ToString(),
-                    Sessions = sessionDtos
-                };
-
-                return Ok(detailDto);
+                var dashboardDto = await _exploreService.GetMenteeDashboardAsync(companyId, userId);
+                return Ok(dashboardDto);
             }
             catch (Exception ex)
             {
@@ -395,3 +162,4 @@ namespace InnerG.Api.Controllers
         }
     }
 }
+// trigger restart

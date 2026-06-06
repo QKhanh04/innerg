@@ -26,4 +26,11 @@ namespace InnerG.Api.DTOs
         public string Description { get; set; } = string.Empty;
         public string? Reason { get; set; }
     }
+
+    public class WishlistVoteResultDto
+    {
+        public bool Voted { get; set; }
+        public int Votes { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
 }

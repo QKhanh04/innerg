@@ -15,5 +15,7 @@ namespace InnerG.Api.Services.Interfaces
         Task<bool> ProcessEnrollmentAsync(Guid userId, Guid enrollmentId, bool isApproved);
         Task<bool> SubmitRollCallAsync(Guid userId, Guid sessionId, RollCallRequest request);
         Task<Guid> CreateClassAsync(Guid userId, CreateClassRequest request);
+        Task<bool> UpdateClassAsync(Guid userId, Guid classId, CreateClassRequest request);
+        Task<bool> CancelClassAsync(Guid userId, Guid classId);
     }
 }

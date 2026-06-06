@@ -47,5 +47,6 @@ namespace InnerG.Api.Models
         public virtual ICollection<TrainingSession> Sessions { get; set; } = new List<TrainingSession>();
         public virtual ICollection<Enrollment> Enrollments { get; set; } = new List<Enrollment>();
         public virtual ICollection<TrainingEventTargetDepartment> TargetDepartments { get; set; } = new List<TrainingEventTargetDepartment>();
+        public virtual ICollection<Resource> Resources { get; set; } = new List<Resource>();
     }
 }
