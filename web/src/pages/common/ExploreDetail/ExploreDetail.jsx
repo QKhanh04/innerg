@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useRole } from '../../../lib/RoleContext';
 import { exploreApi } from '../../../api/exploreApi';
+import { feedbackApi } from '../../../api/feedbackApi';
 import { toastService } from '../../../services/toastService';
 
 /* ─── Skeleton Loader ─────────────────────────────────────────── */
@@ -77,13 +78,19 @@ export default function ExploreDetail() {
   const [detail, setDetail] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
+  const [feedbacks, setFeedbacks] = useState([]);
+
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
         const data = await exploreApi.getClassDetail(id);
-        if (alive) setDetail(data);
+        const fbs = await feedbackApi.getEventFeedbacks(id);
+        if (alive) {
+          setDetail(data);
+          setFeedbacks(fbs);
+        }
       } catch {
         toastService.error('Failed to load workshop details.');
         navigate('/explore');
@@ -336,6 +343,63 @@ export default function ExploreDetail() {
               </div>
             </section>
           )}
+
+          {/* Reviews & Ratings */}
+          {feedbacks && feedbacks.length > 0 && (
+            <section className="space-y-4 pt-6 border-t border-slate-100">
+              <div className="flex items-center gap-3 px-1">
+                <div className="size-9 bg-amber-50 rounded-xl flex items-center justify-center">
+                  <Star className="size-5 text-amber-500 fill-amber-500" />
+                </div>
+                <h2 className="text-lg font-black text-slate-800">Reviews & Ratings</h2>
+                <span className="text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-2.5 py-0.5 rounded-full shadow-sm">
+                  {feedbacks.length} reviews
+                </span>
+              </div>
+              <div className="space-y-4">
+                {feedbacks.map((fb) => (
+                  <div key={fb.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-amber-200 hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="size-11 bg-slate-100 rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-slate-200">
+                          {fb.reviewerAvatarUrl ? (
+                            <img src={fb.reviewerAvatarUrl} alt={fb.reviewerName} className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="size-5 text-slate-400" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{fb.reviewerName}</p>
+                          <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">{new Date(fb.createdAt).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5 bg-amber-50 px-2 py-1.5 rounded-lg border border-amber-100">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} className={cn("size-4 transition-transform hover:scale-110", star <= fb.overallRating ? "fill-amber-400 text-amber-400 drop-shadow-sm" : "fill-transparent text-slate-300")} />
+                        ))}
+                      </div>
+                    </div>
+                    {fb.comment && (
+                      <p className="text-sm text-slate-600 font-medium bg-slate-50 p-4 rounded-xl border border-slate-100 leading-relaxed italic relative">
+                        <span className="absolute -top-3 -left-2 text-4xl text-slate-200 select-none">"</span>
+                        <span className="relative z-10">{fb.comment}</span>
+                      </p>
+                    )}
+                    {Object.keys(fb.criteriaScores || {}).length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-2">
+                        {Object.entries(fb.criteriaScores).map(([criteriaName, score]) => (
+                          <span key={criteriaName} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-200 hover:border-indigo-200 rounded-lg text-[10px] font-bold text-slate-600 shadow-sm cursor-default transition-colors">
+                            {criteriaName}: <span className="text-indigo-600">{score}/5</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
         </motion.div>
 
         {/* ══ RIGHT: Sticky Sidebar ══════════════════════════════ */}
