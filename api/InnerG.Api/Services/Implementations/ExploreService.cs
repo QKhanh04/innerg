@@ -39,7 +39,7 @@ namespace InnerG.Api.Services.Implementations
 
             foreach (var te in trainingEvents)
             {
-                var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
+                var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId && e.DeletedAt == null);
                 string regStatus = "NotRegistered";
                 if (userEnrollment != null)
                 {
@@ -113,7 +113,7 @@ namespace InnerG.Api.Services.Implementations
                     Time = timeStr,
                     Duration = durationStr,
                     TotalSlots = te.MaxParticipants ?? 20,
-                    TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed),
+                    TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed && e.DeletedAt == null),
                     Points = te.RewardPoints,
                     Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
                     RegistrationStatus = regStatus
@@ -141,17 +141,33 @@ namespace InnerG.Api.Services.Implementations
                 throw new InvalidOperationException("You cannot register for a class that you are teaching.");
             }
 
+            // Ngăn đăng ký lớp đã bắt đầu diễn ra
+            if (te.StartDate <= DateTime.UtcNow)
+            {
+                throw new InvalidOperationException("Registration is closed. This class has already started or has already taken place.");
+            }
+
             var existing = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
             if (existing != null)
             {
-                if (existing.Status == EnrollmentStatus.Confirmed || existing.Status == EnrollmentStatus.Pending)
+                // Nếu đã xóa mềm trước đó (bấm Cancel) -> Khôi phục lại
+                if (existing.DeletedAt != null)
+                {
+                    existing.DeletedAt = null;
+                    existing.Status = EnrollmentStatus.Pending;
+                    existing.EnrollmentDate = DateTime.UtcNow;
+                    await _unitOfWork.Repository<Enrollment>().UpdateAsync(existing);
+                }
+                else if (existing.Status == EnrollmentStatus.Confirmed || existing.Status == EnrollmentStatus.Pending)
                 {
                     throw new InvalidOperationException("You are already registered or pending registration for this class.");
                 }
-
-                existing.Status = EnrollmentStatus.Pending;
-                existing.EnrollmentDate = DateTime.UtcNow;
-                await _unitOfWork.Repository<Enrollment>().UpdateAsync(existing);
+                else
+                {
+                    existing.Status = EnrollmentStatus.Pending;
+                    existing.EnrollmentDate = DateTime.UtcNow;
+                    await _unitOfWork.Repository<Enrollment>().UpdateAsync(existing);
+                }
             }
             else
             {
@@ -206,7 +222,7 @@ namespace InnerG.Api.Services.Implementations
                 return null;
             }
 
-            var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId);
+            var userEnrollment = te.Enrollments.FirstOrDefault(e => e.UserId == userId && e.DeletedAt == null);
             string regStatus = "NotRegistered";
             if (userEnrollment != null)
             {
@@ -305,7 +321,7 @@ namespace InnerG.Api.Services.Implementations
                 Time = timeStr,
                 Duration = durationStr,
                 TotalSlots = te.MaxParticipants ?? 20,
-                TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed),
+                TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed && e.DeletedAt == null),
                 Points = te.RewardPoints,
                 Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
                 RegistrationStatus = regStatus,

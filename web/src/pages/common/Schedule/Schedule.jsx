@@ -149,22 +149,47 @@ export default function SchedulePage() {
     });
   };
 
-  const upcomingClasses = [
-    { icon: Users, title: 'Yoga Intensive', time: '04:30 PM • 60 mins', count: 'TODAY', type: 'today' },
-    { icon: Tv, title: 'Breathwork 101', time: '06:00 PM • 30 mins' },
-    { icon: Moon, title: 'Mindful Meditation', time: '09:00 PM • 15 mins' }
-  ];
+  const upcomingClasses = React.useMemo(() => {
+    const now = new Date();
+    return events
+      .filter(e => new Date(e.startTime) > now && e.type !== 'EXTERNAL')
+      .sort((a, b) => new Date(a.startTime) - new Date(b.startTime))
+      .slice(0, 4)
+      .map(e => ({
+        id: e.id,
+        title: e.title,
+        time: `${new Date(e.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • ${Math.round((new Date(e.endTime) - new Date(e.startTime))/60000)} mins`,
+        icon: e.isOnline ? Tv : Users,
+        isOnline: e.isOnline,
+        meetingLink: e.meetingLink,
+        location: e.location,
+        type: e.type, // TEACHING or UPCOMING
+      }));
+  }, [events]);
 
   const pendingRequests = [
     { title: 'Product Strategy 101', requester: 'THU HA (PM)', badge: 'IMPORTANT', count: '+5 Interested' }
   ];
 
-  const completedClasses = [
-    { image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=300&auto=format&fit=crop', title: 'Advanced Power Yoga Core', when: 'Yesterday • 45 mins', rating: '4.9' },
-    { image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=300&auto=format&fit=crop', title: 'Spiritual Sound Healing', when: '2 days ago • 20 mins', rating: '5.0' },
-    { image: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=300&auto=format&fit=crop', title: 'Post-Workout Pilates', when: '3 days ago • 60 mins', rating: '4.8' },
-    { image: 'https://images.unsplash.com/photo-1599447421416-3414500d18a5?q=80&w=300&auto=format&fit=crop', title: 'Vinyasa Flow Restorative', when: '4 days ago • 50 mins', rating: '4.9' }
-  ];
+  const completedClasses = React.useMemo(() => {
+    const now = new Date();
+    return events
+      .filter(e => new Date(e.endTime) < now && e.type !== 'EXTERNAL')
+      .sort((a, b) => new Date(b.endTime) - new Date(a.endTime))
+      .slice(0, 4)
+      .map(e => {
+        const timeDiff = now - new Date(e.endTime);
+        const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+        return {
+          id: e.id,
+          title: e.title,
+          image: `https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=300&auto=format&fit=crop`,
+          when: `${days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days + ' days ago'} • ${Math.round((new Date(e.endTime) - new Date(e.startTime))/60000)} mins`,
+          rating: '5.0',
+          type: e.type
+        };
+      });
+  }, [events]);
 
   // ==========================================
   // DYNAMIC MONTH COMPUTATIONS (WITH OFFSET)
@@ -840,7 +865,14 @@ export default function SchedulePage() {
                                   <span className="text-[8px] opacity-75 font-semibold">
                                     {formatEventTimeRange(event)}
                                   </span>
-                                  {event.hasConflict && (
+                                  {event.isOnline && event.meetingLink ? (
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); window.open(event.meetingLink, '_blank'); }}
+                                      className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider hover:brightness-110 shadow-sm"
+                                    >
+                                      Join
+                                    </button>
+                                  ) : event.hasConflict && (
                                     <span className="flex items-center gap-0.5 text-rose-600 font-extrabold text-[8px] animate-pulse">
                                       <AlertCircle className="size-2.5" /> OVERLAP
                                     </span>
@@ -1022,23 +1054,29 @@ export default function SchedulePage() {
               </span>
             </div>
             
-            <div className="space-y-3.5">
-              {upcomingClasses.map((item, idx) => (
+              {upcomingClasses.length === 0 ? (
+                <p className="text-xs text-slate-400 font-medium text-center py-4">No upcoming classes</p>
+              ) : upcomingClasses.map((item, idx) => (
                 <div 
                   key={idx} 
-                  className="flex items-center gap-3.5 p-3 bg-white hover:bg-slate-55/50 rounded-2xl border border-slate-200/40 hover:border-indigo-150 transition-all duration-300 group cursor-pointer shadow-xs"
+                  className="flex flex-col gap-3 p-4 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200/40 transition-all duration-300 group shadow-xs"
                 >
-                  <div className="size-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100/50 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
-                    <item.icon className="size-4.5" />
+                  <div className="flex items-center gap-3.5">
+                    <div className="size-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100/50 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                      <item.icon className="size-4.5" />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="font-bold text-xs text-slate-800 truncate">{item.title}</p>
+                      <p className="text-[9px] text-slate-455 font-extrabold uppercase tracking-wider mt-0.5">{item.time}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="font-bold text-xs text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{item.title}</p>
-                    <p className="text-[9px] text-slate-455 font-extrabold uppercase tracking-wider mt-0.5">{item.time}</p>
-                  </div>
-                  <ChevronRight className="size-4 text-slate-355 group-hover:text-indigo-500 group-hover:translate-x-0.5 transition-all" />
+                  {item.isOnline && item.meetingLink && (
+                     <button onClick={() => window.open(item.meetingLink, '_blank')} className="w-full mt-1 py-2.5 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-xl text-[10px] font-extrabold tracking-widest uppercase shadow-md shadow-indigo-500/20 hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                       Join Online Class <ExternalLink className="size-3" />
+                     </button>
+                  )}
                 </div>
               ))}
-            </div>
           </div>
 
           {/* B. PENDING REQUESTS */}

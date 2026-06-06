@@ -29,6 +29,7 @@ import { cn } from '../../../lib/utils';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mentorApi } from '../../../api/mentorApi';
 import { exploreApi } from '../../../api/exploreApi';
+import { uploadApi } from '../../../api/uploadApi';
 import { toastService } from '../../../services/toastService';
 
 export default function CreateClassPage() {
@@ -59,6 +60,30 @@ export default function CreateClassPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [aiOptimizing, setAiOptimizing] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+
+  // Upload cover image to Cloudinary
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toastService.warning("Please upload a valid image file.");
+      return;
+    }
+
+    setIsUploadingCover(true);
+    try {
+      const res = await uploadApi.uploadImage(file);
+      setFormData(prev => ({ ...prev, coverImageUrl: res.url }));
+      toastService.success("Cover image uploaded successfully! 🖼️");
+    } catch (error) {
+      toastService.error("Failed to upload cover image.");
+      console.error(error);
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -213,38 +238,35 @@ export default function CreateClassPage() {
     toastService.success("Link added successfully!");
   };
 
-  // Simulate file upload with premium progress loading state
-  const handleFileUpload = (e) => {
+  // Upload document to Cloudinary
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     // Simulate upload starting
     setUploadingFile({ name: file.name, progress: 10 });
     
-    let currentProgress = 10;
-    const interval = setInterval(() => {
-      currentProgress += 30;
-      if (currentProgress >= 100) {
-        clearInterval(interval);
-        setUploadingFile(null);
-        
-        // Add to resources list
-        setResources(prev => [
-          ...prev,
-          {
-            title: file.name,
-            description: "Class attachment file",
-            type: "Document",
-            url: `https://innerg-storage.s3.amazonaws.com/attachments/${file.name}`,
-            fileType: file.name.substring(file.name.lastIndexOf('.')),
-            fileSizeBytes: file.size
-          }
-        ]);
-        toastService.success("File uploaded and attached successfully! 🎉");
-      } else {
-        setUploadingFile({ name: file.name, progress: currentProgress });
-      }
-    }, 300);
+    try {
+      const res = await uploadApi.uploadDocument(file);
+      
+      setResources(prev => [
+        ...prev,
+        {
+          title: res.fileName || file.name,
+          description: "Class attachment file",
+          type: "Document",
+          url: res.url,
+          fileType: file.name.substring(file.name.lastIndexOf('.')),
+          fileSizeBytes: res.fileSize || file.size
+        }
+      ]);
+      toastService.success("File uploaded and attached successfully! 🎉");
+    } catch (error) {
+      toastService.error("Failed to upload file to server.");
+      console.error(error);
+    } finally {
+      setUploadingFile(null);
+    }
   };
 
   const handleRemoveResource = (indexToRemove) => {
@@ -464,22 +486,29 @@ export default function CreateClassPage() {
               />
             </div>
 
-            {/* Cover Image URL */}
+            {/* Cover Image Upload */}
             <div className="space-y-3">
               <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block flex justify-between">
-                <span>Cover Image URL (Optional)</span>
+                <span>Class Cover Image (Optional)</span>
               </label>
               <div className="flex gap-4 items-start">
                 <div className="flex-1 space-y-2">
-                  <input 
-                    type="url" 
-                    name="coverImageUrl"
-                    placeholder="https://images.unsplash.com/..."
-                    value={formData.coverImageUrl}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-xs rounded-2xl outline-none transition-all placeholder:text-slate-400 text-slate-850"
-                  />
-                  <p className="text-[10px] text-slate-400 leading-normal">Paste a valid image URL. If left empty, a default premium placeholder will be used.</p>
+                  {/* File Upload Dropzone for Cover */}
+                  <label className="border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer transition-all bg-slate-50/50 hover:bg-indigo-50/10">
+                    <input 
+                      type="file" 
+                      onChange={handleCoverUpload} 
+                      className="hidden" 
+                      accept="image/png, image/jpeg, image/jpg, image/webp"
+                    />
+                    <div className="size-10 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center shrink-0">
+                      {isUploadingCover ? <Loader2 className="size-5 animate-spin" /> : <UploadCloud className="size-5" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">Click to upload cover photo</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">PNG, JPG or WEBP (Max 5MB). AI will automatically optimize and resize.</p>
+                    </div>
+                  </label>
                 </div>
                 {/* Image Preview */}
                 <div className="size-16 rounded-xl border border-slate-200 overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center relative group">
@@ -487,13 +516,12 @@ export default function CreateClassPage() {
                     src={formData.coverImageUrl || "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop"} 
                     alt="Cover preview" 
                     className="size-full object-cover"
-                    onError={(e) => { 
-                      if (formData.coverImageUrl && e.target.src !== "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop") {
-                        toastService.warning("The image URL you entered is invalid or protected. Using default cover.");
-                        e.target.src = "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop";
-                      }
-                    }}
                   />
+                  {isUploadingCover && (
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center">
+                      <Loader2 className="size-5 text-white animate-spin" />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

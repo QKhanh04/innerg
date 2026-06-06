@@ -135,7 +135,21 @@ namespace InnerG.Api.Controllers
             }
         }
 
-        [HttpPost("sessions/{id}/roll-call")]
+        [HttpGet("classes/{id}/enrolled-users")]
+        public async Task<IActionResult> GetEnrolledUsersForSession(Guid id)
+        {
+            try
+            {
+                var users = await _mentorService.GetEnrolledUsersForSessionAsync(GetCurrentUserId(), id);
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("classes/{id}/roll-call")]
         public async Task<IActionResult> SubmitRollCall(Guid id, [FromBody] RollCallRequest request)
         {
             try

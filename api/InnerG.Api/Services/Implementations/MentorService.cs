@@ -198,35 +198,89 @@ namespace InnerG.Api.Services.Implementations
             return true;
         }
 
-        public async Task<bool> SubmitRollCallAsync(Guid userId, Guid sessionId, RollCallRequest request)
+        public async Task<List<EnrolledUserDto>> GetEnrolledUsersForSessionAsync(Guid userId, Guid eventId)
         {
             var trainer = await GetTrainerByUserIdAsync(userId);
 
             var session = await _unitOfWork.Repository<TrainingSession>()
-                .GetQueryable().Where(s => s.Id == sessionId && s.TrainingEvent.TrainerId == trainer.Id)
-                .Include(s => s.TrainingEvent)
+                .GetQueryable().Where(s => s.TrainingEventId == eventId && s.TrainingEvent.TrainerId == trainer.Id)
+                .FirstOrDefaultAsync();
+
+            if (session == null)
+                return new List<EnrolledUserDto>();
+
+            var enrollments = await _unitOfWork.Repository<Enrollment>()
+                .GetQueryable()
+                .Where(e => e.TrainingEventId == session.TrainingEventId && (e.Status == EnrollmentStatus.Confirmed || e.Status == EnrollmentStatus.Completed))
+                .Include(e => e.User)
+                .ToListAsync();
+
+            var attendances = await _unitOfWork.Repository<SessionAttendance>()
+                .GetQueryable()
+                .Where(a => a.TrainingSessionId == session.Id)
+                .ToListAsync();
+
+            var result = enrollments.Select(e =>
+            {
+                var attendance = attendances.FirstOrDefault(a => a.UserId == e.UserId);
+                return new EnrolledUserDto
+                {
+                    Id = e.UserId,
+                    Name = e.User.FullName,
+                    Avatar = e.User.AvatarUrl,
+                    Position = e.User.JobTitle ?? "Trainee",
+                    Attended = attendance != null && attendance.Status == AttendanceStatus.Present
+                };
+            }).ToList();
+
+            return result;
+        }
+
+        public async Task<bool> SubmitRollCallAsync(Guid userId, Guid eventId, RollCallRequest request)
+        {
+            var trainer = await GetTrainerByUserIdAsync(userId);
+
+            var session = await _unitOfWork.Repository<TrainingSession>()
+                .GetQueryable().Where(s => s.TrainingEventId == eventId && s.TrainingEvent.TrainerId == trainer.Id)
                 .FirstOrDefaultAsync();
 
             if (session == null)
                 return false;
 
-            // Cập nhật Attendance cho những người có mặt
-            var attendances = await _unitOfWork.Repository<SessionAttendance>()
-                .GetQueryable().Where(a => a.TrainingSessionId == sessionId)
+            var enrollments = await _unitOfWork.Repository<Enrollment>()
+                .GetQueryable()
+                .Where(e => e.TrainingEventId == session.TrainingEventId && (e.Status == EnrollmentStatus.Confirmed || e.Status == EnrollmentStatus.Completed))
                 .ToListAsync();
 
-            foreach (var attendance in attendances)
+            var attendances = await _unitOfWork.Repository<SessionAttendance>()
+                .GetQueryable()
+                .Where(a => a.TrainingSessionId == session.Id)
+                .ToListAsync();
+
+            foreach (var enrollment in enrollments)
             {
-                if (request.AttendedUserIds.Contains(attendance.UserId))
+                var isAttended = request.AttendedUserIds.Contains(enrollment.UserId);
+                var existingAttendance = attendances.FirstOrDefault(a => a.UserId == enrollment.UserId);
+
+                if (existingAttendance != null)
                 {
-                    attendance.Status = AttendanceStatus.Present;
-                    attendance.CheckInTime = DateTime.UtcNow;
+                    existingAttendance.Status = isAttended ? AttendanceStatus.Present : AttendanceStatus.Absent;
+                    existingAttendance.CheckInTime = isAttended ? DateTime.UtcNow : null;
+                    await _unitOfWork.Repository<SessionAttendance>().UpdateAsync(existingAttendance);
                 }
                 else
                 {
-                    attendance.Status = AttendanceStatus.Absent;
+                    var newAttendance = new SessionAttendance
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = session.CompanyId,
+                        TrainingSessionId = session.Id,
+                        UserId = enrollment.UserId,
+                        Status = isAttended ? AttendanceStatus.Present : AttendanceStatus.Absent,
+                        CheckInTime = isAttended ? DateTime.UtcNow : null
+                    };
+                    await _unitOfWork.Repository<SessionAttendance>().AddAsync(newAttendance);
                 }
-                await _unitOfWork.Repository<SessionAttendance>().UpdateAsync(attendance);
             }
 
             await _unitOfWork.CommitAsync();

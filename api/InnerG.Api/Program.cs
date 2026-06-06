@@ -204,6 +204,7 @@ builder.Services.AddScoped<IExploreService, ExploreService>();
 builder.Services.AddScoped<IScheduleService, ScheduleService>();
 builder.Services.AddScoped<IWishlistService, WishlistService>();
 builder.Services.AddScoped<IIntegrationService, IntegrationService>();
+builder.Services.AddScoped<IFileService, CloudinaryService>();
 
 builder.Services.AddHostedService<UserSessionCleanupService>();
 
@@ -246,3 +247,5 @@ app.UseExceptionHandler();
 app.MapControllers();
 
 app.Run();
+// trigger restart
+
