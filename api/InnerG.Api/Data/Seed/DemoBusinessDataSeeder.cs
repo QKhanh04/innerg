@@ -15,10 +15,17 @@ namespace InnerG.Api.Data.Seed
             var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync();
             if (company == null) return;
 
+            var configuration = serviceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var mentorEmail = configuration["SEED_MENTOR_EMAIL"];
+            var menteeEmail = configuration["SEED_MENTEE_EMAIL"];
+            var sysAdminEmail = configuration["SEED_SYSADMIN_EMAIL"];
+
+            if (string.IsNullOrEmpty(mentorEmail) || string.IsNullOrEmpty(menteeEmail) || string.IsNullOrEmpty(sysAdminEmail)) return;
+
             // Get users
-            var mentorUser = await context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == "mentor@innerg.com");
-            var menteeUser = await context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == "mentee@innerg.com");
-            var systemAdminUser = await context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == "systemadmin@innerg.com");
+            var mentorUser = await context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == mentorEmail);
+            var menteeUser = await context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == menteeEmail);
+            var systemAdminUser = await context.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == sysAdminEmail);
 
             if (mentorUser == null || menteeUser == null || systemAdminUser == null) return;
 
