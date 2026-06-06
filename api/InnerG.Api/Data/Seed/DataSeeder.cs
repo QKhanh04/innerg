@@ -7,10 +7,15 @@ namespace InnerG.Api.Data.Seed
 {
     public static class DataSeeder
     {
-        private const string SeedPassword = "InnerG123";
-
         public static async Task SeedAsync(IServiceProvider serviceProvider)
         {
+            var configuration = serviceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var seedPassword = configuration["SEED_PASSWORD"];
+            if (string.IsNullOrEmpty(seedPassword))
+            {
+                throw new InvalidOperationException("CRITICAL SECURITY ERROR: Missing 'SEED_PASSWORD' in environment variables! You MUST configure this variable before running the application.");
+            }
+
             var context = serviceProvider.GetRequiredService<AppDbContext>();
             var roleManager = serviceProvider.GetRequiredService<RoleManager<AppRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
@@ -58,7 +63,7 @@ namespace InnerG.Api.Data.Seed
             };
 
             foreach (var seedUser in seedUsers)
-                await EnsureSeedUserAsync(userManager, seedUser);
+                await EnsureSeedUserAsync(userManager, seedUser, seedPassword);
 
             if (!await context.SubscriptionPlans.AnyAsync())
             {
@@ -292,7 +297,8 @@ namespace InnerG.Api.Data.Seed
 
         private static async Task EnsureSeedUserAsync(
             UserManager<AppUser> userManager,
-            SeedUserDefinition definition)
+            SeedUserDefinition definition,
+            string seedPassword)
         {
             var normalizedEmail = definition.Email.Trim().ToLowerInvariant();
             var expectedUserName = BuildUserName(normalizedEmail);
@@ -320,7 +326,7 @@ namespace InnerG.Api.Data.Seed
                     IsActive = true
                 };
 
-                var createResult = await userManager.CreateAsync(user, SeedPassword);
+                var createResult = await userManager.CreateAsync(user, seedPassword);
                 if (!createResult.Succeeded)
                 {
                     throw new InvalidOperationException(
