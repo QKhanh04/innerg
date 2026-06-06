@@ -22,11 +22,18 @@ namespace InnerG.Api.Services.Implementations
             _notificationService = notificationService;
         }
 
-        public async Task<List<HrPendingEventDto>> GetPendingEventsAsync(Guid companyId)
+        public async Task<List<HrPendingEventDto>> GetPendingEventsAsync(Guid companyId, TrainingEventStatus? status = null)
         {
-            return await _context.TrainingEvents
+            var query = _context.TrainingEvents
                 .Include(e => e.Trainer)
-                .Where(e => e.CompanyId == companyId && e.Status == TrainingEventStatus.PendingApproval)
+                .Where(e => e.CompanyId == companyId);
+
+            if (status.HasValue)
+            {
+                query = query.Where(e => e.Status == status.Value);
+            }
+
+            return await query
                 .OrderBy(e => e.StartDate)
                 .Select(e => new HrPendingEventDto
                 {
@@ -34,7 +41,8 @@ namespace InnerG.Api.Services.Implementations
                     Title = e.Title,
                     TrainerName = e.Trainer.FullName,
                     StartDate = e.StartDate,
-                    Type = e.Type.ToString()
+                    Type = e.Type.ToString(),
+                    Status = e.Status.ToString()
                 })
                 .ToListAsync();
         }

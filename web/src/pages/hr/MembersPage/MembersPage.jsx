@@ -45,110 +45,123 @@ export default function MembersPage() {
     };
 
     return (
-        <div className="max-w-[1400px] mx-auto p-4 md:p-8 space-y-8 animate-fadeIn">
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-[#0a192f] tracking-tight">Members</h1>
-                    <p className="text-slate-500 mt-2 font-medium">Personnel management, access control, and learning status tracking.</p>
-                </div>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* ── Hero Section ─────────────────────────────────────────────────── */}
+            <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-6 py-8 text-white shadow-lg shadow-slate-900/10">
+                <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/15 blur-3xl" />
+                <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-primary/10 blur-3xl" />
 
-                <div className="flex items-center gap-3">
-                    <button
-                        type="button"
-                        onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl shadow-sm hover:bg-slate-50 transition-colors"
-                    >
-                        <Download className="w-4 h-4" /> Export CSV
-                    </button>
-                    <a
-                        href="/invitations"
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#13ecb6] text-[#0a192f] font-bold rounded-xl shadow-md shadow-[#13ecb6]/20 hover:brightness-105 transition-all"
-                    >
-                        <Plus className="w-5 h-5" /> Invite
-                    </a>
-                </div>
-            </div>
-
-            {/* Filters Area */}
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative w-full md:max-w-md">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Search className="h-5 w-5 text-slate-400" />
+                <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">HR Module</p>
+                        <h1 className="text-3xl font-bold tracking-tight">Members</h1>
+                        <p className="max-w-2xl text-sm leading-6 text-slate-200">
+                            Personnel management, access control, and learning status tracking.
+                        </p>
                     </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={handleExport}
+                            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white/10 text-white font-bold rounded-xl border border-white/20 hover:bg-white/20 transition-all text-sm"
+                        >
+                            <Download className="size-4 text-primary" />
+                            Export Data
+                        </button>
+                        <a
+                            href="/invitations"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary text-[#0a192f] font-bold rounded-xl shadow-lg hover:brightness-105 active:scale-95 transition-all text-sm"
+                        >
+                            <Plus className="size-5" />
+                            Invite Member
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── Filters Area ─────────────────────────────────────────────────── */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-4 items-center justify-between">
+                <div className="relative w-full lg:max-w-md group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4.5 text-slate-400 group-focus-within:text-primary transition-colors" />
                     <input
                         type="text"
-                        className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#13ecb6] focus:border-[#13ecb6] sm:text-sm transition-all font-semibold"
+                        className="block w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-lg bg-slate-50/50 text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/40 outline-none transition-all"
                         placeholder="Search by name or email..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
 
-                <div className="flex w-full md:w-auto items-center gap-3">
-                    <div className="relative flex-1 md:w-40">
+                <div className="flex w-full lg:w-auto items-center gap-3">
+                    <div className="relative flex-1 lg:w-44">
                         <select
                             value={filters.role}
                             onChange={(e) => handleFilterChange('role', e.target.value)}
-                            className="block w-full pl-3 pr-10 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#13ecb6] focus:bg-white appearance-none text-slate-700 font-bold cursor-pointer transition-all shadow-sm"
+                            className="block w-full pl-4 pr-10 py-2.5 text-sm border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/40 appearance-none text-slate-700 font-bold cursor-pointer transition-all outline-none"
                         >
                             <option value="">All Roles</option>
-                            <option value="HR">HR</option>
+                            <option value="HR">HR Administrator</option>
                             <option value="MENTOR">Mentor</option>
                             <option value="MENTEE">Mentee</option>
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                            <Filter className="w-4 h-4" />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 border-l border-slate-200 my-2">
+                            <Filter className="size-3.5" />
                         </div>
                     </div>
 
-                    <div className="relative flex-1 md:w-40">
+                    <div className="relative flex-1 lg:w-44">
                         <select
                             value={filters.status}
                             onChange={(e) => handleFilterChange('status', e.target.value)}
-                            className="block w-full pl-3 pr-10 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-1 focus:ring-[#13ecb6] focus:bg-white appearance-none text-slate-700 font-bold cursor-pointer transition-all shadow-sm"
+                            className="block w-full pl-4 pr-10 py-2.5 text-sm border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:ring-4 focus:ring-primary/5 focus:border-primary/40 appearance-none text-slate-700 font-bold cursor-pointer transition-all outline-none"
                         >
                             <option value="">All Statuses</option>
-                            <option value="ACTIVE">Active</option>
-                            <option value="INACTIVE">Inactive</option>
+                            <option value="ACTIVE">Active Users</option>
+                            <option value="INACTIVE">Inactive / Blocked</option>
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
-                            <Filter className="w-4 h-4" />
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 border-l border-slate-200 my-2">
+                            <Filter className="size-3.5" />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className="relative min-h-[400px]">
+            {/* ── Main Content ─────────────────────────────────────────────────── */}
+            <div className="relative">
                 {isLoading && (
-                    <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
-                        <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-lg border border-slate-100 font-bold text-slate-600 text-sm">
-                            <div className="w-5 h-5 border-2 border-[#13ecb6] border-t-transparent rounded-full animate-spin"></div>
-                            Loading...
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl animate-in fade-in duration-300">
+                        <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-full shadow-xl border border-slate-100 font-bold text-slate-600 text-sm">
+                            <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                            Synchronizing members...
                         </div>
                     </div>
                 )}
 
-                <MemberTable members={data?.data || []} isLoading={isLoading} />
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <MemberTable members={data?.data || []} isLoading={isLoading} />
+                </div>
 
-                {/* Pagination */}
+                {/* ── Pagination ───────────────────────────────────────────────────── */}
                 {data && data.total > 0 && (
-                    <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <div className="text-sm text-slate-500 font-medium italic">
-                            Showing <span className="font-extrabold text-[#0a192f]">{(filters.page - 1) * filters.pageSize + 1}</span> to <span className="font-extrabold text-[#0a192f]">{Math.min(filters.page * filters.pageSize, data.total)}</span> of <span className="font-extrabold text-[#13ecb6]">{data.total}</span> results
+                    <div className="mt-8 flex items-center justify-between px-6 py-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <p className="text-sm text-slate-500 font-medium">
+                                Showing <span className="text-slate-900 font-bold">{(filters.page - 1) * filters.pageSize + 1}</span> to <span className="text-slate-900 font-bold">{Math.min(filters.page * filters.pageSize, data.total)}</span> of <span className="text-primary font-bold">{data.total}</span> members
+                            </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                             <button
                                 onClick={() => handlePageChange(filters.page - 1)}
                                 disabled={filters.page === 1}
-                                className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                                className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:hover:text-slate-500 disabled:hover:border-slate-200 transition-all shadow-sm"
+                                title="Previous Page"
                             >
-                                <ChevronLeft className="w-5 h-5" />
+                                <ChevronLeft className="size-4.5" />
                             </button>
 
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 mx-1 px-2 border-x border-slate-100">
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                                     let pageNum = filters.page;
                                     if (totalPages <= 5) pageNum = i + 1;
@@ -156,13 +169,15 @@ export default function MembersPage() {
                                     else if (filters.page >= totalPages - 2) pageNum = totalPages - 4 + i;
                                     else pageNum = filters.page - 2 + i;
 
+                                    const isActive = filters.page === pageNum;
+
                                     return (
                                         <button
                                             key={i}
                                             onClick={() => handlePageChange(pageNum)}
-                                            className={`w-9 h-9 rounded-lg text-sm font-extrabold flex items-center justify-center transition-all active:scale-95 ${filters.page === pageNum
-                                                ? 'bg-[#0a192f] text-white shadow-[#0a192f]/20 shadow-lg'
-                                                : 'text-slate-500 hover:bg-slate-100 border border-slate-100 shadow-sm'
+                                            className={`size-9 rounded-lg text-xs font-bold flex items-center justify-center transition-all ${isActive
+                                                ? 'bg-primary text-[#0a192f] shadow-sm'
+                                                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                                                 }`}
                                         >
                                             {pageNum}
@@ -174,9 +189,10 @@ export default function MembersPage() {
                             <button
                                 onClick={() => handlePageChange(filters.page + 1)}
                                 disabled={filters.page >= totalPages}
-                                className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                                className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-primary hover:border-primary/30 disabled:opacity-40 disabled:hover:text-slate-500 disabled:hover:border-slate-200 transition-all shadow-sm"
+                                title="Next Page"
                             >
-                                <ChevronRight className="w-5 h-5" />
+                                <ChevronRight className="size-4.5" />
                             </button>
                         </div>
                     </div>

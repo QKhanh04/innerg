@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Send } from 'lucide-react';
 import { useInvitationActions } from '../../../hooks/hr/useInvitationActions';
 
-const ROLES = ['Mentee', 'Mentor', 'HR'];
+const ROLES = ['Mentee'];
 
 export default function SingleInviteModal({ onClose }) {
     const { createMutation } = useInvitationActions();

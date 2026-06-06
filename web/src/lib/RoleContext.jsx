@@ -18,6 +18,7 @@ export function RoleProvider({ children }) {
         const primaryAppRole = authUser?.appRoles?.[0] || 'Mentee';
 
         return {
+            userId: authUser?.userId || null,
             name: authUser?.fullName || authUser?.email || 'InnerG User',
             position: primaryAppRole,
             avatar: `https://i.pravatar.cc/150?u=${encodeURIComponent(authUser?.email || authUser?.fullName || 'innerg-user')}`,

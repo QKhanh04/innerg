@@ -15,7 +15,7 @@ export const hrWishlistsApi = {
 };
 
 export const hrModerationApi = {
-    pendingEvents: () => api.get('/hr/moderation/events').then((r) => r.data),
+    pendingEvents: (params = {}) => api.get('/hr/moderation/events', { params }).then((r) => r.data),
     reviewEvent: (id, data) => api.patch(`/hr/moderation/events/${id}/review`, data),
     pendingResources: () => api.get('/hr/moderation/resources').then((r) => r.data),
     reviewResource: (id, data) => api.patch(`/hr/moderation/resources/${id}/review`, data),

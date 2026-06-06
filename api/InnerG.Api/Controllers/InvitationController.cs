@@ -149,5 +149,22 @@ namespace InnerG.Api.Controllers
             var result = await _invitationService.ValidateInviteFileAsync(file, companyId.Value);
             return Ok(result);
         }
+
+        [HttpGet("download-template")]
+        [AllowAnonymous]
+        public async Task<IActionResult> DownloadTemplate()
+        {
+            try
+            {
+                var content = await _invitationService.GetTemplateAsync();
+                return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Template_Invitation.xlsx");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error generating template: {ex.Message}");
+                return StatusCode(500, "Internal server error while generating template");
+            }
+        }
+
     }
 }

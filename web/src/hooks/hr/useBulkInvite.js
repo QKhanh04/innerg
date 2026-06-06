@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
+import { toastService } from '../../services/toastService';
 import { invitationsApi } from '../../api/invitationsApi';
 
 export function useBulkInvite() {
@@ -17,7 +17,7 @@ export function useBulkInvite() {
         },
         onError: (err) => {
             const msg = err?.response?.data?.error?.message || 'File validation error';
-            toast.error(msg);
+            toastService.error(msg);
         },
     });
 
@@ -34,7 +34,7 @@ export function useBulkInvite() {
         },
         onError: (err) => {
             const msg = err?.response?.data?.error?.message || 'Bulk send failed';
-            toast.error(msg);
+            toastService.error(msg);
         },
     });
 

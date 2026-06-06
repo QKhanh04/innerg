@@ -41,4 +41,12 @@ export const invitationsApi = {
     bulkRemove: async (ids) => {
         await api.post('/hr/invitations/bulk-delete', { ids });
     },
+
+    getTemplate: async () => {
+        const response = await api.get('/hr/invitations/download-template', {
+            responseType: 'blob',
+        });
+        return response.data;
+    },
+
 };

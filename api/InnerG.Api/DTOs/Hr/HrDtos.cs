@@ -146,6 +146,7 @@ namespace InnerG.Api.DTOs.Hr
         public string TrainerName { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public string Type { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
     }
 
     public class ReviewEventRequest

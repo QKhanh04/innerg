@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using ExcelDataReader;
+using MiniExcelLibs;
 
 namespace InnerG.Api.Services.Implementations
 {
@@ -16,12 +17,12 @@ namespace InnerG.Api.Services.Implementations
     {
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
-        private readonly IConfiguration _configuration;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public InvitationService(
             AppDbContext context,
             IEmailService emailService,
-            IConfiguration configuration)
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _context = context;
             _emailService = emailService;
@@ -387,6 +388,18 @@ namespace InnerG.Api.Services.Implementations
             }
 
             return result;
+        }
+
+        public async Task<byte[]> GetTemplateAsync()
+        {
+            var templateData = new[]
+            {
+                new { email = "example@company.com", role = "Mentee", fullname = "John Doe", department = "Engineering", position = "Software Engineer" }
+            };
+
+            using var ms = new MemoryStream();
+            await MiniExcel.SaveAsAsync(ms, templateData);
+            return ms.ToArray();
         }
 
         private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)

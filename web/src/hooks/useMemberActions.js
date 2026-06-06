@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { membersApi } from '../api/memberApi';
-import toast from 'react-hot-toast';
+import { toastService } from '../services/toastService';
 
 const ERROR_MESSAGES = {
     CANNOT_MODIFY_SELF: 'Cannot perform action on your own account.',
@@ -14,14 +14,14 @@ const ERROR_MESSAGES = {
 const handleMutationError = (error) => {
     const code = error.response?.data?.error?.code;
     const message = ERROR_MESSAGES[code] || error.response?.data?.error?.message || 'An error occurred, please try again.';
-    toast.error(message);
+    toastService.error(message);
 };
 
 export const useMemberActions = () => {
     const queryClient = useQueryClient();
 
     const handleSuccess = (message) => {
-        toast.success(message);
+        toastService.success(message);
         queryClient.invalidateQueries({ queryKey: ['members'] });
     };
 

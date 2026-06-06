@@ -17,5 +17,6 @@ namespace InnerG.Api.Services.Interfaces
         Task DeleteBulkInvitesAsync(BulkRevokeRequest request, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin);
         Task<PaginatedResponse<InviteListItemResponse>> GetInvitesAsync(InviteListQuery query, Guid companyId, bool isSystemAdmin);
         Task<ValidateFileResult> ValidateInviteFileAsync(IFormFile file, Guid companyId);
+        Task<byte[]> GetTemplateAsync();
     }
 }
