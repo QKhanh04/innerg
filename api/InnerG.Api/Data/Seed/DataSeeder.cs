@@ -74,6 +74,54 @@ namespace InnerG.Api.Data.Seed
                 await context.SaveChangesAsync();
             }
 
+            if (!await context.FeedbackCriteria.AnyAsync())
+            {
+                context.FeedbackCriteria.AddRange(
+                    new FeedbackCriteria
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Chuyên môn giảng viên (Trainer's Knowledge)",
+                        Description = "Mức độ am hiểu kiến thức và kỹ năng truyền đạt của giảng viên.",
+                        AppliesTo = CriteriaAppliesTo.Trainer,
+                        IsSystem = true,
+                        DisplayOrder = 1,
+                        IsActive = true
+                    },
+                    new FeedbackCriteria
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Chất lượng tài liệu (Material Quality)",
+                        Description = "Tính thực tiễn và dễ hiểu của tài liệu học tập.",
+                        AppliesTo = CriteriaAppliesTo.Both, // Đánh giá cả khoá học
+                        IsSystem = true,
+                        DisplayOrder = 2,
+                        IsActive = true
+                    },
+                    new FeedbackCriteria
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Mức độ tương tác (Engagement)",
+                        Description = "Sự tham gia tích cực và trao đổi hai chiều trong suốt buổi học.",
+                        AppliesTo = CriteriaAppliesTo.Trainer,
+                        IsSystem = true,
+                        DisplayOrder = 3,
+                        IsActive = true
+                    },
+                    new FeedbackCriteria
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Thái độ học tập (Learning Attitude)",
+                        Description = "Tính kỷ luật, thái độ tham gia và hoàn thành bài tập.",
+                        AppliesTo = CriteriaAppliesTo.Learner, // Giảng viên đánh giá học viên
+                        IsSystem = true,
+                        DisplayOrder = 4,
+                        IsActive = true
+                    }
+                );
+
+                await context.SaveChangesAsync();
+            }
+
             // 4. Seed Default Skills, Trainers, Training Events, and Sessions for Testing Schedules
             if (!await context.Skills.AnyAsync())
             {

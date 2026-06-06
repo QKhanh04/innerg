@@ -31,12 +31,17 @@ export const exploreApi = {
     return response.data;
   },
 
-  // Get personal schedule (timeline/calendar events)
   getPersonalSchedule: async (startDate, endDate) => {
     const params = {};
     if (startDate) params.startDate = startDate;
     if (endDate) params.endDate = endDate;
     const response = await api.get('/schedule', { params });
+    return response.data;
+  },
+
+  // Get enrolled/completed classes for Mentee
+  getMyClasses: async () => {
+    const response = await api.get('/explore/my-classes');
     return response.data;
   }
 };

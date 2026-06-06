@@ -25,6 +25,7 @@ import ResourceHub from '../pages/common/ResourceHub/ResourceHub';
 import Schedule from '../pages/common/Schedule/Schedule';
 import Explore from '../pages/common/Explore/Explore';
 import ExploreDetail from '../pages/common/ExploreDetail/ExploreDetail';
+import MyClasses from '../pages/common/MyClasses/MyClasses';
 import CreateClass from '../pages/mentor/CreateClass/CreateClass';
 import MentorDashboard from '../pages/mentor/MentorDashboard/MentorDashboard';
 import { useAuth } from '../hooks/useAuth';
@@ -156,6 +157,12 @@ const AppRoutes = () => (
             <Route path="/explore/:id" element={
                 <ProtectedRoute allowedRoles={['mentee', 'mentor', 'hr']}>
                     <ExploreDetail />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/my-classes" element={
+                <ProtectedRoute allowedRoles={['mentee', 'mentor']}>
+                    <MyClasses />
                 </ProtectedRoute>
             } />
 

@@ -160,6 +160,27 @@ namespace InnerG.Api.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+        [HttpGet("my-classes")]
+        public async Task<IActionResult> GetMyClasses()
+        {
+            try
+            {
+                var companyId = GetCurrentCompanyId();
+                var userId = GetCurrentUserId();
+
+                if (companyId == Guid.Empty)
+                {
+                    return BadRequest(new { message = "Company context is missing from token." });
+                }
+
+                var classes = await _exploreService.GetMyClassesAsync(companyId, userId);
+                return Ok(classes);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
 }
 // trigger restart
