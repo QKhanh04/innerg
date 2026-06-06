@@ -8,6 +8,8 @@ namespace InnerG.Api.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<AppUser> builder)
         {
+            builder.Property(x => x.CompanyId).IsRequired(false);
+
             // Unique: (CompanyId, Email)
             builder.HasIndex(x => new { x.CompanyId, x.Email })
                 .IsUnique()

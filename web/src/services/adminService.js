@@ -33,6 +33,20 @@ const adminService = {
     return response.data;
   },
 
+  async createSubscriptionPlan(payload) {
+    const response = await api.post('/admin/subscription-plans', payload);
+    return response.data;
+  },
+
+  async updateSubscriptionPlan(planId, payload) {
+    const response = await api.patch(`/admin/subscription-plans/${planId}`, payload);
+    return response.data;
+  },
+
+  async deleteSubscriptionPlan(planId) {
+    await api.delete(`/admin/subscription-plans/${planId}`);
+  },
+
   async assignSubscription(companyId, payload) {
     await api.post(`/admin/companies/${companyId}/subscription`, payload);
   },

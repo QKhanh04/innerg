@@ -70,6 +70,15 @@ const initialPlatformForm = {
   frontendUrlsText: '',
 };
 
+const initialSubscriptionPlanForm = {
+  name: '',
+  maxUsers: 100,
+  storageQuotaGb: 100,
+  pricePerUser: 0,
+  billingCycle: 'Monthly',
+  isActive: true,
+};
+
 function normalizeDomainInput(value) {
   const raw = (value || '').trim().toLowerCase();
   if (!raw) return '';
@@ -125,6 +134,11 @@ export default function AdminDashboard() {
   const [companyActionDialog, setCompanyActionDialog] = useState(null);
   const [moderationDialog, setModerationDialog] = useState(null);
   const [moderationReason, setModerationReason] = useState('Policy violation');
+  const [subscriptionPlanDialogMode, setSubscriptionPlanDialogMode] = useState(null);
+  const [editingSubscriptionPlanId, setEditingSubscriptionPlanId] = useState('');
+  const [subscriptionPlanForm, setSubscriptionPlanForm] = useState(initialSubscriptionPlanForm);
+  const [subscriptionPlanSubmitting, setSubscriptionPlanSubmitting] = useState(false);
+  const [subscriptionPlanActionDialog, setSubscriptionPlanActionDialog] = useState(null);
 
   const loadAdminData = async ({ silent = false } = {}) => {
     if (silent) {
@@ -454,6 +468,85 @@ export default function AdminDashboard() {
       await loadAdminData({ silent: true });
     } catch (err) {
       toastService.error(extractErrorMessage(err, 'Unable to assign subscription.'));
+    }
+  };
+
+  const handleSubscriptionPlanFormChange = (field, value) => {
+    setSubscriptionPlanForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const openCreateSubscriptionPlanDialog = () => {
+    setEditingSubscriptionPlanId('');
+    setSubscriptionPlanForm(initialSubscriptionPlanForm);
+    setSubscriptionPlanDialogMode('create');
+  };
+
+  const openEditSubscriptionPlanDialog = (plan) => {
+    setEditingSubscriptionPlanId(plan.id);
+    setSubscriptionPlanForm({
+      name: plan.name || '',
+      maxUsers: plan.maxUsers || 1,
+      storageQuotaGb: plan.storageQuotaGb || 1,
+      pricePerUser: plan.pricePerUser || 0,
+      billingCycle: plan.billingCycle || 'Monthly',
+      isActive: Boolean(plan.isActive),
+    });
+    setSubscriptionPlanDialogMode('edit');
+  };
+
+  const closeSubscriptionPlanDialog = () => {
+    setEditingSubscriptionPlanId('');
+    setSubscriptionPlanForm(initialSubscriptionPlanForm);
+    setSubscriptionPlanDialogMode(null);
+  };
+
+  const handleSaveSubscriptionPlan = async (event) => {
+    event.preventDefault();
+    setSubscriptionPlanSubmitting(true);
+
+    const payload = {
+      name: subscriptionPlanForm.name,
+      maxUsers: Number(subscriptionPlanForm.maxUsers),
+      storageQuotaGb: Number(subscriptionPlanForm.storageQuotaGb),
+      pricePerUser: Number(subscriptionPlanForm.pricePerUser),
+      billingCycle: subscriptionPlanForm.billingCycle,
+      isActive: Boolean(subscriptionPlanForm.isActive),
+    };
+
+    try {
+      if (subscriptionPlanDialogMode === 'edit' && editingSubscriptionPlanId) {
+        await adminService.updateSubscriptionPlan(editingSubscriptionPlanId, payload);
+        toastService.success('Subscription plan updated.');
+      } else {
+        await adminService.createSubscriptionPlan(payload);
+        toastService.success('Subscription plan created.');
+      }
+
+      closeSubscriptionPlanDialog();
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to save subscription plan.'));
+    } finally {
+      setSubscriptionPlanSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubscriptionPlan = async () => {
+    if (!subscriptionPlanActionDialog?.plan) {
+      return;
+    }
+
+    try {
+      await adminService.deleteSubscriptionPlan(subscriptionPlanActionDialog.plan.id);
+      toastService.success(
+        subscriptionPlanActionDialog.plan.isActive
+          ? 'Subscription plan archived.'
+          : 'Subscription plan removed.',
+      );
+      setSubscriptionPlanActionDialog(null);
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to delete subscription plan.'));
     }
   };
 
@@ -1071,6 +1164,77 @@ export default function AdminDashboard() {
             subtitle="Assign plans and control billing status per workspace"
             icon={CreditCard}
           />
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Plan Catalog</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Create, update, archive, and assign subscription plans used across all workspaces.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openCreateSubscriptionPlanDialog}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+              >
+                <Plus className="size-4" />
+                New plan
+              </button>
+            </div>
+            <div className="mt-5 grid gap-4 xl:grid-cols-3">
+              {plans.length === 0 ? (
+                <div className="xl:col-span-3">
+                  <EmptyState label="No subscription plans found." />
+                </div>
+              ) : (
+                plans.map((plan) => (
+                  <div key={plan.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-900">{plan.name}</p>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${plan.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                            {plan.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          ${formatDecimal(Number(plan.pricePerUser || 0))} per user / {String(plan.billingCycle || '').toLowerCase()}
+                        </p>
+                      </div>
+                      <CreditCard className="size-5 text-primary" />
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Max users</p>
+                        <p className="mt-1 font-semibold text-slate-900">{plan.maxUsers}</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Storage</p>
+                        <p className="mt-1 font-semibold text-slate-900">{plan.storageQuotaGb} GB</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditSubscriptionPlanDialog(plan)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubscriptionPlanActionDialog({ plan })}
+                        className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                      >
+                        <Trash2 className="size-4" />
+                        {plan.isActive ? 'Archive' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             {companyRows.map((company) => (
               <div key={company.id} className="border-b border-slate-100 px-5 py-5 last:border-b-0">
@@ -1174,6 +1338,9 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                     <div className="text-right text-xs text-slate-400">
+                      <div className="mb-1 flex justify-end">
+                        <AuditResultBadge result={item.result} />
+                      </div>
                       <p>{formatDateTime(item.createdAt)}</p>
                       <p>{item.ipAddress || 'No IP'}</p>
                     </div>
@@ -1235,7 +1402,7 @@ export default function AdminDashboard() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
                     >
                       <ShieldAlert className="size-4" />
-                      Apply action
+                      {getModerationActionLabel(item)}
                     </button>
                   </div>
                 </div>
@@ -1519,7 +1686,125 @@ export default function AdminDashboard() {
                 className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
               >
                 {moderationLoading ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
-                Apply action
+                {getModerationActionLabel(moderationDialog)}
+              </button>
+            </div>
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {subscriptionPlanDialogMode ? (
+        <AdminDialog
+          title={subscriptionPlanDialogMode === 'edit' ? 'Edit Subscription Plan' : 'Create Subscription Plan'}
+          description="Maintain the reusable plan catalog that companies can be assigned to."
+          icon={CreditCard}
+          onClose={closeSubscriptionPlanDialog}
+        >
+          <form onSubmit={handleSaveSubscriptionPlan} className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Plan name"
+                value={subscriptionPlanForm.name}
+                onChange={(value) => handleSubscriptionPlanFormChange('name', value)}
+                placeholder="Enterprise"
+              />
+              <Select
+                label="Billing cycle"
+                value={subscriptionPlanForm.billingCycle}
+                onChange={(value) => handleSubscriptionPlanFormChange('billingCycle', value)}
+                options={[
+                  { value: 'Monthly', label: 'Monthly' },
+                  { value: 'Yearly', label: 'Yearly' },
+                ]}
+              />
+              <Input
+                type="number"
+                label="Max users"
+                value={subscriptionPlanForm.maxUsers}
+                onChange={(value) => handleSubscriptionPlanFormChange('maxUsers', value)}
+              />
+              <Input
+                type="number"
+                label="Storage quota (GB)"
+                value={subscriptionPlanForm.storageQuotaGb}
+                onChange={(value) => handleSubscriptionPlanFormChange('storageQuotaGb', value)}
+              />
+              <Input
+                type="number"
+                label="Price per user"
+                value={subscriptionPlanForm.pricePerUser}
+                onChange={(value) => handleSubscriptionPlanFormChange('pricePerUser', value)}
+              />
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={subscriptionPlanForm.isActive}
+                  onChange={(event) => handleSubscriptionPlanFormChange('isActive', event.target.checked)}
+                  className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">Plan is active</span>
+                  <span className="mt-1 block text-sm text-slate-500">Inactive plans remain in history but cannot be assigned to new company subscriptions.</span>
+                </span>
+              </label>
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeSubscriptionPlanDialog}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={subscriptionPlanSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {subscriptionPlanSubmitting ? <Loader2 className="size-4 animate-spin" /> : <BadgeDollarSign className="size-4" />}
+                {subscriptionPlanDialogMode === 'edit' ? 'Save plan' : 'Create plan'}
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+
+      {subscriptionPlanActionDialog ? (
+        <AdminDialog
+          title={subscriptionPlanActionDialog.plan?.isActive ? 'Archive Subscription Plan' : 'Delete Subscription Plan'}
+          description={subscriptionPlanActionDialog.plan?.name || 'Subscription plan'}
+          icon={CreditCard}
+          onClose={() => setSubscriptionPlanActionDialog(null)}
+        >
+          <div className="space-y-5">
+            <div className={`rounded-xl border px-4 py-3 text-sm ${
+              subscriptionPlanActionDialog.plan?.isActive
+                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                : 'border-rose-200 bg-rose-50 text-rose-700'
+            }`}>
+              {subscriptionPlanActionDialog.plan?.isActive
+                ? 'If the plan is already used by companies, it will be made inactive so history stays intact.'
+                : 'This removes the inactive plan from normal admin views.'}
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setSubscriptionPlanActionDialog(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSubscriptionPlan}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                  subscriptionPlanActionDialog.plan?.isActive
+                    ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                }`}
+              >
+                <Trash2 className="size-4" />
+                {subscriptionPlanActionDialog.plan?.isActive ? 'Archive plan' : 'Delete plan'}
               </button>
             </div>
           </div>
@@ -2244,6 +2529,26 @@ function buildModerationImpactText(item) {
   return 'This action will be recorded in the audit log.';
 }
 
+function getModerationActionLabel(item) {
+  if (!item?.targetId) {
+    return 'No direct action';
+  }
+
+  if (item.targetType === 'AppUser') {
+    return 'Lock user';
+  }
+
+  if (item.targetType === 'Resource') {
+    return 'Remove resource';
+  }
+
+  if (item.targetType === 'TrainingEvent') {
+    return 'Cancel event';
+  }
+
+  return 'Apply action';
+}
+
 function buildAuditQuery(filters) {
   return Object.fromEntries(
     Object.entries(filters)
@@ -2297,6 +2602,19 @@ function buildSubscriptionDrafts(companies, plans) {
         trialEndsAt: '',
       },
     ]),
+  );
+}
+
+function AuditResultBadge({ result }) {
+  const normalized = String(result || 'SUCCESS').toUpperCase();
+  const classes = normalized === 'FAILED'
+    ? 'border-rose-200 bg-rose-50 text-rose-700'
+    : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${classes}`}>
+      {normalized}
+    </span>
   );
 }
 

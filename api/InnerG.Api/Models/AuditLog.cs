@@ -9,6 +9,7 @@ namespace InnerG.Api.Models
         public string EntityType { get; set; } = string.Empty;
         public Guid? EntityId { get; set; }
         public string Action { get; set; } = string.Empty; // Create, Update, Delete
+        public string Result { get; set; } = "SUCCESS";
         
         [System.ComponentModel.DataAnnotations.Schema.Column(TypeName = "jsonb")]
         public string? OldValueJson { get; set; } // JSON

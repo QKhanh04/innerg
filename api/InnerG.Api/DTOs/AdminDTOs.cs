@@ -90,6 +90,7 @@ namespace InnerG.Api.DTOs
     {
         public Guid Id { get; set; }
         public string Action { get; set; } = string.Empty;
+        public string Result { get; set; } = "SUCCESS";
         public string EntityType { get; set; } = string.Empty;
         public Guid? EntityId { get; set; }
         public Guid CompanyId { get; set; }
@@ -122,6 +123,16 @@ namespace InnerG.Api.DTOs
         public decimal PricePerUser { get; set; }
         public BillingCycle BillingCycle { get; set; }
         public bool IsActive { get; set; }
+    }
+
+    public class UpsertSubscriptionPlanRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public int MaxUsers { get; set; }
+        public int StorageQuotaGb { get; set; }
+        public decimal PricePerUser { get; set; }
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.Monthly;
+        public bool IsActive { get; set; } = true;
     }
 
     public class UpdateCompanyStatusRequest

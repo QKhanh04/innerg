@@ -11,7 +11,7 @@ namespace InnerG.Api.Data.Seed
 
         public static async Task SeedAsync(IServiceProvider serviceProvider)
         {
-            using var context = serviceProvider.GetRequiredService<AppDbContext>();
+            var context = serviceProvider.GetRequiredService<AppDbContext>();
             var roleManager = serviceProvider.GetRequiredService<RoleManager<AppRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
 
@@ -48,17 +48,17 @@ namespace InnerG.Api.Data.Seed
 
             var seedUsers = new[]
             {
-                new SeedUserDefinition("systemadmin@innerg.com", "System Administrator", new[] { AuthRoles.SystemAdmin }),
-                new SeedUserDefinition("hr@innerg.com", "Human Resources", new[] { AuthRoles.HR }),
-                new SeedUserDefinition("mentor@innerg.com", "Mentor User", new[] { AuthRoles.Mentor }),
-                new SeedUserDefinition("mentee@innerg.com", "Mentee User", new[] { AuthRoles.Mentee }),
-                new SeedUserDefinition("minhduy16082005@gmail.com", "Duy Nguyen", new[] { AuthRoles.HR }),
-                new SeedUserDefinition("dangcongquockhanh@gmail.com", "Dang Cong Quoc Khanh", new[] { AuthRoles.SystemAdmin }),
-                new SeedUserDefinition("khanhhoakt2k4@gmail.com", "Khanh Hoa", new[] { AuthRoles.Mentee })
+                new SeedUserDefinition("systemadmin@innerg.com", "System Administrator", null, new[] { AuthRoles.SystemAdmin }),
+                new SeedUserDefinition("hr@innerg.com", "Human Resources", company.Id, new[] { AuthRoles.HR }),
+                new SeedUserDefinition("mentor@innerg.com", "Mentor User", company.Id, new[] { AuthRoles.Mentor }),
+                new SeedUserDefinition("mentee@innerg.com", "Mentee User", company.Id, new[] { AuthRoles.Mentee }),
+                new SeedUserDefinition("minhduy16082005@gmail.com", "Duy Nguyen", company.Id, new[] { AuthRoles.HR }),
+                new SeedUserDefinition("dangcongquockhanh@gmail.com", "Dang Cong Quoc Khanh", null, new[] { AuthRoles.SystemAdmin }),
+                new SeedUserDefinition("khanhhoakt2k4@gmail.com", "Khanh Hoa", company.Id, new[] { AuthRoles.Mentee })
             };
 
             foreach (var seedUser in seedUsers)
-                await EnsureSeedUserAsync(userManager, company, seedUser);
+                await EnsureSeedUserAsync(userManager, seedUser);
 
             if (!await context.SubscriptionPlans.AnyAsync())
             {
@@ -77,21 +77,27 @@ namespace InnerG.Api.Data.Seed
 
         private static async Task EnsureSeedUserAsync(
             UserManager<AppUser> userManager,
-            Company company,
             SeedUserDefinition definition)
         {
             var normalizedEmail = definition.Email.Trim().ToLowerInvariant();
-            var expectedUserName = BuildUserName(normalizedEmail, company.Id);
+            var expectedUserName = BuildUserName(normalizedEmail);
 
             var user = await userManager.Users
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.CompanyId == company.Id && x.Email == normalizedEmail && x.DeletedAt == null);
+                .FirstOrDefaultAsync(x => x.CompanyId == definition.CompanyId && x.Email == normalizedEmail && x.DeletedAt == null);
+
+            if (user == null && definition.CompanyId == null)
+            {
+                user = await userManager.Users
+                    .IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(x => x.Email == normalizedEmail && x.DeletedAt == null);
+            }
 
             if (user == null)
             {
                 user = new AppUser
                 {
-                    CompanyId = company.Id,
+                    CompanyId = definition.CompanyId,
                     UserName = expectedUserName,
                     Email = normalizedEmail,
                     FullName = definition.FullName,
@@ -113,6 +119,12 @@ namespace InnerG.Api.Data.Seed
                 if (!string.Equals(user.UserName, expectedUserName, StringComparison.Ordinal))
                 {
                     user.UserName = expectedUserName;
+                    changed = true;
+                }
+
+                if (user.CompanyId != definition.CompanyId)
+                {
+                    user.CompanyId = definition.CompanyId;
                     changed = true;
                 }
 
@@ -161,11 +173,11 @@ namespace InnerG.Api.Data.Seed
             }
         }
 
-        private static string BuildUserName(string email, Guid companyId)
+        private static string BuildUserName(string email)
         {
-            return $"{email.Trim().ToLowerInvariant()}.{companyId:N}";
+            return email.Trim().ToLowerInvariant();
         }
 
-        private sealed record SeedUserDefinition(string Email, string FullName, string[] Roles);
+        private sealed record SeedUserDefinition(string Email, string FullName, Guid? CompanyId, string[] Roles);
     }
 }

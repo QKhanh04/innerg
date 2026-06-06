@@ -217,6 +217,7 @@ namespace InnerG.Api.Controllers
         public async Task<IActionResult> GetSubscriptionPlansAsync()
         {
             var plans = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .Where(x => x.DeletedAt == null)
                 .OrderBy(x => x.PricePerUser)
                 .Select(x => new SubscriptionPlanResponse
                 {
@@ -231,6 +232,146 @@ namespace InnerG.Api.Controllers
                 .ToListAsync();
 
             return Ok(plans);
+        }
+
+        [HttpPost("subscription-plans")]
+        public async Task<IActionResult> CreateSubscriptionPlanAsync([FromBody] UpsertSubscriptionPlanRequest request)
+        {
+            ValidateSubscriptionPlanRequest(request);
+
+            var normalizedName = request.Name.Trim();
+            var nameExists = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .AnyAsync(x => x.DeletedAt == null && x.Name.ToLower() == normalizedName.ToLower());
+
+            if (nameExists)
+                throw new ConflictException("Subscription plan name already exists");
+
+            var plan = new SubscriptionPlan
+            {
+                Name = normalizedName,
+                MaxUsers = request.MaxUsers,
+                StorageQuotaGb = request.StorageQuotaGb,
+                PricePerUser = request.PricePerUser,
+                BillingCycle = request.BillingCycle,
+                IsActive = request.IsActive
+            };
+
+            _context.SubscriptionPlans.Add(plan);
+
+            await AddAuditLogAsync(
+                Guid.Empty,
+                "SubscriptionPlan",
+                plan.Id,
+                "Create",
+                null,
+                new
+                {
+                    plan.Name,
+                    plan.MaxUsers,
+                    plan.StorageQuotaGb,
+                    plan.PricePerUser,
+                    plan.BillingCycle,
+                    plan.IsActive
+                });
+
+            await _context.SaveChangesAsync();
+            return StatusCode(StatusCodes.Status201Created, ToSubscriptionPlanResponse(plan));
+        }
+
+        [HttpPatch("subscription-plans/{planId:guid}")]
+        public async Task<IActionResult> UpdateSubscriptionPlanAsync(Guid planId, [FromBody] UpsertSubscriptionPlanRequest request)
+        {
+            ValidateSubscriptionPlanRequest(request);
+
+            var plan = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == planId && x.DeletedAt == null)
+                ?? throw new NotFoundException("Subscription plan not found");
+
+            var normalizedName = request.Name.Trim();
+            var nameExists = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .AnyAsync(x => x.Id != planId && x.DeletedAt == null && x.Name.ToLower() == normalizedName.ToLower());
+
+            if (nameExists)
+                throw new ConflictException("Subscription plan name already exists");
+
+            var oldValue = new
+            {
+                plan.Name,
+                plan.MaxUsers,
+                plan.StorageQuotaGb,
+                plan.PricePerUser,
+                plan.BillingCycle,
+                plan.IsActive
+            };
+
+            plan.Name = normalizedName;
+            plan.MaxUsers = request.MaxUsers;
+            plan.StorageQuotaGb = request.StorageQuotaGb;
+            plan.PricePerUser = request.PricePerUser;
+            plan.BillingCycle = request.BillingCycle;
+            plan.IsActive = request.IsActive;
+            plan.UpdatedAt = DateTime.UtcNow;
+
+            await AddAuditLogAsync(
+                Guid.Empty,
+                "SubscriptionPlan",
+                plan.Id,
+                "Update",
+                oldValue,
+                new
+                {
+                    plan.Name,
+                    plan.MaxUsers,
+                    plan.StorageQuotaGb,
+                    plan.PricePerUser,
+                    plan.BillingCycle,
+                    plan.IsActive
+                });
+
+            await _context.SaveChangesAsync();
+            return Ok(ToSubscriptionPlanResponse(plan));
+        }
+
+        [HttpDelete("subscription-plans/{planId:guid}")]
+        public async Task<IActionResult> DeleteSubscriptionPlanAsync(Guid planId)
+        {
+            var plan = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == planId && x.DeletedAt == null)
+                ?? throw new NotFoundException("Subscription plan not found");
+
+            var inUse = await _context.CompanySubscriptions.IgnoreQueryFilters()
+                .AnyAsync(x => x.SubscriptionPlanId == planId && x.CancelledAt == null && x.DeletedAt == null);
+
+            if (inUse)
+            {
+                plan.IsActive = false;
+                plan.UpdatedAt = DateTime.UtcNow;
+
+                await AddAuditLogAsync(
+                    Guid.Empty,
+                    "SubscriptionPlan",
+                    plan.Id,
+                    "Deactivate",
+                    new { plan.IsActive },
+                    new { plan.IsActive, Reason = "Plan is still assigned to active subscriptions" });
+            }
+            else
+            {
+                plan.IsActive = false;
+                plan.DeletedAt = DateTime.UtcNow;
+                plan.UpdatedAt = DateTime.UtcNow;
+
+                await AddAuditLogAsync(
+                    Guid.Empty,
+                    "SubscriptionPlan",
+                    plan.Id,
+                    "Delete",
+                    new { plan.Name, plan.IsActive, plan.DeletedAt },
+                    new { plan.Name, plan.IsActive, plan.DeletedAt });
+            }
+
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
 
         [HttpPost("companies/{companyId:guid}/subscription")]
@@ -324,7 +465,7 @@ namespace InnerG.Api.Controllers
             var logs = await GetRecentActivityInternalAsync(query);
 
             var csv = new StringBuilder();
-            csv.AppendLine("Id,Company,ActorEmail,Action,EntityType,EntityId,IpAddress,CreatedAt,Summary");
+            csv.AppendLine("Id,Company,ActorEmail,Action,Result,EntityType,EntityId,IpAddress,CreatedAt,Summary");
             foreach (var log in logs)
             {
                 csv.AppendLine(string.Join(",",
@@ -332,6 +473,7 @@ namespace InnerG.Api.Controllers
                     EscapeCsv(log.CompanyName),
                     EscapeCsv(log.UserEmail),
                     EscapeCsv(log.Action),
+                    EscapeCsv(log.Result),
                     EscapeCsv(log.EntityType),
                     EscapeCsv(log.EntityId?.ToString()),
                     EscapeCsv(log.IpAddress),
@@ -432,7 +574,7 @@ namespace InnerG.Api.Controllers
             }
 
             await AddAuditLogAsync(
-                user.CompanyId,
+                user.CompanyId ?? Guid.Empty,
                 "AppUser",
                 user.Id,
                 "ModerationLockUser",
@@ -651,6 +793,7 @@ namespace InnerG.Api.Controllers
                 {
                     Id = x.Id,
                     Action = x.Action,
+                    Result = string.IsNullOrWhiteSpace(x.Result) ? "SUCCESS" : x.Result,
                     EntityType = x.EntityType,
                     EntityId = x.EntityId,
                     CompanyId = x.CompanyId,
@@ -679,6 +822,7 @@ namespace InnerG.Api.Controllers
                     {
                         Id = x.Id,
                         Action = "Created",
+                        Result = "SUCCESS",
                         EntityType = "Company",
                         EntityId = x.Id,
                         CompanyId = x.Id,
@@ -864,7 +1008,7 @@ namespace InnerG.Api.Controllers
         private static string EscapeCsv(string? value) =>
             $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
 
-        private async Task AddAuditLogAsync(Guid companyId, string entityType, Guid? entityId, string action, object? oldValue, object? newValue)
+        private async Task AddAuditLogAsync(Guid companyId, string entityType, Guid? entityId, string action, object? oldValue, object? newValue, string result = "SUCCESS")
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var userId = Guid.TryParse(userIdValue, out var parsedUserId) ? parsedUserId : Guid.Empty;
@@ -876,6 +1020,7 @@ namespace InnerG.Api.Controllers
                 EntityType = entityType,
                 EntityId = entityId,
                 Action = action,
+                Result = result,
                 OldValueJson = oldValue == null ? null : JsonSerializer.Serialize(oldValue),
                 NewValueJson = newValue == null ? null : JsonSerializer.Serialize(newValue),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -883,6 +1028,32 @@ namespace InnerG.Api.Controllers
             });
 
             await Task.CompletedTask;
+        }
+
+        private static SubscriptionPlanResponse ToSubscriptionPlanResponse(SubscriptionPlan plan)
+        {
+            return new SubscriptionPlanResponse
+            {
+                Id = plan.Id,
+                Name = plan.Name,
+                MaxUsers = plan.MaxUsers,
+                StorageQuotaGb = plan.StorageQuotaGb,
+                PricePerUser = plan.PricePerUser,
+                BillingCycle = plan.BillingCycle,
+                IsActive = plan.IsActive
+            };
+        }
+
+        private static void ValidateSubscriptionPlanRequest(UpsertSubscriptionPlanRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+                throw new BadRequestException("Subscription plan name is required");
+            if (request.MaxUsers < 1)
+                throw new BadRequestException("Max users must be at least 1");
+            if (request.StorageQuotaGb < 1)
+                throw new BadRequestException("Storage quota must be at least 1 GB");
+            if (request.PricePerUser < 0)
+                throw new BadRequestException("Price per user cannot be negative");
         }
     }
 }

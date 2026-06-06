@@ -39,12 +39,14 @@ namespace InnerG.Api.Services.Implementations
                 var user = await _unitOfWork.Repository<AppUser>().GetByIdAsync(userId);
                 if (user == null)
                     throw new Exception("User not found.");
+                if (!user.CompanyId.HasValue)
+                    throw new Exception("Platform admin accounts cannot have mentor profiles.");
 
                 // Auto-create Trainer profile for users with Mentor role
                 trainer = new Trainer
                 {
                     Id = Guid.NewGuid(),
-                    CompanyId = user.CompanyId,
+                    CompanyId = user.CompanyId.Value,
                     UserId = userId,
                     TrainerType = TrainerType.Internal,
                     FullName = user.FullName ?? user.Email,
