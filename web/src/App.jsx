@@ -8,6 +8,8 @@ import './App.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RoleProvider } from './lib/RoleContext';
+
 // Component to setup axios interceptors with auth context
 function AxiosInterceptorSetup() {
   const { getAccessToken, refreshAccessToken } = useAuth();
@@ -25,11 +27,13 @@ function App() {
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <BrowserRouter>
-            <AxiosInterceptorSetup />
-            <Toaster />
-            <AppRoutes />
-          </BrowserRouter>
+          <RoleProvider>
+            <BrowserRouter>
+              <AxiosInterceptorSetup />
+              <Toaster position="top-right" reverseOrder={false} />
+              <AppRoutes />
+            </BrowserRouter>
+          </RoleProvider>
         </AuthProvider>
       </QueryClientProvider>
     </GoogleOAuthProvider>

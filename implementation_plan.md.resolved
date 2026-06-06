@@ -1,0 +1,111 @@
+# Implement Invite Employee Feature (Section 4.2)
+
+## Codebase Findings Summary
+
+### Backend
+- **Invite CRUD is already fully implemented** in [AuthController.cs](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Controllers/AuthController.cs) + [AuthService.cs](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Services/Interfaces/IAuthService.cs) at `/api/auth/invites`
+  - `POST /api/auth/invites` → create single invite
+  - `POST /api/auth/invites/bulk` → bulk invite
+  - `POST /api/auth/invites/{id}/resend` → resend
+  - `POST /api/auth/invites/{id}/revoke` → revoke
+  - Token = Base64Url-encoded random bytes (not SHA256)
+  - Role stored in `RolesCsv` on [Invite](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Models/Invite.cs#5-25) model (confirmed)
+- **Missing from backend:**
+  - `GET /api/auth/invites` — paginated list with filters (status, search)
+  - `POST /api/auth/invites/validate-file` — CSV/Excel parse & validate
+
+### Frontend
+- **Tailwind v4** — tokens in [index.css](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/index.css): `--color-primary: #13ecb6`, `--color-deep-blue: #0a192f`, `--color-bg-light: #f6f8f8`, font `Manrope`
+- **API**: `import api from './api/axios'` (default export)
+- **Toast**: `react-hot-toast`, `import toast from 'react-hot-toast'`
+- **Queries**: React Query v5, `useQuery` / `useMutation`
+- **Pattern** matches [MembersPage.tsx](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/pages/hr/MembersPage/MembersPage.tsx) — no base class, inline Tailwind classes
+- **Routes** in [AppRoutes.jsx](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/routes/AppRoutes.jsx) → add `/invitations` under `AppLayout` protected by `['hr']`
+- **No existing invitations pages or components**
+
+---
+
+## Proposed Changes
+
+### Backend
+
+#### [MODIFY] [AuthDTO.cs](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/DTOs/AuthDTO.cs)
+Add new DTOs:
+- `InviteListItemResponse` — list item with inviterName, departmentName, computed status
+- `InviteListQuery` — page, pageSize, status, search
+
+#### [MODIFY] [IAuthService.cs](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Services/Interfaces/IAuthService.cs)
+Add interface methods:
+- `Task<PaginatedResponse<InviteListItemResponse>> GetInvitesAsync(InviteListQuery query, Guid companyId, bool isSystemAdmin)`
+- `Task<ValidateFileResult> ValidateInviteFileAsync(IFormFile file, Guid companyId)`
+
+#### [MODIFY] [AuthService.cs](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Services/Implementations/AuthService.cs)
+Implement the 2 new methods:
+- `GetInvitesAsync` — query [Invites](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Services/Implementations/AuthService.cs#219-239) with IgnoreQueryFilters, include Inviter + Department, compute EXPIRED status in-memory (ExpiresAt < NOW && Status == PENDING)
+- `ValidateInviteFileAsync` — parse CSV/Excel rows, validate each (email format, domain, existing user, pending invite), return valid/invalid lists
+
+> **Library for Excel parsing**: Use `ExcelDataReader` or `CsvHelper` NuGet package. Will use `CsvHelper` for CSV + `ExcelDataReader` for .xlsx, keeping simple approach with manual extension check.
+
+#### [MODIFY] [AuthController.cs](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/api/InnerG.Api/Controllers/AuthController.cs)
+Add:
+- `GET /api/auth/invites` — list with pagination/filters, `[Authorize(Roles = "HR,SystemAdmin")]`
+- `POST /api/auth/invites/validate-file` — multipart upload, `[Authorize(Roles = "HR,SystemAdmin")]`
+
+---
+
+### Frontend
+
+#### [NEW] [invitation.types.ts](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/types/invitation.types.ts)
+Type definitions matching backend DTOs.
+
+#### [NEW] [invitationsApi.ts](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/api/invitationsApi.ts)
+API calls:
+- [getList(params)](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/api/memberApi.ts#4-8) → `GET /auth/invites`
+- `createSingle(data)` → `POST /auth/invites`
+- `validateFile(file)` → `POST /auth/invites/validate-file`
+- `bulkSend(invites)` → `POST /auth/invites/bulk`
+- `resend(id)` → `POST /auth/invites/{id}/resend`
+- [revoke(id)](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/api/memberApi.ts#24-28) → `POST /auth/invites/{id}/revoke`
+
+#### [NEW] [useInvitations.ts](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/hooks/hr/useInvitations.ts)
+`useQuery` for invite list with filters.
+
+#### [NEW] [useInvitationActions.ts](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/hooks/hr/useInvitationActions.ts)
+`useMutation` for revoke, resend, single invite. Each invalidates `['invitations']`.
+
+#### [NEW] [useBulkInvite.ts](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/hooks/hr/useBulkInvite.ts)
+Two separate mutations: `validateFile` and `bulkSend`. State machine: `'upload' | 'preview' | 'result'`.
+
+#### [NEW] Components in `web/src/components/hr/invitations/`
+- `InvitationTable.tsx` — columns: Email, Họ tên, Role badges, Phòng ban, Trạng thái badge, Người mời, Hết hạn, Ngày gửi, Hành động
+- `InvitationFilters.tsx` — search input (debounce 400ms) + status dropdown
+- `InvitationActionMenu.tsx` — "Thu hồi" (PENDING only) / "Gửi lại" (PENDING or EXPIRED)
+- `SingleInviteModal.tsx` — email, roles (checkboxes), department (dropdown), fullName, position
+- `BulkInviteModal.tsx` — 3-step: upload → preview valid/invalid → result
+
+#### [NEW] [InvitationsPage.tsx](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/pages/hr/invitations/InvitationsPage.tsx)
+Header with "Mời nhân viên" + "Import CSV/Excel" buttons, filters, table, pagination.
+
+#### [MODIFY] [AppRoutes.jsx](file:///c:/Users/ACER/Desktop/Ky%208/EXE102/innerg/web/src/routes/AppRoutes.jsx)
+Add `/invitations` route protected by `['hr']`.
+
+---
+
+## Verification Plan
+
+### Build check
+```bash
+cd api/InnerG.Api && dotnet build
+cd web && npm run build
+```
+
+### Manual Verification
+1. Log in as `hr@innerg.com` / `InnerG123`
+2. Navigate to `/invitations`
+3. Verify page loads with empty table (no invites yet)
+4. Click "Mời nhân viên" → Single invite modal opens
+5. Fill: `mentee-new@innerg.com`, role: `Mentee` → Submit → toast success, invite appears in list
+6. Click "..." action → "Gửi lại" → toast success
+7. Click "Thu hồi" → invite status changes to REVOKED
+8. Click "Import CSV/Excel" → upload a valid CSV → verify preview step shows valid rows
+9. Click "Gửi {n} lời mời" → result step shows success count

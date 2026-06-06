@@ -15,6 +15,8 @@ using InnerG.Api.Exceptions;
 using InnerG.Api.Exceptions.Handlers;
 using InnerG.Api.Models;
 using InnerG.Api.Repositories.Backgrounds;
+using InnerG.Api.Repositories.Interfaces;
+using InnerG.Api.Repositories.Implementations;
 using InnerG.Api.Services.Backgrounds;
 using InnerG.Api.Services.Implementations;
 using InnerG.Api.Services.Interfaces;
@@ -68,10 +70,14 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     options.SuppressModelStateInvalidFilter = true;
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddFluentValidationClientsideAdapters();
-builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<AcceptInviteRequestValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 /* =========================
@@ -80,6 +86,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
+builder.Services.AddExceptionHandler<BusinessExceptionHandler>();
 builder.Services.AddExceptionHandler<AppExceptionHandler>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -97,14 +104,18 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(dbConnection)
 );
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+
 /* =========================
    CORS
-   ========================= */
+   ========================= */ 
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
-        policy.WithOrigins(frontendUrls)
+        policy.WithOrigins("http://localhost:5173")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -114,14 +125,17 @@ builder.Services.AddCors(options =>
    IDENTITY
    ========================= */
 
-builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
+builder.Services.AddIdentity<AppUser, AppRole>(options =>
 {
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 6;
-    // options.User.RequireUniqueEmail = true;
+    options.Password.RequiredLength = 8;
+    options.User.RequireUniqueEmail = false;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers = true;
     // options.SignIn.RequireConfirmedEmail = true;
 
 })
@@ -164,12 +178,36 @@ builder.Services.AddAuthorization();
    APPLICATION SERVICES
    ========================= */
 
+builder.Services.AddScoped<IMemberService, MemberService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IHrAnalyticsService, HrAnalyticsService>();
+builder.Services.AddScoped<IHrWishlistService, HrWishlistService>();
+builder.Services.AddScoped<IHrModerationService, HrModerationService>();
+builder.Services.AddScoped<IHrDepartmentService, HrDepartmentService>();
+builder.Services.AddScoped<IHrRewardsService, HrRewardsService>();
+builder.Services.AddScoped<IHrReportsService, HrReportsService>();
+builder.Services.AddScoped<IHrWorkspaceService, HrWorkspaceService>();
+builder.Services.AddScoped<IHrMeetingRoomService, HrMeetingRoomService>();
+builder.Services.AddScoped<IHrEventService, HrEventService>();
+builder.Services.AddScoped<IHrBroadcastService, HrBroadcastService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IMentorService, MentorService>();
+builder.Services.AddScoped<IResourceHubService, ResourceHubService>();
+builder.Services.AddScoped<IExploreService, ExploreService>();
+builder.Services.AddScoped<IFeedbackService, FeedbackService>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
+builder.Services.AddScoped<IWishlistService, WishlistService>();
+builder.Services.AddScoped<IIntegrationService, IntegrationService>();
+builder.Services.AddScoped<IFileService, CloudinaryService>();
 
-builder.Services.AddHostedService<RefreshTokenCleanupService>();
+builder.Services.AddHostedService<UserSessionCleanupService>();
 
 /* =========================
    BUILD APP
@@ -189,15 +227,26 @@ if (app.Environment.IsDevelopment())
 
 using (var scope = app.Services.CreateScope())
 {
-    await RoleSeeder.SeedAsync(scope.ServiceProvider);
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await context.Database.MigrateAsync();
+    await UserNameNormalizationSeeder.NormalizeAsync(context);
+    await DataSeeder.SeedAsync(scope.ServiceProvider);
+    await DemoBusinessDataSeeder.SeedAsync(scope.ServiceProvider);
 }
 
 app.UseHttpsRedirection();
-app.UseCors("AllowReact");
-app.UseExceptionHandler();
+
 app.UseRouting();
+
+app.UseCors("AllowReact");
+
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseExceptionHandler();
+
 app.MapControllers();
 
 app.Run();
+// trigger restart
+
