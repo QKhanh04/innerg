@@ -116,15 +116,21 @@ namespace InnerG.Api.Data.Seed
             {
                 var changed = false;
 
-                if (!string.Equals(user.UserName, expectedUserName, StringComparison.Ordinal))
-                {
-                    user.UserName = expectedUserName;
-                    changed = true;
-                }
-
                 if (user.CompanyId != definition.CompanyId)
                 {
                     user.CompanyId = definition.CompanyId;
+                    changed = true;
+                }
+
+                if (user.DeletedAt != null)
+                {
+                    user.DeletedAt = null;
+                    changed = true;
+                }
+
+                if (!string.Equals(user.UserName, expectedUserName, StringComparison.Ordinal))
+                {
+                    user.UserName = expectedUserName;
                     changed = true;
                 }
 
