@@ -123,18 +123,12 @@ namespace InnerG.Api.Services.Implementations
             _context.Companies.Add(company);
             await _context.SaveChangesAsync();
 
-            var invite = await _invitationService.CreateInviteAsync(
-                new CreateInviteRequest
-                {
-                    CompanyId = company.Id,
-                    Email = hrEmail,
-                    FullName = request.HrFullName,
-                    Roles = [AuthRoles.HR]
-                },
+            var invite = await _invitationService.CreateFirstHrInviteAsync(
+                company.Id,
+                hrEmail,
+                request.HrFullName,
                 inviterId.ToString(),
-                currentCompanyId: null,
-                isSystemAdmin: true,
-                allowExternalEmail: request.AllowExternalHrEmail);
+                request.AllowExternalHrEmail);
 
             _context.AuditLogs.Add(new AuditLog
             {
@@ -554,10 +548,11 @@ namespace InnerG.Api.Services.Implementations
             {
                 var token = await _userManager.GeneratePasswordResetTokenAsync(user);
                 var resetLink = BuildResetPasswordLink(user.Id, token);
+                var workspaceLabel = user.Company?.Name ?? "InnerG Platform Admin";
                 await _emailService.SendPasswordResetAsync(
                     user.Email ?? request.Email,
                     "Reset your InnerG password",
-                    $"""<h3>Reset your password</h3><p>Workspace: {user.Company.Name}</p><a href="{resetLink}">Reset password</a>""");
+                    $"""<h3>Reset your password</h3><p>Workspace: {workspaceLabel}</p><a href="{resetLink}">Reset password</a>""");
             }
         }
 
@@ -651,7 +646,7 @@ namespace InnerG.Api.Services.Implementations
                 FullName = user.FullName,
                 Email = user.Email ?? string.Empty,
                 CompanyId = user.CompanyId,
-                CompanyName = user.Company.Name,
+                CompanyName = user.Company?.Name,
                 Roles = await _userManager.GetRolesAsync(user)
             };
         }
@@ -672,7 +667,10 @@ namespace InnerG.Api.Services.Implementations
             var query = _context.Users
                 .IgnoreQueryFilters()
                 .Include(x => x.Company)
-                .Where(x => x.IsActive && x.DeletedAt == null && x.Company.IsActive && x.Company.DeletedAt == null);
+                .Where(x =>
+                    x.IsActive &&
+                    x.DeletedAt == null &&
+                    (x.CompanyId == null || (x.Company != null && x.Company.IsActive && x.Company.DeletedAt == null)));
 
             if (companyId.HasValue)
                 query = query.Where(x => x.CompanyId == companyId.Value);
@@ -688,10 +686,14 @@ namespace InnerG.Api.Services.Implementations
                 await RevokeOldSessionsAsync(user.Id);
 
             var roles = await _userManager.GetRolesAsync(user);
-            var company = user.Company ?? await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == user.CompanyId)
-                ?? throw new NotFoundException("Company not found");
+            Company? company = null;
+            if (user.CompanyId.HasValue)
+            {
+                company = user.Company ?? await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == user.CompanyId.Value)
+                    ?? throw new NotFoundException("Company not found");
+            }
 
-            var accessToken = _tokenService.GenerateAccessToken(user, roles, user.CompanyId, company.Name);
+            var accessToken = _tokenService.GenerateAccessToken(user, roles, user.CompanyId, company?.Name);
             var rawRefreshToken = _tokenService.GenerateRefreshToken();
 
             _context.UserSessions.Add(new UserSession
@@ -713,7 +715,7 @@ namespace InnerG.Api.Services.Implementations
                 FullName = user.FullName,
                 Email = user.Email ?? string.Empty,
                 CompanyId = user.CompanyId,
-                CompanyName = company.Name,
+                CompanyName = company?.Name,
                 Roles = roles
             };
         }
@@ -747,7 +749,11 @@ namespace InnerG.Api.Services.Implementations
             return await _context.Users
                 .IgnoreQueryFilters()
                 .Include(x => x.Company)
-                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive && x.DeletedAt == null && x.Company.IsActive && x.Company.DeletedAt == null)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == id &&
+                    x.IsActive &&
+                    x.DeletedAt == null &&
+                    (x.CompanyId == null || (x.Company != null && x.Company.IsActive && x.Company.DeletedAt == null)))
                 ?? throw new UnauthorizedException("User not found");
         }
 
@@ -793,6 +799,9 @@ namespace InnerG.Api.Services.Implementations
             var options = new List<WorkspaceOption>();
             foreach (var user in users)
             {
+                if (user.CompanyId == null || user.Company == null)
+                    continue;
+
                 var roles = await _userManager.GetRolesAsync(user);
                 options.Add(new WorkspaceOption
                 {

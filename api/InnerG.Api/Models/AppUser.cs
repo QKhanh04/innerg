@@ -5,9 +5,9 @@ using InnerG.Api.Common.Interfaces;
 
 namespace InnerG.Api.Models
 {
-    public class AppUser : IdentityUser<Guid>, IMultiTenant, IAuditable, ISoftDelete
+    public class AppUser : IdentityUser<Guid>, IAuditable, ISoftDelete
     {
-        public Guid CompanyId { get; set; }
+        public Guid? CompanyId { get; set; }
         public Guid? DepartmentId { get; set; }
         
         public string FullName { get; set; } = string.Empty;
@@ -33,7 +33,7 @@ namespace InnerG.Api.Models
         public DateTime? DeletedAt { get; set; }
 
         // Navigation properties
-        public virtual Company Company { get; set; } = null!;
+        public virtual Company? Company { get; set; }
         public virtual Department? Department { get; set; }
         public virtual ICollection<UserSession> Sessions { get; set; } = new List<UserSession>();
         public virtual ICollection<UserSkill> UserSkills { get; set; } = new List<UserSkill>();

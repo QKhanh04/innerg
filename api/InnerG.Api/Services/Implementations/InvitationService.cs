@@ -29,6 +29,45 @@ namespace InnerG.Api.Services.Implementations
             _configuration = configuration;
         }
 
+        public async Task<InviteResponse> CreateFirstHrInviteAsync(Guid companyId, string hrEmail, string? hrFullName, string inviterUserId, bool allowExternalEmail = false)
+        {
+            if (!Guid.TryParse(inviterUserId, out var inviterId))
+                throw new UnauthorizedException();
+
+            var company = await _context.Companies
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == companyId && x.DeletedAt == null)
+                ?? throw new NotFoundException("Company not found");
+
+            var email = NormalizeEmail(hrEmail);
+            if (!allowExternalEmail && !EmailMatchesDomain(email, company.Domain))
+                throw new BadRequestException("HR email must belong to the company domain");
+
+            if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.Email == email && x.DeletedAt == null))
+                throw new ConflictException("User is already a member of this company");
+
+            var pendingInvite = await _context.Invites
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Email == email && x.Status == InviteStatus.Pending);
+
+            if (pendingInvite != null && pendingInvite.ExpiresAt > DateTime.UtcNow)
+                throw new ConflictException("A pending invite already exists for this email");
+
+            if (pendingInvite != null && pendingInvite.ExpiresAt <= DateTime.UtcNow)
+                pendingInvite.Status = InviteStatus.Expired;
+
+            var invite = await CreateInviteRecordAsync(
+                company,
+                inviterId,
+                email,
+                string.IsNullOrWhiteSpace(hrFullName) ? null : hrFullName.Trim(),
+                departmentId: null,
+                position: null,
+                roles: [AuthRoles.HR]);
+
+            return ToInviteResponse(invite.Invite, company, invite.RawToken);
+        }
+
         public async Task<InviteResponse> CreateInviteAsync(CreateInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin, bool allowExternalEmail = false)
         {
             var companyId = request.CompanyId ?? currentCompanyId
@@ -91,36 +130,16 @@ namespace InnerG.Api.Services.Implementations
             if (pendingInvite != null && pendingInvite.ExpiresAt <= DateTime.UtcNow)
                 pendingInvite.Status = InviteStatus.Expired;
 
-            var roles = NormalizeCompanyRoles(request.Roles);
-            var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
-            var invite = new Invite
-            {
-                CompanyId = companyId,
-                InviterId = inviterId,
-                DepartmentId = request.DepartmentId,
-                Email = email,
-                FullName = string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
-                Position = string.IsNullOrWhiteSpace(request.Position) ? null : request.Position.Trim(),
-                RolesCsv = string.Join(",", roles),
-                TokenHash = HashToken(rawToken),
-                ExpiresAt = DateTime.UtcNow.AddDays(GetInviteExpiryDays())
-            };
-
-            _context.Invites.Add(invite);
-            await _context.SaveChangesAsync();
-
-            var inviteLink = BuildInviteLink(rawToken);
-            await _emailService.SendInviteAsync(
+            var invite = await CreateInviteRecordAsync(
+                company,
+                inviterId,
                 email,
-                $"You're invited to join {company.Name} on InnerG",
-                $"""
-                <h3>You're invited to InnerG</h3>
-                <p>{company.Name} has invited you to join its internal learning workspace.</p>
-                <p>Please click the link below to activate your account. This invite expires on {invite.ExpiresAt:yyyy-MM-dd HH:mm} UTC.</p>
-                <a href="{inviteLink}">Accept invite</a>
-                """);
+                string.IsNullOrWhiteSpace(request.FullName) ? null : request.FullName.Trim(),
+                request.DepartmentId,
+                string.IsNullOrWhiteSpace(request.Position) ? null : request.Position.Trim(),
+                NormalizeCompanyRoles(request.Roles));
 
-            return ToInviteResponse(invite, company, rawToken);
+            return ToInviteResponse(invite.Invite, company, invite.RawToken);
         }
 
         public async Task<BulkInviteResponse> CreateBulkInvitesAsync(BulkInviteRequest request, string inviterUserId, Guid? currentCompanyId, bool isSystemAdmin)
@@ -305,6 +324,46 @@ namespace InnerG.Api.Services.Implementations
                 Page = page,
                 PageSize = pageSize
             };
+        }
+
+        private async Task<InviteWithToken> CreateInviteRecordAsync(
+            Company company,
+            Guid inviterId,
+            string email,
+            string? fullName,
+            Guid? departmentId,
+            string? position,
+            IList<string> roles)
+        {
+            var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
+            var invite = new Invite
+            {
+                CompanyId = company.Id,
+                InviterId = inviterId,
+                DepartmentId = departmentId,
+                Email = email,
+                FullName = fullName,
+                Position = position,
+                RolesCsv = string.Join(",", roles),
+                TokenHash = HashToken(rawToken),
+                ExpiresAt = DateTime.UtcNow.AddDays(GetInviteExpiryDays())
+            };
+
+            _context.Invites.Add(invite);
+            await _context.SaveChangesAsync();
+
+            var inviteLink = BuildInviteLink(rawToken);
+            await _emailService.SendInviteAsync(
+                email,
+                $"You're invited to join {company.Name} on InnerG",
+                $"""
+                <h3>You're invited to InnerG</h3>
+                <p>{company.Name} has invited you to join its internal learning workspace.</p>
+                <p>Please click the link below to activate your account. This invite expires on {invite.ExpiresAt:yyyy-MM-dd HH:mm} UTC.</p>
+                <a href="{inviteLink}">Accept invite</a>
+                """);
+
+            return new InviteWithToken(invite, rawToken);
         }
 
         public async Task<ValidateFileResult> ValidateInviteFileAsync(IFormFile file, Guid companyId)
@@ -541,5 +600,7 @@ namespace InnerG.Api.Services.Implementations
                 InviteLink = BuildInviteLink(rawToken)
             };
         }
+
+        private sealed record InviteWithToken(Invite Invite, string RawToken);
     }
 }

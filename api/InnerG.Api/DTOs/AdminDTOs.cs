@@ -8,6 +8,12 @@ namespace InnerG.Api.DTOs
     {
         public int TotalCompanies { get; set; }
         public int ActiveCompanies { get; set; }
+        public int TotalUsers { get; set; }
+        public int EventsThisMonth { get; set; }
+        public long TotalStorageBytes { get; set; }
+        public int TotalStorageQuotaGb { get; set; }
+        public double PlatformStorageUsedPercent { get; set; }
+        public double AverageRetentionRate { get; set; }
         public int PendingInvites { get; set; }
         public int ActiveSubscriptions { get; set; }
         public int ActiveSessions { get; set; }
@@ -33,6 +39,13 @@ namespace InnerG.Api.DTOs
         public int MentorCount { get; set; }
         public int HrCount { get; set; }
         public int PendingInviteCount { get; set; }
+        public int EventsThisMonth { get; set; }
+        public long StorageUsedBytes { get; set; }
+        public int? StorageQuotaGb { get; set; }
+        public double StorageUsedPercent { get; set; }
+        public double RetentionRate { get; set; }
+        public bool IsNearPlanLimit { get; set; }
+        public bool IsOverPlanLimit { get; set; }
         public string? SubscriptionPlanName { get; set; }
         public SubscriptionStatus? SubscriptionStatus { get; set; }
         public DateTime? SubscriptionEndsAt { get; set; }
@@ -77,6 +90,7 @@ namespace InnerG.Api.DTOs
     {
         public Guid Id { get; set; }
         public string Action { get; set; } = string.Empty;
+        public string Result { get; set; } = "SUCCESS";
         public string EntityType { get; set; } = string.Empty;
         public Guid? EntityId { get; set; }
         public Guid CompanyId { get; set; }
@@ -89,6 +103,17 @@ namespace InnerG.Api.DTOs
         public string? Summary { get; set; }
     }
 
+    public class AdminAuditLogQuery
+    {
+        public int Take { get; set; } = 50;
+        public Guid? CompanyId { get; set; }
+        public Guid? ActorId { get; set; }
+        public string? Action { get; set; }
+        public string? EntityType { get; set; }
+        public DateTime? From { get; set; }
+        public DateTime? To { get; set; }
+    }
+
     public class SubscriptionPlanResponse
     {
         public Guid Id { get; set; }
@@ -98,6 +123,16 @@ namespace InnerG.Api.DTOs
         public decimal PricePerUser { get; set; }
         public BillingCycle BillingCycle { get; set; }
         public bool IsActive { get; set; }
+    }
+
+    public class UpsertSubscriptionPlanRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public int MaxUsers { get; set; }
+        public int StorageQuotaGb { get; set; }
+        public decimal PricePerUser { get; set; }
+        public BillingCycle BillingCycle { get; set; } = BillingCycle.Monthly;
+        public bool IsActive { get; set; } = true;
     }
 
     public class UpdateCompanyStatusRequest
@@ -130,6 +165,37 @@ namespace InnerG.Api.DTOs
         public bool SmtpConfigured { get; set; }
         public int InviteExpiryDays { get; set; }
         public int RefreshTokenDays { get; set; }
+        public bool MaintenanceMode { get; set; }
+        public string? SystemBanner { get; set; }
         public IList<string> FrontendUrls { get; set; } = new List<string>();
+    }
+
+    public class UpdatePlatformSettingsRequest
+    {
+        public int InviteExpiryDays { get; set; } = 7;
+        public int RefreshTokenDays { get; set; } = 7;
+        public bool MaintenanceMode { get; set; }
+        public string? SystemBanner { get; set; }
+        public IList<string> FrontendUrls { get; set; } = new List<string>();
+    }
+
+    public class AdminModerationItemResponse
+    {
+        public Guid Id { get; set; }
+        public Guid CompanyId { get; set; }
+        public string? CompanyName { get; set; }
+        public string Source { get; set; } = string.Empty;
+        public string TargetType { get; set; } = string.Empty;
+        public Guid? TargetId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string ReporterName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public string? Summary { get; set; }
+    }
+
+    public class AdminModerationActionRequest
+    {
+        public string? Reason { get; set; }
     }
 }

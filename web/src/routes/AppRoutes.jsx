@@ -75,6 +75,31 @@ const AppRoutes = () => (
                     <AdminDashboard />
                 </ProtectedRoute>
             } />
+            <Route path="/admin/companies" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                </ProtectedRoute>
+            } />
+            <Route path="/admin/subscriptions" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                </ProtectedRoute>
+            } />
+            <Route path="/admin/audit" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                </ProtectedRoute>
+            } />
+            <Route path="/admin/moderation" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                </ProtectedRoute>
+            } />
+            <Route path="/admin/platform" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                </ProtectedRoute>
+            } />
             <Route path="/admin/companies/:companyId" element={
                 <ProtectedRoute allowedRoles={['admin']}>
                     <CompanyDetail />

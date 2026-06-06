@@ -13,13 +13,17 @@ import {
     BarChart3,
     BookOpen,
     ShieldCheck,
-    Bell
+    Bell,
+    Building2,
+    CreditCard,
+    FileClock,
+    Shield,
+    Cog
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useRole } from '../lib/RoleContext';
 
 const navItems = [
-    { icon: ShieldCheck, label: 'Admin Dashboard', path: '/admin', roles: ['admin'] },
     { icon: LayoutDashboard, label: 'Home Feed', path: '/dashboard', roles: ['mentee'] },
     { icon: BarChart3, label: 'Analytics', path: '/analytics', roles: ['hr'] },
     { icon: Users, label: 'Members', path: '/members', roles: ['hr'] },
@@ -37,12 +41,30 @@ const navItems = [
     { icon: User, label: 'Profile', path: '/profile', roles: ['mentee', 'mentor', 'hr', 'admin'] },
 ];
 
+const adminModuleItems = [
+    { icon: ShieldCheck, label: 'Overview', path: '/admin' },
+    { icon: Building2, label: 'Companies', path: '/admin/companies' },
+    { icon: CreditCard, label: 'Subscriptions', path: '/admin/subscriptions' },
+    { icon: FileClock, label: 'Audit', path: '/admin/audit' },
+    { icon: Shield, label: 'Moderation', path: '/admin/moderation' },
+    { icon: Cog, label: 'Platform', path: '/admin/platform' },
+];
+
 export function Sidebar() {
     const location = useLocation();
     const navigate = useNavigate();
     const { role, setRole, user } = useRole();
 
     const visibleNavItems = navItems.filter((item) => item.roles.includes(role));
+    const adminUtilityItems = visibleNavItems.filter((item) => item.path === '/resources' || item.path === '/profile');
+
+    const isNavActive = (path) => {
+        if (path === '/admin') {
+            return location.pathname === '/admin';
+        }
+
+        return location.pathname === path || location.pathname.startsWith(`${path}/`);
+    };
 
     const handleRoleChange = (newRole) => {
         setRole(newRole);
@@ -80,8 +102,61 @@ export function Sidebar() {
             </div>
 
             <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                {visibleNavItems.map((item) => {
-                    const isActive = location.pathname === item.path;
+                {role === 'admin' ? (
+                    <>
+                        <div className="px-3 pb-2">
+                            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Admin</p>
+                        </div>
+                        {adminModuleItems.map((item) => {
+                            const isActive = isNavActive(item.path);
+                            return (
+                                <Link
+                                    key={item.path}
+                                    to={item.path}
+                                    className={cn(
+                                        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                                        isActive
+                                            ? "bg-primary/10 text-primary font-bold border-l-4 border-primary rounded-l-none -ml-4 pl-7"
+                                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                    )}
+                                >
+                                    <item.icon className={cn("size-5", isActive && "fill-primary/20")} />
+                                    <span className="text-sm font-medium">{item.label}</span>
+                                </Link>
+                            );
+                        })}
+
+                        {adminUtilityItems.length > 0 ? (
+                            <>
+                                <div className="mx-3 my-3 border-t border-slate-100" />
+                                <div className="px-3 pb-2">
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">General</p>
+                                </div>
+                                {adminUtilityItems.map((item) => {
+                                    const isActive = isNavActive(item.path);
+                                    return (
+                                        <Link
+                                            key={item.path}
+                                            to={item.path}
+                                            className={cn(
+                                                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
+                                                isActive
+                                                    ? "bg-primary/10 text-primary font-bold border-l-4 border-primary rounded-l-none -ml-4 pl-7"
+                                                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                            )}
+                                        >
+                                            <item.icon className={cn("size-5", isActive && "fill-primary/20")} />
+                                            <span className="text-sm font-medium">{item.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </>
+                        ) : null}
+                    </>
+                ) : null}
+
+                {role !== 'admin' ? visibleNavItems.map((item) => {
+                    const isActive = isNavActive(item.path);
                     return (
                         <Link
                             key={item.path}
@@ -97,7 +172,7 @@ export function Sidebar() {
                             <span className="text-sm font-medium">{item.label}</span>
                         </Link>
                     );
-                })}
+                }) : null}
             </nav>
 
             <div className="p-4 border-t border-slate-100 space-y-3">
