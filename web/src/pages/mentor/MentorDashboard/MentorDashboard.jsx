@@ -38,11 +38,29 @@ import { toastService } from '../../../services/toastService';
 export default function MentorDashboard() {
   const navigate = useNavigate();
   const [activeLaunchSession, setActiveLaunchSession] = useState(null);
-  const [rollCallList, setRollCallList] = useState([
-    { name: 'Jane Doe', avatar: 'https://i.pravatar.cc/150?u=janedoe', position: 'Junior Frontend Developer', attended: true },
-    { name: 'Michael Scott', avatar: 'https://i.pravatar.cc/150?u=michael', position: 'Sales Lead', attended: false },
-    { name: 'Pam Beesly', avatar: 'https://i.pravatar.cc/150?u=pam', position: 'Designer', attended: true }
-  ]);
+  const [rollCallList, setRollCallList] = useState([]);
+  const [isLoadingRollCall, setIsLoadingRollCall] = useState(false);
+
+  // Fetch enrolled users when launching a session
+  useEffect(() => {
+    if (activeLaunchSession?.id) {
+      const fetchRollCallList = async () => {
+        setIsLoadingRollCall(true);
+        try {
+          const users = await mentorApi.getEnrolledUsersForSession(activeLaunchSession.id);
+          setRollCallList(users);
+        } catch (error) {
+          showToast('Failed to load enrolled users for this session.');
+          setRollCallList([]);
+        } finally {
+          setIsLoadingRollCall(false);
+        }
+      };
+      fetchRollCallList();
+    } else {
+      setRollCallList([]);
+    }
+  }, [activeLaunchSession]);
 
   const showToast = (message) => {
     const lowerMsg = message.toLowerCase();
@@ -203,9 +221,11 @@ export default function MentorDashboard() {
   };
 
   const handleConfirmRollCall = async () => {
-    const attendedIds = rollCallList.filter(s => s.attended).map(s => s.id || 'mock-id');
+    if (!activeLaunchSession?.id) return;
+    
+    const attendedIds = rollCallList.filter(s => s.attended).map(s => s.id);
     try {
-      await mentorApi.submitRollCall(activeLaunchSession?.id || 'mock-session', attendedIds, "Roll call note");
+      await mentorApi.submitRollCall(activeLaunchSession.id, attendedIds, "Roll call note");
       showToast(`Roll call success! Awarded points to ${attendedIds.length} attendees! 🎁`);
       setActiveLaunchSession(null);
     } catch (error) {
@@ -630,15 +650,54 @@ export default function MentorDashboard() {
                               </button>
                             )}
                           </>
-                        ) : isPublished ? (
-                          <button 
-                            onClick={() => setActiveLaunchSession(cls)}
-                            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
-                          >
-                            <ExternalLink className="size-3" />
-                            Launch Session
-                          </button>
-                        ) : isCancelled ? (
+                        ) : isPublished ? (() => {
+                          const now = new Date();
+                          const start = new Date(cls.startDate);
+                          const end = new Date(cls.endDate);
+                          // Cho phép Launch từ 30 phút trước giờ bắt đầu đến khi kết thúc
+                          const canLaunch = now >= new Date(start.getTime() - 30 * 60 * 1000) && now <= end;
+                          const isPast = now > end;
+                          const isFuture = now < new Date(start.getTime() - 30 * 60 * 1000);
+
+                          if (isPast) return (
+                            <button
+                              disabled
+                              className="flex-1 bg-slate-100 text-slate-400 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed"
+                            >
+                              Session Ended
+                            </button>
+                          );
+
+                          if (isFuture) return (
+                            <>
+                              <button
+                                onClick={() => navigate(`/mentor/edit/${cls.id}`)}
+                                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                              >
+                                <Edit2 className="size-3" />
+                                Edit
+                              </button>
+                              <button
+                                disabled
+                                title={`Session starts at ${new Date(cls.startDate).toLocaleString()}`}
+                                className="flex-1 bg-indigo-50 text-indigo-400 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed"
+                              >
+                                <Clock className="size-3" />
+                                Not Started Yet
+                              </button>
+                            </>
+                          );
+
+                          return (
+                            <button
+                              onClick={() => setActiveLaunchSession(cls)}
+                              className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-1"
+                            >
+                              <ExternalLink className="size-3" />
+                              Launch Session
+                            </button>
+                          );
+                        })() : isCancelled ? (
                           <button 
                             disabled
                             className="flex-1 bg-slate-100 text-slate-400 font-extrabold py-2.5 rounded-xl text-[9px] uppercase tracking-widest flex items-center justify-center gap-1 cursor-not-allowed"

@@ -18,7 +18,8 @@ import {
   Sparkles,
   Flame,
   TrendingUp,
-  Bookmark
+  Bookmark,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
@@ -342,7 +343,7 @@ export default function DashboardPage() {
         </div>
 
         {/* RIGHT: Points Widget + Activity Stream (35%) */}
-        <aside className="flex-[0.35] space-y-8">
+        <aside className="flex-[0.35] min-w-0 space-y-8">
           
           {/* POINTS WIDGET (Ultra premium Glassmorphic mesh gradient design) */}
           <div className="bg-gradient-to-br from-[#0F1F3D] via-[#1a2d52] to-[#047857] rounded-3xl p-8 shadow-xl relative overflow-hidden group border border-slate-800/80">
@@ -716,12 +717,21 @@ function RoadmapItem({ date, time, title, instructor, status, category, eventDat
            
            <div className="flex gap-3 shrink-0 items-center">
              {eventData && eventData.type !== 'EXTERNAL' ? (
-               <button 
-                 disabled={true}
-                 className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#0F1F3D]/10 text-[#0F1F3D] cursor-default border border-[#0F1F3D]/10"
-               >
-                 Enrolled
-               </button>
+               eventData.isOnline && eventData.meetingLink ? (
+                 <button 
+                   onClick={() => window.open(eventData.meetingLink, '_blank')}
+                   className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:brightness-110 active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
+                 >
+                   Join Online Class <ExternalLink className="size-3" />
+                 </button>
+               ) : (
+                 <button 
+                   disabled={true}
+                   className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#0F1F3D]/10 text-[#0F1F3D] cursor-default border border-[#0F1F3D]/10"
+                 >
+                   Enrolled
+                 </button>
+               )
              ) : (
                <button 
                  onClick={() => onRegister(null, title)}

@@ -13,7 +13,8 @@ namespace InnerG.Api.Services.Interfaces
         Task<List<HostedClassResponse>> GetHostedClassesAsync(Guid userId);
         Task<List<PendingEnrollmentResponse>> GetPendingEnrollmentsAsync(Guid userId);
         Task<bool> ProcessEnrollmentAsync(Guid userId, Guid enrollmentId, bool isApproved);
-        Task<bool> SubmitRollCallAsync(Guid userId, Guid sessionId, RollCallRequest request);
+        Task<List<EnrolledUserDto>> GetEnrolledUsersForSessionAsync(Guid userId, Guid eventId);
+        Task<bool> SubmitRollCallAsync(Guid userId, Guid eventId, RollCallRequest request);
         Task<Guid> CreateClassAsync(Guid userId, CreateClassRequest request);
         Task<bool> UpdateClassAsync(Guid userId, Guid classId, CreateClassRequest request);
         Task<bool> CancelClassAsync(Guid userId, Guid classId);

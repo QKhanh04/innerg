@@ -43,9 +43,15 @@ export const mentorApi = {
     return response.data;
   },
 
+  // Lấy danh sách học viên của buổi học
+  getEnrolledUsersForSession: async (eventId) => {
+    const response = await api.get(`/Mentor/classes/${eventId}/enrolled-users`);
+    return response.data;
+  },
+
   // Gửi điểm danh (Roll Call)
-  submitRollCall: async (sessionId, attendedUserIds, note = "") => {
-    const response = await api.post(`/Mentor/sessions/${sessionId}/roll-call`, {
+  submitRollCall: async (eventId, attendedUserIds, note = "") => {
+    const response = await api.post(`/Mentor/classes/${eventId}/roll-call`, {
       attendedUserIds,
       note
     });
