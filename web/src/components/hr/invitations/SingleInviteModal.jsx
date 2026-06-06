@@ -2,28 +2,24 @@ import React, { useState } from 'react';
 import { X, Send } from 'lucide-react';
 import { useInvitationActions } from '../../../hooks/hr/useInvitationActions';
 
-interface Props {
-    onClose: () => void;
-}
+const ROLES = ['Mentee'];
 
-const ROLES = ['Mentee', 'Mentor', 'HR'];
-
-export default function SingleInviteModal({ onClose }: Props) {
+export default function SingleInviteModal({ onClose }) {
     const { createMutation } = useInvitationActions();
 
     const [email, setEmail] = useState('');
-    const [selectedRoles, setSelectedRoles] = useState<string[]>(['Mentee']);
+    const [selectedRoles, setSelectedRoles] = useState(['Mentee']);
     const [fullName, setFullName] = useState('');
     const [position, setPosition] = useState('');
     const [department, setDepartment] = useState('');
 
-    const toggleRole = (role: string) => {
+    const toggleRole = (role) => {
         setSelectedRoles((prev) =>
             prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
         );
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (!email.trim() || selectedRoles.length === 0) return;
 

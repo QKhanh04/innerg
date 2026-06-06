@@ -339,7 +339,7 @@ namespace InnerG.Api.Services.Implementations
                 DepartmentId = invite.DepartmentId,
                 UserName = await GenerateUniqueUserNameAsync(invite.Email),
                 Email = invite.Email,
-                FullName = request.FullName.Trim(),
+                FullName = (request.FullName ?? invite.FullName ?? string.Empty).Trim(),
                 AvatarUrl = request.AvatarUrl,
                 JobTitle = invite.Position,
                 EmailConfirmed = true,
@@ -348,9 +348,13 @@ namespace InnerG.Api.Services.Implementations
 
             var createResult = await _userManager.CreateAsync(user, request.Password);
             if (!createResult.Succeeded)
+            {
+                _logger.LogWarning("User creation failed for {Email}: {Errors}", invite.Email, string.Join(", ", createResult.Errors.Select(e => e.Description)));
                 throw IdentityErrorMapper.ToValidationException(createResult);
+            }
 
             await AddRolesAsync(user, invite.Roles);
+            
             invite.Status = InviteStatus.Accepted;
             invite.AcceptedAt = DateTime.UtcNow;
 
@@ -363,6 +367,7 @@ namespace InnerG.Api.Services.Implementations
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            _logger.LogInformation("Invite transaction committed for {Email}. Creating session...", invite.Email);
             return await CreateSessionAsync(user);
         }
 
@@ -895,6 +900,9 @@ namespace InnerG.Api.Services.Implementations
 
         private static string NormalizeEmail(string email)
         {
+            if (string.IsNullOrWhiteSpace(email))
+                return string.Empty;
+
             return email.Trim().ToLowerInvariant();
         }
 

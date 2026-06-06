@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using ExcelDataReader;
+using MiniExcelLibs;
 
 namespace InnerG.Api.Services.Implementations
 {
@@ -16,12 +17,12 @@ namespace InnerG.Api.Services.Implementations
     {
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
-        private readonly IConfiguration _configuration;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
         public InvitationService(
             AppDbContext context,
             IEmailService emailService,
-            IConfiguration configuration)
+            Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _context = context;
             _emailService = emailService;
@@ -198,9 +199,32 @@ namespace InnerG.Api.Services.Implementations
                 }
                 catch (AppException)
                 {
-                    // Ignore individual errors during bulk operation for now, 
-                    // or we could collect them like in bulk invite.
-                    // Given the frontend's expectation, we'll just try to revoke as many as possible.
+                    // Ignore individual errors during bulk operation
+                }
+            }
+        }
+
+        public async Task DeleteInviteAsync(Guid inviteId, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            var invite = await GetInviteForMutationAsync(inviteId, currentCompanyId, isSystemAdmin);
+            invite.DeletedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteBulkInvitesAsync(BulkRevokeRequest request, string actorUserId, Guid? currentCompanyId, bool isSystemAdmin)
+        {
+            if (request?.Ids == null || !request.Ids.Any())
+                return;
+
+            foreach (var id in request.Ids)
+            {
+                try
+                {
+                    await DeleteInviteAsync(id, actorUserId, currentCompanyId, isSystemAdmin);
+                }
+                catch (AppException)
+                {
+                    // Ignore individual errors during bulk operation
                 }
             }
         }
@@ -364,6 +388,18 @@ namespace InnerG.Api.Services.Implementations
             }
 
             return result;
+        }
+
+        public async Task<byte[]> GetTemplateAsync()
+        {
+            var templateData = new[]
+            {
+                new { email = "example@company.com", role = "Mentee", fullname = "John Doe", department = "Engineering", position = "Software Engineer" }
+            };
+
+            using var ms = new MemoryStream();
+            await MiniExcel.SaveAsAsync(ms, templateData);
+            return ms.ToArray();
         }
 
         private async Task<Invite> GetInviteForMutationAsync(Guid inviteId, Guid? currentCompanyId, bool isSystemAdmin)

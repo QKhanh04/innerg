@@ -18,8 +18,8 @@ namespace InnerG.Api.Controllers
         public HrModerationController(IHrModerationService service) => _service = service;
 
         [HttpGet("events")]
-        public async Task<IActionResult> PendingEvents([FromQuery] string? status = "PendingApproval") =>
-            Ok(await _service.GetPendingEventsAsync(GetCurrentCompanyId()));
+        public async Task<IActionResult> PendingEvents([FromQuery] TrainingEventStatus? status) =>
+            Ok(await _service.GetPendingEventsAsync(GetCurrentCompanyId(), status));
 
         [HttpPatch("events/{eventId:guid}/review")]
         public async Task<IActionResult> ReviewEvent(Guid eventId, [FromBody] ReviewEventRequest request)
