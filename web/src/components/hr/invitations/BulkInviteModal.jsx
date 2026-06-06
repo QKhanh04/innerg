@@ -1,34 +1,51 @@
 import React, { useRef } from 'react';
 import { Upload, X, CheckCircle2, AlertCircle, Send, FileSpreadsheet } from 'lucide-react';
 import { useBulkInvite } from '../../../hooks/hr/useBulkInvite';
-import toast from 'react-hot-toast';
+import { invitationsApi } from '../../../api/invitationsApi';
+import { toastService } from '../../../services/toastService';
 
-interface Props {
-    onClose: () => void;
-}
-
-export default function BulkInviteModal({ onClose }: Props) {
+export default function BulkInviteModal({ onClose }) {
     const { step, validateResult, bulkResult, validateMutation, bulkSendMutation, reset } = useBulkInvite();
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef(null);
 
     const handleClose = () => {
         reset();
         onClose();
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         const validExts = ['.csv', '.xlsx', '.xls'];
         const lowerName = file.name.toLowerCase();
         if (!validExts.some((ext) => lowerName.endsWith(ext))) {
-            toast.error('Please select a .csv or .xlsx file');
+            toastService.error('Please select a .csv or .xlsx file');
             return;
         }
 
         validateMutation.mutate(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            console.log('Fetching template...');
+            const blob = await invitationsApi.getTemplate();
+            console.log('Template fetched instance:', blob);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'Template_Invitation.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Download template error:', error);
+            console.error('Error info:', error.response?.data || error.message);
+            toastService.error('Failed to download template: ' + (error.response?.data?.message || error.message));
+        }
     };
 
     const submitValid = () => {
@@ -87,6 +104,16 @@ export default function BulkInviteModal({ onClose }: Props) {
                             >
                                 {validateMutation.isPending ? 'Checking...' : 'Upload File'}
                             </button>
+
+                            <div className="mt-6 pt-6 border-t border-slate-100">
+                                <button
+                                    onClick={handleDownloadTemplate}
+                                    className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+                                >
+                                    <FileSpreadsheet className="w-4 h-4" />
+                                    Download Excel Template
+                                </button>
+                            </div>
                         </div>
                     )}
 

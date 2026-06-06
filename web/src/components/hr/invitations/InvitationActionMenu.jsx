@@ -1,29 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, RotateCcw, X, Trash2 } from 'lucide-react';
-import type { InviteListItem } from '../../../types/invitation.types';
 import { useInvitationActions } from '../../../hooks/hr/useInvitationActions';
 
-interface Props {
-    invite: InviteListItem;
-}
-
-export default function InvitationActionMenu({ invite }: Props) {
+export default function InvitationActionMenu({ invite }) {
     const [open, setOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef(null);
     const { resendMutation, revokeMutation, deleteMutation } = useInvitationActions();
 
     const canRevoke = invite.status === 'PENDING';
     const canResend = invite.status === 'PENDING' || invite.status === 'EXPIRED';
 
     useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+        const handler = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
-
-    // if (!canRevoke && !canResend) return null; // Removed this because we want to allow delete always
 
     return (
         <div className="relative inline-block text-left" ref={menuRef}>

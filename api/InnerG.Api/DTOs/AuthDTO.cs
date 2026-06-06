@@ -65,9 +65,9 @@ namespace InnerG.Api.DTOs
 
     public class WorkspaceOption
     {
-        public Guid CompanyId { get; set; }
-        public string CompanyName { get; set; } = string.Empty;
-        public string EmailDomain { get; set; } = string.Empty;
+        public Guid? CompanyId { get; set; }
+        public string? CompanyName { get; set; }
+        public string? EmailDomain { get; set; }
         public IList<string> Roles { get; set; } = new List<string>();
     }
 

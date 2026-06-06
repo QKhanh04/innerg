@@ -1,28 +1,22 @@
 import React, { useState } from 'react';
-import type { InviteListItem } from '../../../types/invitation.types';
 import InvitationActionMenu from './InvitationActionMenu';
-import { Trash2, AlertCircle } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useInvitationActions } from '../../../hooks/hr/useInvitationActions';
 import { cn } from '../../../lib/utils';
 
-interface Props {
-    invitations: InviteListItem[];
-    isLoading: boolean;
-}
-
-const statusConfig: Record<string, { label: string; className: string }> = {
+const statusConfig = {
     PENDING: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
     ACCEPTED: { label: 'Accepted', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
     EXPIRED: { label: 'Expired', className: 'bg-slate-100 text-slate-500 border border-slate-200' },
     REVOKED: { label: 'Revoked', className: 'bg-red-50 text-red-600 border border-red-200' },
 };
 
-function fmt(date: string) {
+function fmt(date) {
     return new Date(date).toLocaleDateString('en-US');
 }
 
-export default function InvitationTable({ invitations, isLoading }: Props) {
-    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+export default function InvitationTable({ invitations, isLoading }) {
+    const [selectedIds, setSelectedIds] = useState([]);
     const { bulkDeleteMutation } = useInvitationActions();
 
     if (isLoading) return null;
@@ -46,7 +40,7 @@ export default function InvitationTable({ invitations, isLoading }: Props) {
         }
     };
 
-    const toggleSelect = (id: string) => {
+    const toggleSelect = (id) => {
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );

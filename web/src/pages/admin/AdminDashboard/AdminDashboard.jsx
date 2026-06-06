@@ -10,10 +10,12 @@ import {
   Cog,
   Copy,
   CreditCard,
+  Download,
   ExternalLink,
   Filter,
   FileClock,
   Globe2,
+  HardDrive,
   Loader2,
   Mail,
   Plus,
@@ -25,18 +27,12 @@ import {
   TrendingUp,
   UserCog,
   Users,
+  X,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import adminService from '../../../services/adminService';
-
-const tabs = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'companies', label: 'Companies' },
-  { id: 'subscriptions', label: 'Subscriptions' },
-  { id: 'audit', label: 'Audit' },
-  { id: 'platform', label: 'Platform' },
-];
+import { toastService } from '../../../services/toastService';
 
 const initialCompanyForm = {
   companyName: '',
@@ -54,6 +50,33 @@ const initialEditCompanyForm = {
   logoUrl: '',
   timezone: 'Asia/Ho_Chi_Minh',
   language: 'vi',
+};
+
+const initialAuditFilters = {
+  take: 180,
+  companyId: '',
+  actorId: '',
+  action: '',
+  entityType: '',
+  from: '',
+  to: '',
+};
+
+const initialPlatformForm = {
+  inviteExpiryDays: 7,
+  refreshTokenDays: 7,
+  maintenanceMode: false,
+  systemBanner: '',
+  frontendUrlsText: '',
+};
+
+const initialSubscriptionPlanForm = {
+  name: '',
+  maxUsers: 100,
+  storageQuotaGb: 100,
+  pricePerUser: 0,
+  billingCycle: 'Monthly',
+  isActive: true,
 };
 
 function normalizeDomainInput(value) {
@@ -82,15 +105,13 @@ function emailBelongsToDomain(email, domain) {
 
 export default function AdminDashboard() {
   const { user, createCompany } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
   const [overview, setOverview] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [plans, setPlans] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [companyForm, setCompanyForm] = useState(initialCompanyForm);
   const [companySubmitting, setCompanySubmitting] = useState(false);
   const [lastHrInvite, setLastHrInvite] = useState(null);
@@ -101,6 +122,23 @@ export default function AdminDashboard() {
   const [subscriptionDrafts, setSubscriptionDrafts] = useState({});
   const [companySearch, setCompanySearch] = useState('');
   const [companyStatusFilter, setCompanyStatusFilter] = useState('all');
+  const [auditFilters, setAuditFilters] = useState(initialAuditFilters);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [moderationQueue, setModerationQueue] = useState([]);
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [platformForm, setPlatformForm] = useState(initialPlatformForm);
+  const [platformSaving, setPlatformSaving] = useState(false);
+  const [companyDialogMode, setCompanyDialogMode] = useState(null);
+  const [subscriptionCompanyId, setSubscriptionCompanyId] = useState('');
+  const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
+  const [companyActionDialog, setCompanyActionDialog] = useState(null);
+  const [moderationDialog, setModerationDialog] = useState(null);
+  const [moderationReason, setModerationReason] = useState('Policy violation');
+  const [subscriptionPlanDialogMode, setSubscriptionPlanDialogMode] = useState(null);
+  const [editingSubscriptionPlanId, setEditingSubscriptionPlanId] = useState('');
+  const [subscriptionPlanForm, setSubscriptionPlanForm] = useState(initialSubscriptionPlanForm);
+  const [subscriptionPlanSubmitting, setSubscriptionPlanSubmitting] = useState(false);
+  const [subscriptionPlanActionDialog, setSubscriptionPlanActionDialog] = useState(null);
 
   const loadAdminData = async ({ silent = false } = {}) => {
     if (silent) {
@@ -109,23 +147,24 @@ export default function AdminDashboard() {
       setLoading(true);
     }
 
-    setError('');
-
     try {
-      const [overviewData, companiesData, planData, auditData] = await Promise.all([
+      const [overviewData, companiesData, planData, auditData, moderationData] = await Promise.all([
         adminService.getOverview(),
         adminService.getCompanies(),
         adminService.getSubscriptionPlans(),
-        adminService.getAuditLogs(180),
+        adminService.getAuditLogs(buildAuditQuery(auditFilters)),
+        adminService.getModerationQueue(),
       ]);
 
       setOverview(overviewData);
       setCompanies(companiesData);
       setPlans(planData);
       setAuditLogs(auditData);
+      setModerationQueue(moderationData);
       setSubscriptionDrafts(buildSubscriptionDrafts(companiesData, planData));
+      setPlatformForm(buildPlatformForm(overviewData.platformSettings));
     } catch (err) {
-      setError(extractErrorMessage(err, 'Unable to load admin data.'));
+      toastService.error(extractErrorMessage(err, 'Unable to load admin data.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -164,22 +203,22 @@ export default function AdminDashboard() {
         icon: Building2,
       },
       {
-        label: 'Pending Invites',
-        value: overview.pendingInvites,
-        meta: `${overview.auditEventsLast7Days} audit events / 7d`,
-        icon: Clock3,
+        label: 'Users',
+        value: overview.totalUsers,
+        meta: `${overview.pendingInvites} pending invites`,
+        icon: Users,
       },
       {
-        label: 'Active Sessions',
-        value: overview.activeSessions,
+        label: 'Classes This Month',
+        value: overview.eventsThisMonth,
         meta: `${overview.activeSubscriptions} active subscriptions`,
         icon: Activity,
       },
       {
-        label: 'Privileged Accounts',
-        value: overview.privilegedAccounts,
-        meta: 'HR + System Admin',
-        icon: ShieldCheck,
+        label: 'Storage Used',
+        value: formatBytes(overview.totalStorageBytes),
+        meta: `${formatDecimal(overview.platformStorageUsedPercent || 0)}% of quota`,
+        icon: HardDrive,
       },
     ];
   }, [overview]);
@@ -290,24 +329,23 @@ export default function AdminDashboard() {
   const handleCreateCompany = async (event) => {
     event.preventDefault();
     setCompanySubmitting(true);
-    setNotice('');
-    setError('');
     setInviteLinkCopied(false);
 
     try {
       if (!companyForm.allowExternalHrEmail && !emailBelongsToDomain(companyForm.hrEmail, companyForm.emailDomain)) {
-        setError(`HR email must use @${normalizeDomainInput(companyForm.emailDomain)}. Turn on "Allow external HR email" if this is a temporary onboarding address.`);
+        toastService.error(`HR email must use @${normalizeDomainInput(companyForm.emailDomain)}. Turn on "Allow external HR email" if this is a temporary onboarding address.`);
         return;
       }
 
       const response = await createCompany(companyForm);
       const hrInvite = response?.hrInvite || null;
       setLastHrInvite(hrInvite);
-      setNotice(`Company created. HR invite is ready for ${hrInvite?.email || companyForm.hrEmail}.`);
+      toastService.success(`Company created. HR invite is ready for ${hrInvite?.email || companyForm.hrEmail}.`);
       setCompanyForm(initialCompanyForm);
+      setCompanyDialogMode(null);
       await loadAdminData({ silent: true });
     } catch (err) {
-      setError(extractErrorMessage(err, 'Unable to create company.'));
+      toastService.error(extractErrorMessage(err, 'Unable to create company.'));
     } finally {
       setCompanySubmitting(false);
     }
@@ -321,9 +359,10 @@ export default function AdminDashboard() {
     try {
       await navigator.clipboard.writeText(lastHrInvite.inviteLink);
       setInviteLinkCopied(true);
+      toastService.success('Invite link copied.');
       window.setTimeout(() => setInviteLinkCopied(false), 1800);
     } catch {
-      setError('Unable to copy invite link. Please select and copy it manually.');
+      toastService.error('Unable to copy invite link. Please select and copy it manually.');
     }
   };
 
@@ -336,13 +375,13 @@ export default function AdminDashboard() {
       timezone: company.timezone || 'Asia/Ho_Chi_Minh',
       language: company.language || 'vi',
     });
-    setNotice('');
-    setError('');
+    setCompanyDialogMode('edit');
   };
 
   const handleCancelEditCompany = () => {
     setEditCompanyId('');
     setEditCompanyForm(initialEditCompanyForm);
+    setCompanyDialogMode(null);
   };
 
   const handleUpdateCompany = async (event) => {
@@ -352,49 +391,50 @@ export default function AdminDashboard() {
     }
 
     setCompanyUpdating(true);
-    setNotice('');
-    setError('');
 
     try {
       await adminService.updateCompany(editCompanyId, editCompanyForm);
-      setNotice('Company updated.');
+      toastService.success('Company updated.');
       setEditCompanyId('');
       setEditCompanyForm(initialEditCompanyForm);
+      setCompanyDialogMode(null);
       await loadAdminData({ silent: true });
     } catch (err) {
-      setError(extractErrorMessage(err, 'Unable to update company.'));
+      toastService.error(extractErrorMessage(err, 'Unable to update company.'));
     } finally {
       setCompanyUpdating(false);
     }
   };
 
-  const handleToggleCompanyStatus = async (company) => {
-    setNotice('');
-    setError('');
-
-    try {
-      await adminService.updateCompanyStatus(company.id, !company.isActive);
-      setNotice(`${company.name} ${company.isActive ? 'deactivated' : 'activated'}.`);
-      await loadAdminData({ silent: true });
-    } catch (err) {
-      setError(extractErrorMessage(err, 'Unable to update company status.'));
-    }
-  };
-
-  const handleDeleteCompany = async (company) => {
-    if (window.confirm(`Delete company "${company.name}"? This will soft-delete the tenant and hide it from active operations.`) === false) {
+  const handleConfirmCompanyStatus = async () => {
+    if (!companyActionDialog?.company || companyActionDialog.action !== 'status') {
       return;
     }
 
-    setNotice('');
-    setError('');
-
+    const company = companyActionDialog.company;
     try {
-      await adminService.deleteCompany(company.id);
-      setNotice(`${company.name} deleted.`);
+      await adminService.updateCompanyStatus(company.id, !company.isActive);
+      toastService.success(`${company.name} ${company.isActive ? 'deactivated' : 'activated'}.`);
+      setCompanyActionDialog(null);
       await loadAdminData({ silent: true });
     } catch (err) {
-      setError(extractErrorMessage(err, 'Unable to delete company.'));
+      toastService.error(extractErrorMessage(err, 'Unable to update company status.'));
+    }
+  };
+
+  const handleConfirmDeleteCompany = async () => {
+    if (!companyActionDialog?.company || companyActionDialog.action !== 'delete') {
+      return;
+    }
+
+    const company = companyActionDialog.company;
+    try {
+      await adminService.deleteCompany(company.id);
+      toastService.success(`${company.name} deleted.`);
+      setCompanyActionDialog(null);
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to delete company.'));
     }
   };
 
@@ -411,12 +451,9 @@ export default function AdminDashboard() {
   const handleAssignSubscription = async (companyId) => {
     const draft = subscriptionDrafts[companyId];
     if (!draft?.subscriptionPlanId) {
-      setError('Select a subscription plan before applying it.');
+      toastService.error('Select a subscription plan before applying it.');
       return;
     }
-
-    setNotice('');
-    setError('');
 
     try {
       await adminService.assignSubscription(companyId, {
@@ -426,12 +463,203 @@ export default function AdminDashboard() {
         currentPeriodEnd: draft.currentPeriodEnd,
         trialEndsAt: draft.trialEndsAt || null,
       });
-      setNotice('Subscription updated.');
+      toastService.success('Subscription updated.');
+      setSubscriptionCompanyId('');
       await loadAdminData({ silent: true });
     } catch (err) {
-      setError(extractErrorMessage(err, 'Unable to assign subscription.'));
+      toastService.error(extractErrorMessage(err, 'Unable to assign subscription.'));
     }
   };
+
+  const handleSubscriptionPlanFormChange = (field, value) => {
+    setSubscriptionPlanForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const openCreateSubscriptionPlanDialog = () => {
+    setEditingSubscriptionPlanId('');
+    setSubscriptionPlanForm(initialSubscriptionPlanForm);
+    setSubscriptionPlanDialogMode('create');
+  };
+
+  const openEditSubscriptionPlanDialog = (plan) => {
+    setEditingSubscriptionPlanId(plan.id);
+    setSubscriptionPlanForm({
+      name: plan.name || '',
+      maxUsers: plan.maxUsers || 1,
+      storageQuotaGb: plan.storageQuotaGb || 1,
+      pricePerUser: plan.pricePerUser || 0,
+      billingCycle: plan.billingCycle || 'Monthly',
+      isActive: Boolean(plan.isActive),
+    });
+    setSubscriptionPlanDialogMode('edit');
+  };
+
+  const closeSubscriptionPlanDialog = () => {
+    setEditingSubscriptionPlanId('');
+    setSubscriptionPlanForm(initialSubscriptionPlanForm);
+    setSubscriptionPlanDialogMode(null);
+  };
+
+  const handleSaveSubscriptionPlan = async (event) => {
+    event.preventDefault();
+    setSubscriptionPlanSubmitting(true);
+
+    const payload = {
+      name: subscriptionPlanForm.name,
+      maxUsers: Number(subscriptionPlanForm.maxUsers),
+      storageQuotaGb: Number(subscriptionPlanForm.storageQuotaGb),
+      pricePerUser: Number(subscriptionPlanForm.pricePerUser),
+      billingCycle: subscriptionPlanForm.billingCycle,
+      isActive: Boolean(subscriptionPlanForm.isActive),
+    };
+
+    try {
+      if (subscriptionPlanDialogMode === 'edit' && editingSubscriptionPlanId) {
+        await adminService.updateSubscriptionPlan(editingSubscriptionPlanId, payload);
+        toastService.success('Subscription plan updated.');
+      } else {
+        await adminService.createSubscriptionPlan(payload);
+        toastService.success('Subscription plan created.');
+      }
+
+      closeSubscriptionPlanDialog();
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to save subscription plan.'));
+    } finally {
+      setSubscriptionPlanSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubscriptionPlan = async () => {
+    if (!subscriptionPlanActionDialog?.plan) {
+      return;
+    }
+
+    try {
+      await adminService.deleteSubscriptionPlan(subscriptionPlanActionDialog.plan.id);
+      toastService.success(
+        subscriptionPlanActionDialog.plan.isActive
+          ? 'Subscription plan archived.'
+          : 'Subscription plan removed.',
+      );
+      setSubscriptionPlanActionDialog(null);
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to delete subscription plan.'));
+    }
+  };
+
+  const handleAuditFilterChange = (field, value) => {
+    setAuditFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLoadAuditLogs = async () => {
+    setAuditLoading(true);
+
+    try {
+      const data = await adminService.getAuditLogs(buildAuditQuery(auditFilters));
+      setAuditLogs(data);
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to load audit logs.'));
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleExportAuditLogs = async () => {
+    setAuditLoading(true);
+
+    try {
+      const blob = await adminService.exportAuditLogs(buildAuditQuery({ ...auditFilters, take: 1000 }));
+      downloadBlob(blob, 'admin-audit-logs.csv');
+      toastService.success('Audit log export started.');
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to export audit logs.'));
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleRefreshModeration = async () => {
+    setModerationLoading(true);
+
+    try {
+      setModerationQueue(await adminService.getModerationQueue());
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to load moderation queue.'));
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  const openModerationDialog = (item) => {
+    if (!item?.targetId) {
+      toastService.error('This moderation item is informational and has no direct action target.');
+      return;
+    }
+
+    setModerationDialog(item);
+    setModerationReason('Policy violation');
+  };
+
+  const handleModerationAction = async () => {
+    if (!moderationDialog?.targetId) {
+      return;
+    }
+
+    const reason = moderationReason.trim() || 'Policy violation';
+    setModerationLoading(true);
+
+    try {
+      if (moderationDialog.targetType === 'AppUser') {
+        await adminService.lockUser(moderationDialog.targetId, reason);
+        toastService.success('User account locked.');
+      } else if (moderationDialog.targetType === 'Resource') {
+        await adminService.deleteModerationResource(moderationDialog.targetId, reason);
+        toastService.success('Resource removed.');
+      } else if (moderationDialog.targetType === 'TrainingEvent') {
+        await adminService.deleteModerationEvent(moderationDialog.targetId, reason);
+        toastService.success('Training event removed.');
+      } else {
+        toastService.error('This moderation item is informational and has no direct action target.');
+        return;
+      }
+
+      setModerationDialog(null);
+      await handleRefreshModeration();
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to apply moderation action.'));
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
+  const handlePlatformFormChange = (field, value) => {
+    setPlatformForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSavePlatformSettings = async (event) => {
+    event.preventDefault();
+    setPlatformSaving(true);
+
+    try {
+      const response = await adminService.updatePlatformSettings(parsePlatformForm(platformForm));
+      setOverview((prev) => prev ? { ...prev, platformSettings: response } : prev);
+      setPlatformForm(buildPlatformForm(response));
+      toastService.success('Platform settings updated.');
+      setPlatformDialogOpen(false);
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to update platform settings.'));
+    } finally {
+      setPlatformSaving(false);
+    }
+  };
+
+  const subscriptionCompany = companies.find((company) => company.id === subscriptionCompanyId);
+  const subscriptionDraft = subscriptionDrafts[subscriptionCompanyId] || {};
+  const activeTab = getAdminTabFromPath(location.pathname);
 
   if (loading) {
     return (
@@ -475,30 +703,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      <section className="flex flex-wrap gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === tab.id
-                ? 'bg-primary text-deep-blue shadow-md shadow-primary/20'
-                : 'border border-slate-200 bg-white text-slate-600 hover:border-primary/30 hover:bg-primary/5 hover:text-slate-900'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </section>
-
-      {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-      ) : null}
-      {notice ? (
-        <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-deep-blue">{notice}</div>
-      ) : null}
-
+      <div className="space-y-8">
       {activeTab === 'overview' ? (
         <div className="space-y-8">
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -783,144 +988,83 @@ export default function AdminDashboard() {
       ) : null}
 
       {activeTab === 'companies' ? (
-        <div className="space-y-8">
-          <section className="grid gap-6 xl:grid-cols-[1.1fr_1.2fr]">
-            <div className="space-y-4">
-              <SectionHeader
-                title="Create Company"
-                subtitle="Provision a new tenant and issue the first HR invite"
-                icon={Plus}
-              />
-              <form onSubmit={handleCreateCompany} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
-                <Input label="Company Name" value={companyForm.companyName} onChange={(value) => handleCompanyFormChange('companyName', value)} />
-                <Input label="Email Domain" value={companyForm.emailDomain} onChange={(value) => handleCompanyFormChange('emailDomain', value)} placeholder="company.com" />
-                <Input label="HR Full Name" value={companyForm.hrFullName} onChange={(value) => handleCompanyFormChange('hrFullName', value)} />
-                <Input label="HR Email" value={companyForm.hrEmail} onChange={(value) => handleCompanyFormChange('hrEmail', value)} placeholder="hr@company.com" />
-                <Input label="Timezone" value={companyForm.timezone} onChange={(value) => handleCompanyFormChange('timezone', value)} />
-                <Input label="Language" value={companyForm.language} onChange={(value) => handleCompanyFormChange('language', value)} />
-                <label className="md:col-span-2 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={companyForm.allowExternalHrEmail}
-                    onChange={(event) => handleCompanyFormChange('allowExternalHrEmail', event.target.checked)}
-                    className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  <span>
-                    <span className="block text-sm font-semibold text-slate-900">Allow external HR email</span>
-                    <span className="mt-1 block text-sm text-slate-500">
-                      Use this only when the first HR must receive the invite through a non-company email such as Gmail. Future employee invites still use the company domain rule.
+        <div className="space-y-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <SectionHeader
+              title="Company Directory"
+              subtitle="Provision, search, activate, deactivate, and soft-delete tenants"
+              icon={Users}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setCompanyForm(initialCompanyForm);
+                setCompanyDialogMode('create');
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+            >
+              <Plus className="size-4" />
+              New Company
+            </button>
+          </div>
+
+          {lastHrInvite ? (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded-lg border border-primary/15 bg-white p-2 text-primary">
+                      <Mail className="size-4" />
+                    </div>
+                    <p className="font-semibold text-slate-900">HR invite created</p>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        lastHrInvite.emailSent
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-amber-50 text-amber-700'
+                      }`}
+                    >
+                      {lastHrInvite.emailSent ? 'Email sent' : 'Manual link required'}
                     </span>
-                  </span>
-                </label>
-                <div className="md:col-span-2">
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {lastHrInvite.email} will become the first HR after accepting this invite.
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {lastHrInvite.emailDeliveryMessage}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   <button
-                    type="submit"
-                    disabled={companySubmitting}
-                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+                    type="button"
+                    onClick={handleCopyInviteLink}
+                    className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-primary/10"
                   >
-                    {companySubmitting ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                    Create company
+                    <Copy className="size-4" />
+                    {inviteLinkCopied ? 'Copied' : 'Copy link'}
                   </button>
+                  <a
+                    href={lastHrInvite.inviteLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+                  >
+                    <ExternalLink className="size-4" />
+                    Open invite
+                  </a>
                 </div>
-              </form>
+              </div>
 
-              {lastHrInvite ? (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="rounded-lg border border-primary/15 bg-white p-2 text-primary">
-                          <Mail className="size-4" />
-                        </div>
-                        <p className="font-semibold text-slate-900">HR invite created</p>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            lastHrInvite.emailSent
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-amber-50 text-amber-700'
-                          }`}
-                        >
-                          {lastHrInvite.emailSent ? 'Email sent' : 'Manual link required'}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-600">
-                        {lastHrInvite.email} will become the first HR after accepting this invite.
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {lastHrInvite.emailDeliveryMessage}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCopyInviteLink}
-                        className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-primary/10"
-                      >
-                        <Copy className="size-4" />
-                        {inviteLinkCopied ? 'Copied' : 'Copy link'}
-                      </button>
-                      <a
-                        href={lastHrInvite.inviteLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-deep-blue transition hover:brightness-105"
-                      >
-                        <ExternalLink className="size-4" />
-                        Open invite
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Accept invite link</p>
-                    <p className="mt-1 break-all text-sm text-slate-700">{lastHrInvite.inviteLink}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="space-y-4">
-                <SectionHeader
-                  title="Edit Company"
-                  subtitle={editCompanyId ? 'Update tenant profile, domain, and locale settings' : 'Select a company from the directory to edit'}
-                  icon={UserCog}
-                />
-                <form onSubmit={handleUpdateCompany} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
-                  <Input label="Company Name" value={editCompanyForm.name} onChange={(value) => handleEditCompanyFormChange('name', value)} />
-                  <Input label="Email Domain" value={editCompanyForm.domain} onChange={(value) => handleEditCompanyFormChange('domain', value)} placeholder="company.com" />
-                  <Input label="Timezone" value={editCompanyForm.timezone} onChange={(value) => handleEditCompanyFormChange('timezone', value)} />
-                  <Input label="Language" value={editCompanyForm.language} onChange={(value) => handleEditCompanyFormChange('language', value)} />
-                  <div className="md:col-span-2">
-                    <Input label="Logo URL" value={editCompanyForm.logoUrl} onChange={(value) => handleEditCompanyFormChange('logoUrl', value)} placeholder="https://..." />
-                  </div>
-                  <div className="md:col-span-2 flex flex-wrap gap-3">
-                    <button
-                      type="submit"
-                      disabled={!editCompanyId || companyUpdating}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
-                    >
-                      {companyUpdating ? <Loader2 className="size-4 animate-spin" /> : <UserCog className="size-4" />}
-                      Save changes
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelEditCompany}
-                      disabled={!editCompanyId || companyUpdating}
-                      className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-primary/30 hover:bg-primary/5 hover:text-slate-900 disabled:opacity-60"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </form>
+              <div className="mt-4 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Accept invite link</p>
+                <p className="mt-1 break-all text-sm text-slate-700">{lastHrInvite.inviteLink}</p>
               </div>
             </div>
+          ) : null}
 
+          <section className="space-y-4">
             <div className="space-y-4">
-              <SectionHeader
-                title="Company Directory"
-                subtitle="Provision, search, activate, deactivate, and soft-delete tenants"
-                icon={Users}
-              />
               <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center">
                 <div className="relative flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -984,7 +1128,7 @@ export default function AdminDashboard() {
                       {company.deletedAt ? null : (
                         <button
                           type="button"
-                          onClick={() => handleToggleCompanyStatus(company)}
+                          onClick={() => setCompanyActionDialog({ action: 'status', company })}
                           className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
                             company.isActive
                               ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
@@ -997,7 +1141,7 @@ export default function AdminDashboard() {
                       {!company.deletedAt ? (
                         <button
                           type="button"
-                          onClick={() => handleDeleteCompany(company)}
+                          onClick={() => setCompanyActionDialog({ action: 'delete', company })}
                           className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
                         >
                           <Trash2 className="size-4" />
@@ -1020,60 +1164,121 @@ export default function AdminDashboard() {
             subtitle="Assign plans and control billing status per workspace"
             icon={CreditCard}
           />
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            {companyRows.map((company) => {
-              const draft = subscriptionDrafts[company.id] || {};
-              return (
-                <div key={company.id} className="border-b border-slate-100 px-5 py-5 last:border-b-0">
-                  <div className="mb-4 flex flex-col gap-1 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900">{company.name}</p>
-                      <p className="text-sm text-slate-500">
-                        Current: {company.subscriptionPlanName || 'Unassigned'} {company.subscriptionStatus ? `· ${company.subscriptionStatus}` : ''}
-                      </p>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Plan Catalog</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Create, update, archive, and assign subscription plans used across all workspaces.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openCreateSubscriptionPlanDialog}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+              >
+                <Plus className="size-4" />
+                New plan
+              </button>
+            </div>
+            <div className="mt-5 grid gap-4 xl:grid-cols-3">
+              {plans.length === 0 ? (
+                <div className="xl:col-span-3">
+                  <EmptyState label="No subscription plans found." />
+                </div>
+              ) : (
+                plans.map((plan) => (
+                  <div key={plan.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-slate-900">{plan.name}</p>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${plan.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                            {plan.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          ${formatDecimal(Number(plan.pricePerUser || 0))} per user / {String(plan.billingCycle || '').toLowerCase()}
+                        </p>
+                      </div>
+                      <CreditCard className="size-5 text-primary" />
                     </div>
-                    <p className="text-xs text-slate-400">
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Max users</p>
+                        <p className="mt-1 font-semibold text-slate-900">{plan.maxUsers}</p>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Storage</p>
+                        <p className="mt-1 font-semibold text-slate-900">{plan.storageQuotaGb} GB</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditSubscriptionPlanDialog(plan)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSubscriptionPlanActionDialog({ plan })}
+                        className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                      >
+                        <Trash2 className="size-4" />
+                        {plan.isActive ? 'Archive' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            {companyRows.map((company) => (
+              <div key={company.id} className="border-b border-slate-100 px-5 py-5 last:border-b-0">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-slate-900">{company.name}</p>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                        {company.subscriptionPlanName || 'Unassigned'}
+                      </span>
+                      {company.subscriptionStatus ? (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                          {company.subscriptionStatus}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm text-slate-500">
+                      {company.memberCount} users · {company.eventsThisMonth || 0} classes this month · {formatBytes(company.storageUsedBytes)} used
+                      {company.storageQuotaGb ? ` / ${company.storageQuotaGb} GB` : ''}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
                       Period ends {company.subscriptionEndsAt ? formatDate(company.subscriptionEndsAt) : 'not set'}
                     </p>
                   </div>
-
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                    <Select
-                      label="Plan"
-                      value={draft.subscriptionPlanId || ''}
-                      onChange={(value) => handleSubscriptionDraftChange(company.id, 'subscriptionPlanId', value)}
-                      options={plans.map((plan) => ({ value: plan.id, label: `${plan.name} · $${plan.pricePerUser}/${plan.billingCycle.toLowerCase()}` }))}
-                    />
-                    <Select
-                      label="Status"
-                      value={draft.status || 'Active'}
-                      onChange={(value) => handleSubscriptionDraftChange(company.id, 'status', value)}
-                      options={[
-                        { value: 'Trial', label: 'Trial' },
-                        { value: 'Active', label: 'Active' },
-                        { value: 'PastDue', label: 'Past Due' },
-                        { value: 'Cancelled', label: 'Cancelled' },
-                        { value: 'Expired', label: 'Expired' },
-                      ]}
-                    />
-                    <Input type="date" label="Period Start" value={toDateInputValue(draft.currentPeriodStart)} onChange={(value) => handleSubscriptionDraftChange(company.id, 'currentPeriodStart', value)} />
-                    <Input type="date" label="Period End" value={toDateInputValue(draft.currentPeriodEnd)} onChange={(value) => handleSubscriptionDraftChange(company.id, 'currentPeriodEnd', value)} />
-                    <Input type="date" label="Trial Ends" value={toDateInputValue(draft.trialEndsAt)} onChange={(value) => handleSubscriptionDraftChange(company.id, 'trialEndsAt', value)} />
-                  </div>
-
-                  <div className="mt-4">
+                  <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                    {company.isOverPlanLimit ? (
+                      <p className="text-sm font-semibold text-rose-600">Over plan limit</p>
+                    ) : company.isNearPlanLimit ? (
+                      <p className="text-sm font-semibold text-amber-600">Near plan limit</p>
+                    ) : (
+                      <p className="text-sm font-semibold text-emerald-600">Within plan</p>
+                    )}
                     <button
                       type="button"
-                      onClick={() => handleAssignSubscription(company.id)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+                      onClick={() => setSubscriptionCompanyId(company.id)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-deep-blue transition hover:brightness-105"
                     >
                       <BadgeDollarSign className="size-4" />
-                      Apply subscription
+                      Manage plan
                     </button>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
@@ -1082,9 +1287,43 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           <SectionHeader
             title="Audit Feed"
-            subtitle="Recent platform-wide actions across all tenants"
+            subtitle="Filter, inspect, and export platform-wide actions"
             icon={FileClock}
           />
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-7">
+            <Select
+              label="Company"
+              value={auditFilters.companyId}
+              onChange={(value) => handleAuditFilterChange('companyId', value)}
+              options={companies.map((company) => ({ value: company.id, label: company.name }))}
+            />
+            <Input label="Actor ID" value={auditFilters.actorId} onChange={(value) => handleAuditFilterChange('actorId', value)} placeholder="optional user id" />
+            <Input label="Action" value={auditFilters.action} onChange={(value) => handleAuditFilterChange('action', value)} placeholder="Update, Delete..." />
+            <Input label="Entity" value={auditFilters.entityType} onChange={(value) => handleAuditFilterChange('entityType', value)} placeholder="Company" />
+            <Input type="date" label="From" value={auditFilters.from} onChange={(value) => handleAuditFilterChange('from', value)} />
+            <Input type="date" label="To" value={auditFilters.to} onChange={(value) => handleAuditFilterChange('to', value)} />
+            <Input type="number" label="Rows" value={auditFilters.take} onChange={(value) => handleAuditFilterChange('take', value)} />
+            <div className="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-7">
+              <button
+                type="button"
+                onClick={handleLoadAuditLogs}
+                disabled={auditLoading}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {auditLoading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                Apply filters
+              </button>
+              <button
+                type="button"
+                onClick={handleExportAuditLogs}
+                disabled={auditLoading}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-primary/30 hover:bg-primary/5"
+              >
+                <Download className="size-4" />
+                Export CSV
+              </button>
+            </div>
+          </div>
           <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
             {auditLogs.length === 0 ? (
               <EmptyState label="No audit entries found." />
@@ -1099,9 +1338,72 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                     <div className="text-right text-xs text-slate-400">
+                      <div className="mb-1 flex justify-end">
+                        <AuditResultBadge result={item.result} />
+                      </div>
                       <p>{formatDateTime(item.createdAt)}</p>
                       <p>{item.ipAddress || 'No IP'}</p>
                     </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'moderation' ? (
+        <div className="space-y-4">
+          <SectionHeader
+            title="System Moderation"
+            subtitle="Review escalated reports and remove unsafe platform content"
+            icon={ShieldAlert}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{moderationQueue.length} items in queue</p>
+              <p className="mt-1 text-sm text-slate-500">Audit reports and pending content that may need system-level intervention.</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefreshModeration}
+              disabled={moderationLoading}
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+            >
+              <RefreshCw className={`size-4 ${moderationLoading ? 'animate-spin' : ''}`} />
+              Refresh queue
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+            {moderationQueue.length === 0 ? (
+              <EmptyState label="No moderation items found." />
+            ) : (
+              moderationQueue.map((item) => (
+                <div key={`${item.source}-${item.id}`} className="border-b border-slate-100 px-5 py-4 last:border-b-0">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-slate-900">{item.title}</p>
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">{item.status}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{item.targetType}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {item.companyName || 'Global'} · {item.reporterName || 'System'} · {formatDateTime(item.createdAt)}
+                      </p>
+                      {item.summary ? (
+                        <p className="mt-2 max-w-4xl break-words rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">{item.summary}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openModerationDialog(item)}
+                      disabled={moderationLoading || !item.targetId}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      <ShieldAlert className="size-4" />
+                      {getModerationActionLabel(item)}
+                    </button>
                   </div>
                 </div>
               ))
@@ -1114,7 +1416,7 @@ export default function AdminDashboard() {
         <div className="space-y-6">
           <SectionHeader
             title="Platform Settings"
-            subtitle="Global integration and security posture"
+            subtitle="Global integration, security posture, and editable runtime policy"
             icon={Cog}
           />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1144,6 +1446,23 @@ export default function AdminDashboard() {
             />
           </div>
 
+          <div className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">Runtime Policy</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Invite TTL, refresh token TTL, maintenance mode, banner, and allowed frontend origins.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPlatformDialogOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+            >
+              <Cog className="size-4" />
+              Edit settings
+            </button>
+          </div>
+
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="text-base font-semibold text-slate-900">Frontend Origins</h3>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -1156,6 +1475,516 @@ export default function AdminDashboard() {
           </div>
         </div>
       ) : null}
+      </div>
+
+      {companyDialogMode === 'create' ? (
+        <AdminDialog
+          title="Create Company"
+          description="Provision a new tenant and invite the first HR admin."
+          icon={Building2}
+          onClose={() => setCompanyDialogMode(null)}
+        >
+          <form onSubmit={handleCreateCompany} className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Company name"
+                value={companyForm.companyName}
+                onChange={(value) => handleCompanyFormChange('companyName', value)}
+                placeholder="InnerG Vietnam"
+              />
+              <Input
+                label="Email domain"
+                value={companyForm.emailDomain}
+                onChange={(value) => handleCompanyFormChange('emailDomain', value)}
+                placeholder="company.com"
+              />
+              <Input
+                label="HR full name"
+                value={companyForm.hrFullName}
+                onChange={(value) => handleCompanyFormChange('hrFullName', value)}
+                placeholder="Nguyen Van A"
+              />
+              <Input
+                type="email"
+                label="HR email"
+                value={companyForm.hrEmail}
+                onChange={(value) => handleCompanyFormChange('hrEmail', value)}
+                placeholder="hr@company.com"
+              />
+              <Input
+                label="Timezone"
+                value={companyForm.timezone}
+                onChange={(value) => handleCompanyFormChange('timezone', value)}
+              />
+              <Input
+                label="Language"
+                value={companyForm.language}
+                onChange={(value) => handleCompanyFormChange('language', value)}
+              />
+            </div>
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={companyForm.allowExternalHrEmail}
+                onChange={(event) => handleCompanyFormChange('allowExternalHrEmail', event.target.checked)}
+                className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-900">Allow external HR email</span>
+                <span className="mt-1 block text-sm text-slate-500">Use this only when the first HR invite needs a temporary external address.</span>
+              </span>
+            </label>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCompanyDialogMode(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={companySubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {companySubmitting ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                Create company
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+
+      {companyDialogMode === 'edit' ? (
+        <AdminDialog
+          title="Update Company"
+          description="Edit tenant profile details without leaving the directory."
+          icon={Building2}
+          onClose={handleCancelEditCompany}
+        >
+          <form onSubmit={handleUpdateCompany} className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input label="Company name" value={editCompanyForm.name} onChange={(value) => handleEditCompanyFormChange('name', value)} />
+              <Input label="Domain" value={editCompanyForm.domain} onChange={(value) => handleEditCompanyFormChange('domain', value)} />
+              <Input label="Logo URL" value={editCompanyForm.logoUrl} onChange={(value) => handleEditCompanyFormChange('logoUrl', value)} />
+              <Input label="Timezone" value={editCompanyForm.timezone} onChange={(value) => handleEditCompanyFormChange('timezone', value)} />
+              <Input label="Language" value={editCompanyForm.language} onChange={(value) => handleEditCompanyFormChange('language', value)} />
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelEditCompany}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={companyUpdating}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {companyUpdating ? <Loader2 className="size-4 animate-spin" /> : <Building2 className="size-4" />}
+                Update company
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+
+      {companyActionDialog?.company ? (
+        <AdminDialog
+          title={companyActionDialog.action === 'delete' ? 'Delete Company' : `${companyActionDialog.company.isActive ? 'Deactivate' : 'Activate'} Company`}
+          description={
+            companyActionDialog.action === 'delete'
+              ? `This will soft-delete ${companyActionDialog.company.name} and hide it from active operations.`
+              : `${companyActionDialog.company.isActive ? 'Deactivate' : 'Activate'} ${companyActionDialog.company.name} for workspace access control.`
+          }
+          icon={companyActionDialog.action === 'delete' ? Trash2 : ShieldAlert}
+          onClose={() => setCompanyActionDialog(null)}
+        >
+          <div className="space-y-5">
+            <div className={`rounded-xl border px-4 py-3 text-sm ${
+              companyActionDialog.action === 'delete'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : companyActionDialog.company.isActive
+                  ? 'border-amber-200 bg-amber-50 text-amber-700'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            }`}>
+              {companyActionDialog.action === 'delete'
+                ? 'This action keeps historical records but removes the tenant from normal operations.'
+                : companyActionDialog.company.isActive
+                  ? 'Members will no longer be able to use this workspace while it is inactive.'
+                  : 'Members will regain access to this workspace after activation.'}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setCompanyActionDialog(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={companyActionDialog.action === 'delete' ? handleConfirmDeleteCompany : handleConfirmCompanyStatus}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                  companyActionDialog.action === 'delete'
+                    ? 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                    : companyActionDialog.company.isActive
+                      ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                {companyActionDialog.action === 'delete' ? <Trash2 className="size-4" /> : <ShieldAlert className="size-4" />}
+                {companyActionDialog.action === 'delete'
+                  ? 'Delete company'
+                  : companyActionDialog.company.isActive
+                    ? 'Deactivate company'
+                    : 'Activate company'}
+              </button>
+            </div>
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {moderationDialog ? (
+        <AdminDialog
+          title="Moderation Action"
+          description={buildModerationDialogDescription(moderationDialog)}
+          icon={ShieldAlert}
+          onClose={() => setModerationDialog(null)}
+        >
+          <div className="space-y-5">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {buildModerationImpactText(moderationDialog)}
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Reason</span>
+              <textarea
+                value={moderationReason}
+                onChange={(event) => setModerationReason(event.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Enter moderation reason"
+              />
+            </label>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setModerationDialog(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleModerationAction}
+                disabled={moderationLoading}
+                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+              >
+                {moderationLoading ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
+                {getModerationActionLabel(moderationDialog)}
+              </button>
+            </div>
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {subscriptionPlanDialogMode ? (
+        <AdminDialog
+          title={subscriptionPlanDialogMode === 'edit' ? 'Edit Subscription Plan' : 'Create Subscription Plan'}
+          description="Maintain the reusable plan catalog that companies can be assigned to."
+          icon={CreditCard}
+          onClose={closeSubscriptionPlanDialog}
+        >
+          <form onSubmit={handleSaveSubscriptionPlan} className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Plan name"
+                value={subscriptionPlanForm.name}
+                onChange={(value) => handleSubscriptionPlanFormChange('name', value)}
+                placeholder="Enterprise"
+              />
+              <Select
+                label="Billing cycle"
+                value={subscriptionPlanForm.billingCycle}
+                onChange={(value) => handleSubscriptionPlanFormChange('billingCycle', value)}
+                options={[
+                  { value: 'Monthly', label: 'Monthly' },
+                  { value: 'Yearly', label: 'Yearly' },
+                ]}
+              />
+              <Input
+                type="number"
+                label="Max users"
+                value={subscriptionPlanForm.maxUsers}
+                onChange={(value) => handleSubscriptionPlanFormChange('maxUsers', value)}
+              />
+              <Input
+                type="number"
+                label="Storage quota (GB)"
+                value={subscriptionPlanForm.storageQuotaGb}
+                onChange={(value) => handleSubscriptionPlanFormChange('storageQuotaGb', value)}
+              />
+              <Input
+                type="number"
+                label="Price per user"
+                value={subscriptionPlanForm.pricePerUser}
+                onChange={(value) => handleSubscriptionPlanFormChange('pricePerUser', value)}
+              />
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={subscriptionPlanForm.isActive}
+                  onChange={(event) => handleSubscriptionPlanFormChange('isActive', event.target.checked)}
+                  className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">Plan is active</span>
+                  <span className="mt-1 block text-sm text-slate-500">Inactive plans remain in history but cannot be assigned to new company subscriptions.</span>
+                </span>
+              </label>
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeSubscriptionPlanDialog}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={subscriptionPlanSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {subscriptionPlanSubmitting ? <Loader2 className="size-4 animate-spin" /> : <BadgeDollarSign className="size-4" />}
+                {subscriptionPlanDialogMode === 'edit' ? 'Save plan' : 'Create plan'}
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+
+      {subscriptionPlanActionDialog ? (
+        <AdminDialog
+          title={subscriptionPlanActionDialog.plan?.isActive ? 'Archive Subscription Plan' : 'Delete Subscription Plan'}
+          description={subscriptionPlanActionDialog.plan?.name || 'Subscription plan'}
+          icon={CreditCard}
+          onClose={() => setSubscriptionPlanActionDialog(null)}
+        >
+          <div className="space-y-5">
+            <div className={`rounded-xl border px-4 py-3 text-sm ${
+              subscriptionPlanActionDialog.plan?.isActive
+                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                : 'border-rose-200 bg-rose-50 text-rose-700'
+            }`}>
+              {subscriptionPlanActionDialog.plan?.isActive
+                ? 'If the plan is already used by companies, it will be made inactive so history stays intact.'
+                : 'This removes the inactive plan from normal admin views.'}
+            </div>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setSubscriptionPlanActionDialog(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSubscriptionPlan}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                  subscriptionPlanActionDialog.plan?.isActive
+                    ? 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                    : 'border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                }`}
+              >
+                <Trash2 className="size-4" />
+                {subscriptionPlanActionDialog.plan?.isActive ? 'Archive plan' : 'Delete plan'}
+              </button>
+            </div>
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {subscriptionCompany ? (
+        <AdminDialog
+          title="Manage Subscription"
+          description={`${subscriptionCompany.name} · ${subscriptionCompany.subscriptionPlanName || 'Unassigned'}`}
+          icon={CreditCard}
+          onClose={() => setSubscriptionCompanyId('')}
+        >
+          <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-900">{subscriptionCompany.name}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {subscriptionCompany.memberCount} users · {formatBytes(subscriptionCompany.storageUsedBytes)} used
+              {subscriptionCompany.storageQuotaGb ? ` / ${subscriptionCompany.storageQuotaGb} GB` : ''}
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Select
+              label="Plan"
+              value={subscriptionDraft.subscriptionPlanId || ''}
+              onChange={(value) => handleSubscriptionDraftChange(subscriptionCompany.id, 'subscriptionPlanId', value)}
+              options={plans.map((plan) => ({ value: plan.id, label: `${plan.name} · $${plan.pricePerUser}/${plan.billingCycle.toLowerCase()}` }))}
+            />
+            <Select
+              label="Status"
+              value={subscriptionDraft.status || 'Active'}
+              onChange={(value) => handleSubscriptionDraftChange(subscriptionCompany.id, 'status', value)}
+              options={[
+                { value: 'Trial', label: 'Trial' },
+                { value: 'Active', label: 'Active' },
+                { value: 'PastDue', label: 'Past Due' },
+                { value: 'Cancelled', label: 'Cancelled' },
+                { value: 'Expired', label: 'Expired' },
+              ]}
+            />
+            <Input
+              type="date"
+              label="Period Start"
+              value={toDateInputValue(subscriptionDraft.currentPeriodStart)}
+              onChange={(value) => handleSubscriptionDraftChange(subscriptionCompany.id, 'currentPeriodStart', value)}
+            />
+            <Input
+              type="date"
+              label="Period End"
+              value={toDateInputValue(subscriptionDraft.currentPeriodEnd)}
+              onChange={(value) => handleSubscriptionDraftChange(subscriptionCompany.id, 'currentPeriodEnd', value)}
+            />
+            <Input
+              type="date"
+              label="Trial Ends"
+              value={toDateInputValue(subscriptionDraft.trialEndsAt)}
+              onChange={(value) => handleSubscriptionDraftChange(subscriptionCompany.id, 'trialEndsAt', value)}
+            />
+          </div>
+          <div className="mt-5 flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setSubscriptionCompanyId('')}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAssignSubscription(subscriptionCompany.id)}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105"
+            >
+              <BadgeDollarSign className="size-4" />
+              Apply subscription
+            </button>
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {platformDialogOpen ? (
+        <AdminDialog
+          title="Edit Platform Settings"
+          description="Update global runtime policy used by the admin platform."
+          icon={Cog}
+          onClose={() => setPlatformDialogOpen(false)}
+          size="max-w-3xl"
+        >
+          <form onSubmit={handleSavePlatformSettings} className="grid gap-4 md:grid-cols-2">
+            <Input
+              type="number"
+              label="Invite expiry days"
+              value={platformForm.inviteExpiryDays}
+              onChange={(value) => handlePlatformFormChange('inviteExpiryDays', value)}
+            />
+            <Input
+              type="number"
+              label="Refresh token days"
+              value={platformForm.refreshTokenDays}
+              onChange={(value) => handlePlatformFormChange('refreshTokenDays', value)}
+            />
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
+              <input
+                type="checkbox"
+                checked={platformForm.maintenanceMode}
+                onChange={(event) => handlePlatformFormChange('maintenanceMode', event.target.checked)}
+                className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-slate-900">Maintenance mode</span>
+                <span className="mt-1 block text-sm text-slate-500">Stores the global maintenance flag for the platform shell and future middleware.</span>
+              </span>
+            </label>
+            <div className="md:col-span-2">
+              <Input
+                label="System-wide banner"
+                value={platformForm.systemBanner}
+                onChange={(value) => handlePlatformFormChange('systemBanner', value)}
+                placeholder="Optional platform announcement"
+              />
+            </div>
+            <label className="block md:col-span-2">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Frontend origins</span>
+              <textarea
+                value={platformForm.frontendUrlsText}
+                onChange={(event) => handlePlatformFormChange('frontendUrlsText', event.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="One URL per line"
+              />
+            </label>
+            <div className="flex flex-wrap justify-end gap-3 md:col-span-2">
+              <button
+                type="button"
+                onClick={() => setPlatformDialogOpen(false)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={platformSaving}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {platformSaving ? <Loader2 className="size-4 animate-spin" /> : <Cog className="size-4" />}
+                Save settings
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+    </div>
+  );
+}
+
+function AdminDialog({ title, description, icon: Icon, children, onClose, size = 'max-w-2xl' }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+      <div className={`max-h-[88vh] w-full ${size} overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl`}>
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl border border-primary/15 bg-primary/10 p-3 text-primary">
+              <Icon className="size-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+              <p className="mt-1 text-sm text-slate-500">{description}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            aria-label="Close dialog"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="max-h-[calc(88vh-92px)] overflow-y-auto px-5 py-5">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1644,6 +2473,122 @@ function EmptyState({ label }) {
   return <div className="px-5 py-8 text-sm text-slate-500">{label}</div>;
 }
 
+function getAdminTabFromPath(pathname) {
+  if (pathname.startsWith('/admin/companies')) {
+    return 'companies';
+  }
+
+  if (pathname.startsWith('/admin/subscriptions')) {
+    return 'subscriptions';
+  }
+
+  if (pathname.startsWith('/admin/audit')) {
+    return 'audit';
+  }
+
+  if (pathname.startsWith('/admin/moderation')) {
+    return 'moderation';
+  }
+
+  if (pathname.startsWith('/admin/platform')) {
+    return 'platform';
+  }
+
+  return 'overview';
+}
+
+function buildModerationDialogDescription(item) {
+  if (item.targetType === 'AppUser') {
+    return `Lock the selected user account for ${item.companyName || 'this workspace'}.`;
+  }
+
+  if (item.targetType === 'Resource') {
+    return `Remove the reported resource from ${item.companyName || 'the platform'}.`;
+  }
+
+  if (item.targetType === 'TrainingEvent') {
+    return `Cancel and remove the reported training event from ${item.companyName || 'the platform'}.`;
+  }
+
+  return 'Apply a system-level moderation action to the selected item.';
+}
+
+function buildModerationImpactText(item) {
+  if (item.targetType === 'AppUser') {
+    return 'This will disable the user account and revoke active sessions.';
+  }
+
+  if (item.targetType === 'Resource') {
+    return 'This will soft-delete the resource so it no longer appears in normal flows.';
+  }
+
+  if (item.targetType === 'TrainingEvent') {
+    return 'This will cancel the event and mark it as deleted from active scheduling.';
+  }
+
+  return 'This action will be recorded in the audit log.';
+}
+
+function getModerationActionLabel(item) {
+  if (!item?.targetId) {
+    return 'No direct action';
+  }
+
+  if (item.targetType === 'AppUser') {
+    return 'Lock user';
+  }
+
+  if (item.targetType === 'Resource') {
+    return 'Remove resource';
+  }
+
+  if (item.targetType === 'TrainingEvent') {
+    return 'Cancel event';
+  }
+
+  return 'Apply action';
+}
+
+function buildAuditQuery(filters) {
+  return Object.fromEntries(
+    Object.entries(filters)
+      .filter(([, value]) => value !== '' && value !== null && value !== undefined)
+      .map(([key, value]) => [key, value]),
+  );
+}
+
+function buildPlatformForm(settings = {}) {
+  return {
+    inviteExpiryDays: settings?.inviteExpiryDays || 7,
+    refreshTokenDays: settings?.refreshTokenDays || 7,
+    maintenanceMode: Boolean(settings?.maintenanceMode),
+    systemBanner: settings?.systemBanner || '',
+    frontendUrlsText: (settings?.frontendUrls || []).join('\n'),
+  };
+}
+
+function parsePlatformForm(form) {
+  return {
+    inviteExpiryDays: Number(form.inviteExpiryDays) || 7,
+    refreshTokenDays: Number(form.refreshTokenDays) || 7,
+    maintenanceMode: Boolean(form.maintenanceMode),
+    systemBanner: form.systemBanner || null,
+    frontendUrls: form.frontendUrlsText
+      .split(/\r?\n/)
+      .map((item) => item.trim())
+      .filter(Boolean),
+  };
+}
+
+function downloadBlob(blob, fileName) {
+  const url = window.URL.createObjectURL(new Blob([blob]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
 function buildSubscriptionDrafts(companies, plans) {
   const fallbackPlanId = plans[0]?.id || '';
   return Object.fromEntries(
@@ -1657,6 +2602,19 @@ function buildSubscriptionDrafts(companies, plans) {
         trialEndsAt: '',
       },
     ]),
+  );
+}
+
+function AuditResultBadge({ result }) {
+  const normalized = String(result || 'SUCCESS').toUpperCase();
+  const classes = normalized === 'FAILED'
+    ? 'border-rose-200 bg-rose-50 text-rose-700'
+    : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${classes}`}>
+      {normalized}
+    </span>
   );
 }
 
@@ -1782,6 +2740,18 @@ function formatPercent(value) {
 
 function formatDecimal(value) {
   return Number.isFinite(value) ? value.toFixed(value >= 10 ? 0 : 1) : '0';
+}
+
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (bytes <= 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const scaled = bytes / (1024 ** index);
+  return `${formatDecimal(scaled)} ${units[index]}`;
 }
 
 function findPlanIdByName(plans, planName) {

@@ -3,6 +3,7 @@ using System;
 using InnerG.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace InnerG.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260602154129_UpdateModel")]
+    partial class UpdateModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -64,7 +67,7 @@ namespace InnerG.Api.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("CompanyId")
+                    b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -216,10 +219,6 @@ namespace InnerG.Api.Migrations
                     b.Property<string>("OldValueJson")
                         .HasColumnType("jsonb");
 
-                    b.Property<string>("Result")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -233,7 +232,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Badge", b =>
@@ -278,7 +277,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("CompanyId");
 
-                    b.ToTable("Badges", (string)null);
+                    b.ToTable("Badges");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Company", b =>
@@ -327,7 +326,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Companies", (string)null);
+                    b.ToTable("Companies");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.CompanySubscription", b =>
@@ -376,7 +375,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("CompanyId", "Status");
 
-                    b.ToTable("CompanySubscriptions", (string)null);
+                    b.ToTable("CompanySubscriptions");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Department", b =>
@@ -420,7 +419,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Enrollment", b =>
@@ -471,7 +470,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("Enrollments", (string)null);
+                    b.ToTable("Enrollments");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Feedback", b =>
@@ -531,7 +530,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("Feedbacks", (string)null);
+                    b.ToTable("Feedbacks");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.FeedbackCriteria", b =>
@@ -581,7 +580,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.ToTable("FeedbackCriteria", (string)null);
+                    b.ToTable("FeedbackCriteria");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.FeedbackResponse", b =>
@@ -614,7 +613,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("FeedbackId");
 
-                    b.ToTable("FeedbackResponses", (string)null);
+                    b.ToTable("FeedbackResponses");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.InnerGPointsLedger", b =>
@@ -668,7 +667,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("InnerGPointsLedger", (string)null);
+                    b.ToTable("InnerGPointsLedger");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Invite", b =>
@@ -807,7 +806,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("LeaderboardSnapshots", (string)null);
+                    b.ToTable("LeaderboardSnapshots");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.LearningWishlist", b =>
@@ -880,7 +879,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("LearningWishlists", (string)null);
+                    b.ToTable("LearningWishlists");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.MeetingRoom", b =>
@@ -919,7 +918,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MeetingRooms", (string)null);
+                    b.ToTable("MeetingRooms");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Notification", b =>
@@ -972,7 +971,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.NotificationPreference", b =>
@@ -1010,7 +1009,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("NotificationPreferences", (string)null);
+                    b.ToTable("NotificationPreferences");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.PointRule", b =>
@@ -1068,7 +1067,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.ToTable("PointRules", (string)null);
+                    b.ToTable("PointRules");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Resource", b =>
@@ -1120,7 +1119,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("TrainingEventId");
 
-                    b.ToTable("Resources", (string)null);
+                    b.ToTable("Resources");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.ResourceDepartmentAccess", b =>
@@ -1150,7 +1149,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("ResourceId");
 
-                    b.ToTable("ResourceDepartmentAccess", (string)null);
+                    b.ToTable("ResourceDepartmentAccess");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Reward", b =>
@@ -1201,7 +1200,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("Rewards", (string)null);
+                    b.ToTable("Rewards");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.SessionAttendance", b =>
@@ -1246,7 +1245,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("SessionAttendances", (string)null);
+                    b.ToTable("SessionAttendances");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Skill", b =>
@@ -1295,7 +1294,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("Skills", (string)null);
+                    b.ToTable("Skills");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.SkillAssessment", b =>
@@ -1344,7 +1343,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId", "SkillId", "Period");
 
-                    b.ToTable("SkillAssessments", (string)null);
+                    b.ToTable("SkillAssessments");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.SubscriptionPlan", b =>
@@ -1384,7 +1383,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("SubscriptionPlans", (string)null);
+                    b.ToTable("SubscriptionPlans");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.Trainer", b =>
@@ -1458,7 +1457,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"UserId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
-                    b.ToTable("Trainers", (string)null);
+                    b.ToTable("Trainers");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainerInvitation", b =>
@@ -1517,7 +1516,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("TrainingEventId");
 
-                    b.ToTable("TrainerInvitations", (string)null);
+                    b.ToTable("TrainerInvitations");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainerSkill", b =>
@@ -1553,7 +1552,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("TrainerSkills", (string)null);
+                    b.ToTable("TrainerSkills");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainingEvent", b =>
@@ -1623,7 +1622,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("TrainerId");
 
-                    b.ToTable("TrainingEvents", (string)null);
+                    b.ToTable("TrainingEvents");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainingEventTargetDepartment", b =>
@@ -1654,7 +1653,7 @@ namespace InnerG.Api.Migrations
                     b.HasIndex("TrainingEventId", "DepartmentId")
                         .IsUnique();
 
-                    b.ToTable("TrainingEventTargetDepartments", (string)null);
+                    b.ToTable("TrainingEventTargetDepartments");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.TrainingSession", b =>
@@ -1704,7 +1703,7 @@ namespace InnerG.Api.Migrations
                     b.HasIndex("MeetingRoomId", "StartTime", "EndTime")
                         .HasFilter("\"MeetingRoomId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
-                    b.ToTable("TrainingSessions", (string)null);
+                    b.ToTable("TrainingSessions");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.UserBadge", b =>
@@ -1738,7 +1737,7 @@ namespace InnerG.Api.Migrations
                     b.HasIndex("UserId", "BadgeId")
                         .IsUnique();
 
-                    b.ToTable("UserBadges", (string)null);
+                    b.ToTable("UserBadges");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.UserIntegration", b =>
@@ -1791,7 +1790,7 @@ namespace InnerG.Api.Migrations
                     b.HasIndex("UserId", "Provider")
                         .IsUnique();
 
-                    b.ToTable("UserIntegrations", (string)null);
+                    b.ToTable("UserIntegrations");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.UserReward", b =>
@@ -1840,7 +1839,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserRewards", (string)null);
+                    b.ToTable("UserRewards");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.UserSession", b =>
@@ -1943,7 +1942,7 @@ namespace InnerG.Api.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.ToTable("UserSkills", (string)null);
+                    b.ToTable("UserSkills");
                 });
 
             modelBuilder.Entity("InnerG.Api.Models.WishlistVote", b =>
@@ -1973,7 +1972,7 @@ namespace InnerG.Api.Migrations
 
                     b.HasIndex("WishlistId");
 
-                    b.ToTable("WishlistVotes", (string)null);
+                    b.ToTable("WishlistVotes");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -2083,7 +2082,9 @@ namespace InnerG.Api.Migrations
                 {
                     b.HasOne("InnerG.Api.Models.Company", "Company")
                         .WithMany("Users")
-                        .HasForeignKey("CompanyId");
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("InnerG.Api.Models.Department", "Department")
                         .WithMany("Users")
@@ -2362,7 +2363,7 @@ namespace InnerG.Api.Migrations
             modelBuilder.Entity("InnerG.Api.Models.Resource", b =>
                 {
                     b.HasOne("InnerG.Api.Models.TrainingEvent", "TrainingEvent")
-                        .WithMany("Resources")
+                        .WithMany()
                         .HasForeignKey("TrainingEventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -2817,8 +2818,6 @@ namespace InnerG.Api.Migrations
             modelBuilder.Entity("InnerG.Api.Models.TrainingEvent", b =>
                 {
                     b.Navigation("Enrollments");
-
-                    b.Navigation("Resources");
 
                     b.Navigation("Sessions");
 

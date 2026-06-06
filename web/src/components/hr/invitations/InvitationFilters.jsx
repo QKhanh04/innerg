@@ -1,14 +1,7 @@
 import React from 'react';
 import { Search, Filter } from 'lucide-react';
 
-interface Props {
-    search: string;
-    status: string;
-    onSearchChange: (v: string) => void;
-    onStatusChange: (v: string) => void;
-}
-
-export default function InvitationFilters({ search, status, onSearchChange, onStatusChange }: Props) {
+export default function InvitationFilters({ search, status, onSearchChange, onStatusChange }) {
     return (
         <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
             <div className="relative w-full md:max-w-md">

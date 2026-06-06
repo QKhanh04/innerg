@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using InnerG.Api.Data;
 using InnerG.Api.DTOs;
 using InnerG.Api.Exceptions;
@@ -18,11 +20,13 @@ namespace InnerG.Api.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _environment;
 
-        public AdminController(AppDbContext context, IConfiguration configuration)
+        public AdminController(AppDbContext context, IConfiguration configuration, IWebHostEnvironment environment)
         {
             _context = context;
             _configuration = configuration;
+            _environment = environment;
         }
 
         [HttpGet("overview")]
@@ -36,6 +40,12 @@ namespace InnerG.Api.Controllers
             {
                 TotalCompanies = companies.Count,
                 ActiveCompanies = companies.Count(x => x.IsActive),
+                TotalUsers = await _context.Users.IgnoreQueryFilters().CountAsync(x => x.DeletedAt == null),
+                EventsThisMonth = await CountEventsThisMonthAsync(),
+                TotalStorageBytes = companies.Sum(x => x.StorageUsedBytes),
+                TotalStorageQuotaGb = companies.Sum(x => x.StorageQuotaGb ?? 0),
+                PlatformStorageUsedPercent = CalculatePlatformStorageUsedPercent(companies),
+                AverageRetentionRate = companies.Count == 0 ? 0 : companies.Average(x => x.RetentionRate),
                 PendingInvites = await _context.Invites.IgnoreQueryFilters().CountAsync(x => x.Status == InviteStatus.Pending),
                 ActiveSubscriptions = await _context.CompanySubscriptions.IgnoreQueryFilters().CountAsync(x => x.Status == SubscriptionStatus.Active),
                 ActiveSessions = await _context.UserSessions.IgnoreQueryFilters().CountAsync(x => x.IsActive && x.RevokedAt == null && x.ExpiresAt > DateTime.UtcNow),
@@ -207,6 +217,7 @@ namespace InnerG.Api.Controllers
         public async Task<IActionResult> GetSubscriptionPlansAsync()
         {
             var plans = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .Where(x => x.DeletedAt == null)
                 .OrderBy(x => x.PricePerUser)
                 .Select(x => new SubscriptionPlanResponse
                 {
@@ -223,6 +234,146 @@ namespace InnerG.Api.Controllers
             return Ok(plans);
         }
 
+        [HttpPost("subscription-plans")]
+        public async Task<IActionResult> CreateSubscriptionPlanAsync([FromBody] UpsertSubscriptionPlanRequest request)
+        {
+            ValidateSubscriptionPlanRequest(request);
+
+            var normalizedName = request.Name.Trim();
+            var nameExists = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .AnyAsync(x => x.DeletedAt == null && x.Name.ToLower() == normalizedName.ToLower());
+
+            if (nameExists)
+                throw new ConflictException("Subscription plan name already exists");
+
+            var plan = new SubscriptionPlan
+            {
+                Name = normalizedName,
+                MaxUsers = request.MaxUsers,
+                StorageQuotaGb = request.StorageQuotaGb,
+                PricePerUser = request.PricePerUser,
+                BillingCycle = request.BillingCycle,
+                IsActive = request.IsActive
+            };
+
+            _context.SubscriptionPlans.Add(plan);
+
+            await AddAuditLogAsync(
+                Guid.Empty,
+                "SubscriptionPlan",
+                plan.Id,
+                "Create",
+                null,
+                new
+                {
+                    plan.Name,
+                    plan.MaxUsers,
+                    plan.StorageQuotaGb,
+                    plan.PricePerUser,
+                    plan.BillingCycle,
+                    plan.IsActive
+                });
+
+            await _context.SaveChangesAsync();
+            return StatusCode(StatusCodes.Status201Created, ToSubscriptionPlanResponse(plan));
+        }
+
+        [HttpPatch("subscription-plans/{planId:guid}")]
+        public async Task<IActionResult> UpdateSubscriptionPlanAsync(Guid planId, [FromBody] UpsertSubscriptionPlanRequest request)
+        {
+            ValidateSubscriptionPlanRequest(request);
+
+            var plan = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == planId && x.DeletedAt == null)
+                ?? throw new NotFoundException("Subscription plan not found");
+
+            var normalizedName = request.Name.Trim();
+            var nameExists = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .AnyAsync(x => x.Id != planId && x.DeletedAt == null && x.Name.ToLower() == normalizedName.ToLower());
+
+            if (nameExists)
+                throw new ConflictException("Subscription plan name already exists");
+
+            var oldValue = new
+            {
+                plan.Name,
+                plan.MaxUsers,
+                plan.StorageQuotaGb,
+                plan.PricePerUser,
+                plan.BillingCycle,
+                plan.IsActive
+            };
+
+            plan.Name = normalizedName;
+            plan.MaxUsers = request.MaxUsers;
+            plan.StorageQuotaGb = request.StorageQuotaGb;
+            plan.PricePerUser = request.PricePerUser;
+            plan.BillingCycle = request.BillingCycle;
+            plan.IsActive = request.IsActive;
+            plan.UpdatedAt = DateTime.UtcNow;
+
+            await AddAuditLogAsync(
+                Guid.Empty,
+                "SubscriptionPlan",
+                plan.Id,
+                "Update",
+                oldValue,
+                new
+                {
+                    plan.Name,
+                    plan.MaxUsers,
+                    plan.StorageQuotaGb,
+                    plan.PricePerUser,
+                    plan.BillingCycle,
+                    plan.IsActive
+                });
+
+            await _context.SaveChangesAsync();
+            return Ok(ToSubscriptionPlanResponse(plan));
+        }
+
+        [HttpDelete("subscription-plans/{planId:guid}")]
+        public async Task<IActionResult> DeleteSubscriptionPlanAsync(Guid planId)
+        {
+            var plan = await _context.SubscriptionPlans.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == planId && x.DeletedAt == null)
+                ?? throw new NotFoundException("Subscription plan not found");
+
+            var inUse = await _context.CompanySubscriptions.IgnoreQueryFilters()
+                .AnyAsync(x => x.SubscriptionPlanId == planId && x.CancelledAt == null && x.DeletedAt == null);
+
+            if (inUse)
+            {
+                plan.IsActive = false;
+                plan.UpdatedAt = DateTime.UtcNow;
+
+                await AddAuditLogAsync(
+                    Guid.Empty,
+                    "SubscriptionPlan",
+                    plan.Id,
+                    "Deactivate",
+                    new { plan.IsActive },
+                    new { plan.IsActive, Reason = "Plan is still assigned to active subscriptions" });
+            }
+            else
+            {
+                plan.IsActive = false;
+                plan.DeletedAt = DateTime.UtcNow;
+                plan.UpdatedAt = DateTime.UtcNow;
+
+                await AddAuditLogAsync(
+                    Guid.Empty,
+                    "SubscriptionPlan",
+                    plan.Id,
+                    "Delete",
+                    new { plan.Name, plan.IsActive, plan.DeletedAt },
+                    new { plan.Name, plan.IsActive, plan.DeletedAt });
+            }
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
         [HttpPost("companies/{companyId:guid}/subscription")]
         public async Task<IActionResult> AssignSubscriptionAsync(Guid companyId, [FromBody] AssignSubscriptionRequest request)
         {
@@ -234,7 +385,11 @@ namespace InnerG.Api.Controllers
                 .FirstOrDefaultAsync(x => x.Id == request.SubscriptionPlanId && x.IsActive)
                 ?? throw new NotFoundException("Subscription plan not found");
 
-            if (request.CurrentPeriodEnd <= request.CurrentPeriodStart)
+            var currentPeriodStart = EnsureUtc(request.CurrentPeriodStart);
+            var currentPeriodEnd = EnsureUtc(request.CurrentPeriodEnd);
+            var trialEndsAt = EnsureUtc(request.TrialEndsAt);
+
+            if (currentPeriodEnd <= currentPeriodStart)
                 throw new BadRequestException("Subscription period end must be after period start");
 
             var subscription = await _context.CompanySubscriptions.IgnoreQueryFilters()
@@ -250,9 +405,9 @@ namespace InnerG.Api.Controllers
                     SubscriptionPlanId = plan.Id,
                     Status = request.Status,
                     StartedAt = DateTime.UtcNow,
-                    TrialEndsAt = request.TrialEndsAt,
-                    CurrentPeriodStart = request.CurrentPeriodStart,
-                    CurrentPeriodEnd = request.CurrentPeriodEnd
+                    TrialEndsAt = trialEndsAt,
+                    CurrentPeriodStart = currentPeriodStart,
+                    CurrentPeriodEnd = currentPeriodEnd
                 };
                 _context.CompanySubscriptions.Add(subscription);
             }
@@ -270,9 +425,9 @@ namespace InnerG.Api.Controllers
 
                 subscription.SubscriptionPlanId = plan.Id;
                 subscription.Status = request.Status;
-                subscription.CurrentPeriodStart = request.CurrentPeriodStart;
-                subscription.CurrentPeriodEnd = request.CurrentPeriodEnd;
-                subscription.TrialEndsAt = request.TrialEndsAt;
+                subscription.CurrentPeriodStart = currentPeriodStart;
+                subscription.CurrentPeriodEnd = currentPeriodEnd;
+                subscription.TrialEndsAt = trialEndsAt;
                 subscription.CancelledAt = request.Status == SubscriptionStatus.Cancelled ? DateTime.UtcNow : null;
             }
 
@@ -297,16 +452,234 @@ namespace InnerG.Api.Controllers
         }
 
         [HttpGet("audit-logs")]
-        public async Task<IActionResult> GetAuditLogsAsync([FromQuery] int take = 50, [FromQuery] Guid? companyId = null)
+        public async Task<IActionResult> GetAuditLogsAsync([FromQuery] AdminAuditLogQuery query)
         {
-            take = Math.Clamp(take, 1, 100);
-            return Ok(await GetRecentActivityInternalAsync(take, companyId));
+            query.Take = Math.Clamp(query.Take, 1, 200);
+            return Ok(await GetRecentActivityInternalAsync(query));
+        }
+
+        [HttpGet("audit-logs/export")]
+        public async Task<IActionResult> ExportAuditLogsAsync([FromQuery] AdminAuditLogQuery query)
+        {
+            query.Take = Math.Clamp(query.Take <= 0 ? 1000 : query.Take, 1, 5000);
+            var logs = await GetRecentActivityInternalAsync(query);
+
+            var csv = new StringBuilder();
+            csv.AppendLine("Id,Company,ActorEmail,Action,Result,EntityType,EntityId,IpAddress,CreatedAt,Summary");
+            foreach (var log in logs)
+            {
+                csv.AppendLine(string.Join(",",
+                    EscapeCsv(log.Id.ToString()),
+                    EscapeCsv(log.CompanyName),
+                    EscapeCsv(log.UserEmail),
+                    EscapeCsv(log.Action),
+                    EscapeCsv(log.Result),
+                    EscapeCsv(log.EntityType),
+                    EscapeCsv(log.EntityId?.ToString()),
+                    EscapeCsv(log.IpAddress),
+                    EscapeCsv(log.CreatedAt.ToString("O")),
+                    EscapeCsv(log.Summary)));
+            }
+
+            return File(Encoding.UTF8.GetBytes(csv.ToString()), "text/csv", "admin-audit-logs.csv");
+        }
+
+        [HttpGet("moderation")]
+        public async Task<IActionResult> GetModerationQueueAsync()
+        {
+            var logs = await _context.AuditLogs.IgnoreQueryFilters()
+                .Include(x => x.User)
+                .Where(x =>
+                    x.Action.ToLower().Contains("report") ||
+                    x.Action.ToLower().Contains("reject") ||
+                    x.Action.ToLower().Contains("violation") ||
+                    x.Action.ToLower().Contains("flag"))
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(50)
+                .Select(x => new AdminModerationItemResponse
+                {
+                    Id = x.Id,
+                    CompanyId = x.CompanyId,
+                    Source = "Audit",
+                    TargetType = x.EntityType,
+                    TargetId = x.EntityId,
+                    Title = x.Action,
+                    ReporterName = x.User.FullName,
+                    Status = "Needs Review",
+                    CreatedAt = x.CreatedAt,
+                    Summary = x.NewValueJson
+                })
+                .ToListAsync();
+
+            var pendingEvents = await _context.TrainingEvents.IgnoreQueryFilters()
+                .Where(x => x.DeletedAt == null && x.Status == TrainingEventStatus.PendingApproval)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(20)
+                .Select(x => new AdminModerationItemResponse
+                {
+                    Id = x.Id,
+                    CompanyId = x.CompanyId,
+                    Source = "TrainingEvent",
+                    TargetType = "TrainingEvent",
+                    TargetId = x.Id,
+                    Title = x.Title,
+                    ReporterName = "System",
+                    Status = "Pending Approval",
+                    CreatedAt = x.CreatedAt,
+                    Summary = x.Description
+                })
+                .ToListAsync();
+
+            var queue = logs.Concat(pendingEvents)
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(80)
+                .ToList();
+
+            var companyNames = await _context.Companies.IgnoreQueryFilters()
+                .Where(x => queue.Select(q => q.CompanyId).Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Name);
+
+            foreach (var item in queue)
+            {
+                if (companyNames.TryGetValue(item.CompanyId, out var companyName))
+                    item.CompanyName = companyName;
+            }
+
+            return Ok(queue);
+        }
+
+        [HttpPost("moderation/users/{userId:guid}/lock")]
+        public async Task<IActionResult> LockUserAsync(Guid userId, [FromBody] AdminModerationActionRequest request)
+        {
+            var user = await _context.Users.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == userId && x.DeletedAt == null)
+                ?? throw new NotFoundException("User not found");
+
+            if (await _context.UserRoles
+                    .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
+                    .AnyAsync(x => x.UserId == userId && x.Name == AuthRoles.SystemAdmin))
+                throw new BadRequestException("System admin accounts cannot be locked through moderation");
+
+            var oldValue = new { user.IsActive };
+            user.IsActive = false;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var sessions = await _context.UserSessions.IgnoreQueryFilters()
+                .Where(x => x.UserId == userId && x.IsActive)
+                .ToListAsync();
+            foreach (var session in sessions)
+            {
+                session.IsActive = false;
+                session.RevokedAt = DateTime.UtcNow;
+            }
+
+            await AddAuditLogAsync(
+                user.CompanyId ?? Guid.Empty,
+                "AppUser",
+                user.Id,
+                "ModerationLockUser",
+                oldValue,
+                new { user.IsActive, request.Reason });
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpDelete("moderation/resources/{resourceId:guid}")]
+        public async Task<IActionResult> DeleteResourceForModerationAsync(Guid resourceId, [FromBody] AdminModerationActionRequest? request = null)
+        {
+            var resource = await _context.Resources.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == resourceId)
+                ?? throw new NotFoundException("Resource not found");
+
+            if (resource.DeletedAt != null)
+                return NoContent();
+
+            resource.DeletedAt = DateTime.UtcNow;
+            resource.UpdatedAt = DateTime.UtcNow;
+
+            await AddAuditLogAsync(
+                resource.CompanyId,
+                "Resource",
+                resource.Id,
+                "ModerationDeleteResource",
+                new { resource.Title, resource.DeletedAt },
+                new { resource.Title, resource.DeletedAt, request?.Reason });
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpDelete("moderation/events/{eventId:guid}")]
+        public async Task<IActionResult> DeleteEventForModerationAsync(Guid eventId, [FromBody] AdminModerationActionRequest? request = null)
+        {
+            var trainingEvent = await _context.TrainingEvents.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == eventId)
+                ?? throw new NotFoundException("Training event not found");
+
+            if (trainingEvent.DeletedAt != null)
+                return NoContent();
+
+            var oldValue = new { trainingEvent.Status, trainingEvent.DeletedAt };
+            trainingEvent.Status = TrainingEventStatus.Cancelled;
+            trainingEvent.DeletedAt = DateTime.UtcNow;
+            trainingEvent.UpdatedAt = DateTime.UtcNow;
+
+            await AddAuditLogAsync(
+                trainingEvent.CompanyId,
+                "TrainingEvent",
+                trainingEvent.Id,
+                "ModerationDeleteEvent",
+                oldValue,
+                new { trainingEvent.Status, trainingEvent.DeletedAt, request?.Reason });
+
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpPatch("platform-settings")]
+        public async Task<IActionResult> UpdatePlatformSettingsAsync([FromBody] UpdatePlatformSettingsRequest request)
+        {
+            if (request.InviteExpiryDays < 1)
+                throw new BadRequestException("Invite expiry days must be at least 1");
+            if (request.RefreshTokenDays < 1)
+                throw new BadRequestException("Refresh token days must be at least 1");
+
+            await UpdateAppSettingsJsonAsync(request);
+
+            await AddAuditLogAsync(
+                Guid.Empty,
+                "PlatformSettings",
+                null,
+                "Update",
+                BuildPlatformSettings(),
+                request);
+
+            await _context.SaveChangesAsync();
+            return Ok(new PlatformSettingsResponse
+            {
+                EnvironmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+                GoogleOAuthConfigured =
+                    !string.IsNullOrWhiteSpace(_configuration["GOOGLE_CLIENT_ID"]) &&
+                    !string.IsNullOrWhiteSpace(_configuration["GOOGLE_CLIENT_SECRET"]),
+                SmtpConfigured =
+                    !string.IsNullOrWhiteSpace(_configuration["SMTP_HOST"]) &&
+                    !string.IsNullOrWhiteSpace(_configuration["SMTP_USERNAME"]) &&
+                    !string.IsNullOrWhiteSpace(_configuration["SMTP_PASSWORD"]),
+                InviteExpiryDays = request.InviteExpiryDays,
+                RefreshTokenDays = request.RefreshTokenDays,
+                FrontendUrls = request.FrontendUrls,
+                MaintenanceMode = request.MaintenanceMode,
+                SystemBanner = request.SystemBanner
+            });
         }
 
         private async Task<List<AdminCompanyResponse>> GetCompaniesInternalAsync()
         {
             var mentorUserIds = await GetUserIdsForRoleAsync(AuthRoles.Mentor);
             var hrUserIds = await GetUserIdsForRoleAsync(AuthRoles.HR);
+            var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var retentionCutoff = DateTime.UtcNow.AddDays(-30);
 
             var companies = await _context.Companies.IgnoreQueryFilters()
                 .OrderByDescending(x => x.CreatedAt)
@@ -314,6 +687,10 @@ namespace InnerG.Api.Controllers
                 {
                     Company = x,
                     MemberCount = _context.Users.IgnoreQueryFilters().Count(u => u.CompanyId == x.Id && u.DeletedAt == null),
+                    ActiveMemberCount = _context.Users.IgnoreQueryFilters().Count(u => u.CompanyId == x.Id && u.DeletedAt == null && u.IsActive),
+                    RetainedMemberCount = _context.Users.IgnoreQueryFilters().Count(u => u.CompanyId == x.Id && u.DeletedAt == null && u.IsActive && u.LastLoginAt != null && u.LastLoginAt >= retentionCutoff),
+                    EventsThisMonth = _context.TrainingEvents.IgnoreQueryFilters().Count(e => e.CompanyId == x.Id && e.DeletedAt == null && e.StartDate >= monthStart),
+                    StorageUsedBytes = _context.Resources.IgnoreQueryFilters().Where(r => r.CompanyId == x.Id && r.DeletedAt == null).Sum(r => r.FileSizeBytes ?? 0),
                     PendingInviteCount = _context.Invites.IgnoreQueryFilters().Count(i => i.CompanyId == x.Id && i.Status == InviteStatus.Pending),
                     Subscription = _context.CompanySubscriptions.IgnoreQueryFilters()
                         .Include(s => s.SubscriptionPlan)
@@ -322,6 +699,8 @@ namespace InnerG.Api.Controllers
                         .Select(s => new
                         {
                             s.SubscriptionPlan.Name,
+                            s.SubscriptionPlan.MaxUsers,
+                            s.SubscriptionPlan.StorageQuotaGb,
                             s.Status,
                             s.CurrentPeriodEnd
                         })
@@ -343,6 +722,17 @@ namespace InnerG.Api.Controllers
                 MentorCount = _context.Users.IgnoreQueryFilters().Count(u => u.CompanyId == x.Company.Id && u.DeletedAt == null && mentorUserIds.Contains(u.Id)),
                 HrCount = _context.Users.IgnoreQueryFilters().Count(u => u.CompanyId == x.Company.Id && u.DeletedAt == null && hrUserIds.Contains(u.Id)),
                 PendingInviteCount = x.PendingInviteCount,
+                EventsThisMonth = x.EventsThisMonth,
+                StorageUsedBytes = x.StorageUsedBytes,
+                StorageQuotaGb = x.Subscription?.StorageQuotaGb,
+                StorageUsedPercent = CalculateStorageUsedPercent(x.StorageUsedBytes, x.Subscription?.StorageQuotaGb),
+                RetentionRate = x.ActiveMemberCount > 0 ? (double)x.RetainedMemberCount / x.ActiveMemberCount : 0,
+                IsNearPlanLimit =
+                    (x.Subscription != null && x.Subscription.MaxUsers > 0 && x.MemberCount >= x.Subscription.MaxUsers * 0.8) ||
+                    CalculateStorageUsedPercent(x.StorageUsedBytes, x.Subscription?.StorageQuotaGb) >= 80,
+                IsOverPlanLimit =
+                    (x.Subscription != null && x.Subscription.MaxUsers > 0 && x.MemberCount > x.Subscription.MaxUsers) ||
+                    CalculateStorageUsedPercent(x.StorageUsedBytes, x.Subscription?.StorageQuotaGb) >= 100,
                 SubscriptionPlanName = x.Subscription?.Name,
                 SubscriptionStatus = x.Subscription?.Status,
                 SubscriptionEndsAt = x.Subscription?.CurrentPeriodEnd,
@@ -369,9 +759,31 @@ namespace InnerG.Api.Controllers
 
         private async Task<List<AdminAuditLogResponse>> GetRecentActivityInternalAsync(int take, Guid? companyId = null)
         {
+            return await GetRecentActivityInternalAsync(new AdminAuditLogQuery { Take = take, CompanyId = companyId });
+        }
+
+        private async Task<List<AdminAuditLogResponse>> GetRecentActivityInternalAsync(AdminAuditLogQuery query)
+        {
+            var take = Math.Clamp(query.Take, 1, 5000);
             var auditQuery = _context.AuditLogs.IgnoreQueryFilters().AsQueryable();
-            if (companyId.HasValue)
-                auditQuery = auditQuery.Where(x => x.CompanyId == companyId.Value);
+            if (query.CompanyId.HasValue)
+                auditQuery = auditQuery.Where(x => x.CompanyId == query.CompanyId.Value);
+            if (query.ActorId.HasValue)
+                auditQuery = auditQuery.Where(x => x.UserId == query.ActorId.Value);
+            if (!string.IsNullOrWhiteSpace(query.Action))
+            {
+                var action = query.Action.Trim().ToLower();
+                auditQuery = auditQuery.Where(x => x.Action.ToLower().Contains(action));
+            }
+            if (!string.IsNullOrWhiteSpace(query.EntityType))
+            {
+                var entityType = query.EntityType.Trim().ToLower();
+                auditQuery = auditQuery.Where(x => x.EntityType.ToLower().Contains(entityType));
+            }
+            if (query.From.HasValue)
+                auditQuery = auditQuery.Where(x => x.CreatedAt >= EnsureUtc(query.From.Value));
+            if (query.To.HasValue)
+                auditQuery = auditQuery.Where(x => x.CreatedAt <= EnsureUtc(query.To.Value));
 
             var logs = await auditQuery
                 .Include(x => x.User)
@@ -381,6 +793,7 @@ namespace InnerG.Api.Controllers
                 {
                     Id = x.Id,
                     Action = x.Action,
+                    Result = string.IsNullOrWhiteSpace(x.Result) ? "SUCCESS" : x.Result,
                     EntityType = x.EntityType,
                     EntityId = x.EntityId,
                     CompanyId = x.CompanyId,
@@ -396,8 +809,11 @@ namespace InnerG.Api.Controllers
             if (logs.Count == 0)
             {
                 var companyQuery = _context.Companies.IgnoreQueryFilters().AsQueryable();
-                if (companyId.HasValue)
-                    companyQuery = companyQuery.Where(x => x.Id == companyId.Value);
+                if (query.CompanyId.HasValue)
+                    companyQuery = companyQuery.Where(x => x.Id == query.CompanyId.Value);
+                if (query.ActorId.HasValue || !string.IsNullOrWhiteSpace(query.Action) ||
+                    !string.IsNullOrWhiteSpace(query.EntityType) || query.From.HasValue || query.To.HasValue)
+                    return new List<AdminAuditLogResponse>();
 
                 return await companyQuery
                     .OrderByDescending(x => x.CreatedAt)
@@ -406,6 +822,7 @@ namespace InnerG.Api.Controllers
                     {
                         Id = x.Id,
                         Action = "Created",
+                        Result = "SUCCESS",
                         EntityType = "Company",
                         EntityId = x.Id,
                         CompanyId = x.Id,
@@ -501,11 +918,97 @@ namespace InnerG.Api.Controllers
                     !string.IsNullOrWhiteSpace(_configuration["SMTP_PASSWORD"]),
                 InviteExpiryDays = int.TryParse(_configuration["Invites:ExpireDays"], out var inviteDays) && inviteDays > 0 ? inviteDays : 7,
                 RefreshTokenDays = int.TryParse(_configuration["Jwt:RefreshTokenDays"], out var refreshDays) && refreshDays > 0 ? refreshDays : 7,
+                MaintenanceMode = bool.TryParse(_configuration["Platform:MaintenanceMode"], out var maintenanceMode) && maintenanceMode,
+                SystemBanner = _configuration["Platform:SystemBanner"],
                 FrontendUrls = frontendUrls
             };
         }
 
-        private async Task AddAuditLogAsync(Guid companyId, string entityType, Guid? entityId, string action, object? oldValue, object? newValue)
+        private async Task<int> CountEventsThisMonthAsync()
+        {
+            var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            return await _context.TrainingEvents.IgnoreQueryFilters()
+                .CountAsync(x => x.DeletedAt == null && x.StartDate >= monthStart);
+        }
+
+        private static DateTime EnsureUtc(DateTime value)
+        {
+            return value.Kind switch
+            {
+                DateTimeKind.Utc => value,
+                DateTimeKind.Local => value.ToUniversalTime(),
+                _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            };
+        }
+
+        private static DateTime? EnsureUtc(DateTime? value)
+        {
+            return value.HasValue ? EnsureUtc(value.Value) : null;
+        }
+
+        private static double CalculateStorageUsedPercent(long usedBytes, int? quotaGb)
+        {
+            if (!quotaGb.HasValue || quotaGb.Value <= 0)
+                return 0;
+
+            var quotaBytes = quotaGb.Value * 1024d * 1024d * 1024d;
+            return Math.Round((usedBytes / quotaBytes) * 100, 2);
+        }
+
+        private static double CalculatePlatformStorageUsedPercent(IList<AdminCompanyResponse> companies)
+        {
+            var quotaGb = companies.Sum(x => x.StorageQuotaGb ?? 0);
+            if (quotaGb <= 0)
+                return 0;
+
+            return CalculateStorageUsedPercent(companies.Sum(x => x.StorageUsedBytes), quotaGb);
+        }
+
+        private async Task UpdateAppSettingsJsonAsync(UpdatePlatformSettingsRequest request)
+        {
+            var settingsPath = Path.Combine(_environment.ContentRootPath, "appsettings.json");
+            if (!System.IO.File.Exists(settingsPath))
+                throw new NotFoundException("appsettings.json not found");
+
+            var json = await System.IO.File.ReadAllTextAsync(settingsPath);
+            var root = JsonNode.Parse(json)?.AsObject()
+                ?? throw new BadRequestException("appsettings.json is invalid");
+
+            var jwt = GetOrCreateObject(root, "Jwt");
+            jwt["RefreshTokenDays"] = request.RefreshTokenDays;
+
+            var invites = GetOrCreateObject(root, "Invites");
+            invites["ExpireDays"] = request.InviteExpiryDays;
+
+            var frontend = GetOrCreateObject(root, "Frontend");
+            frontend["Urls"] = new JsonArray(request.FrontendUrls
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => JsonValue.Create(x.Trim())!)
+                .ToArray());
+
+            var platform = GetOrCreateObject(root, "Platform");
+            platform["MaintenanceMode"] = request.MaintenanceMode;
+            platform["SystemBanner"] = string.IsNullOrWhiteSpace(request.SystemBanner) ? null : request.SystemBanner.Trim();
+
+            await System.IO.File.WriteAllTextAsync(
+                settingsPath,
+                root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+
+        private static JsonObject GetOrCreateObject(JsonObject root, string key)
+        {
+            if (root[key] is JsonObject existing)
+                return existing;
+
+            var created = new JsonObject();
+            root[key] = created;
+            return created;
+        }
+
+        private static string EscapeCsv(string? value) =>
+            $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
+
+        private async Task AddAuditLogAsync(Guid companyId, string entityType, Guid? entityId, string action, object? oldValue, object? newValue, string result = "SUCCESS")
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var userId = Guid.TryParse(userIdValue, out var parsedUserId) ? parsedUserId : Guid.Empty;
@@ -517,6 +1020,7 @@ namespace InnerG.Api.Controllers
                 EntityType = entityType,
                 EntityId = entityId,
                 Action = action,
+                Result = result,
                 OldValueJson = oldValue == null ? null : JsonSerializer.Serialize(oldValue),
                 NewValueJson = newValue == null ? null : JsonSerializer.Serialize(newValue),
                 IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
@@ -524,6 +1028,32 @@ namespace InnerG.Api.Controllers
             });
 
             await Task.CompletedTask;
+        }
+
+        private static SubscriptionPlanResponse ToSubscriptionPlanResponse(SubscriptionPlan plan)
+        {
+            return new SubscriptionPlanResponse
+            {
+                Id = plan.Id,
+                Name = plan.Name,
+                MaxUsers = plan.MaxUsers,
+                StorageQuotaGb = plan.StorageQuotaGb,
+                PricePerUser = plan.PricePerUser,
+                BillingCycle = plan.BillingCycle,
+                IsActive = plan.IsActive
+            };
+        }
+
+        private static void ValidateSubscriptionPlanRequest(UpsertSubscriptionPlanRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Name))
+                throw new BadRequestException("Subscription plan name is required");
+            if (request.MaxUsers < 1)
+                throw new BadRequestException("Max users must be at least 1");
+            if (request.StorageQuotaGb < 1)
+                throw new BadRequestException("Storage quota must be at least 1 GB");
+            if (request.PricePerUser < 0)
+                throw new BadRequestException("Price per user cannot be negative");
         }
     }
 }
