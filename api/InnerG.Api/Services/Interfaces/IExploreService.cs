@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using InnerG.Api.DTOs;
+using InnerG.Api.DTOs.Explore;
 
 namespace InnerG.Api.Services.Interfaces
 {
@@ -12,5 +13,6 @@ namespace InnerG.Api.Services.Interfaces
         Task<bool> UnregisterClassAsync(Guid companyId, Guid userId, Guid eventId);
         Task<ExploreClassDetailDto?> GetExploreClassDetailAsync(Guid companyId, Guid userId, Guid eventId);
         Task<MenteeDashboardDto> GetMenteeDashboardAsync(Guid companyId, Guid userId);
+        Task<List<MyClassDto>> GetMyClassesAsync(Guid companyId, Guid userId);
     }
 }

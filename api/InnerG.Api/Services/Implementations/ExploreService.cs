@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using InnerG.Api.Data;
 using InnerG.Api.DTOs;
+using InnerG.Api.DTOs.Explore;
 using InnerG.Api.Models;
 using InnerG.Api.Repositories.Interfaces;
 using InnerG.Api.Services.Interfaces;
@@ -659,6 +660,35 @@ namespace InnerG.Api.Services.Implementations
                 TrendingSkills = trendingSkills,
                 Recommendations = recommendationsDto
             };
+        }
+
+        public async Task<List<MyClassDto>> GetMyClassesAsync(Guid companyId, Guid userId)
+        {
+            var enrollments = await _unitOfWork.Repository<Enrollment>().GetQueryable()
+                .Include(e => e.TrainingEvent)
+                    .ThenInclude(te => te.Trainer)
+                .Where(e => e.UserId == userId && e.TrainingEvent.CompanyId == companyId)
+                .ToListAsync();
+
+            var feedbacks = await _unitOfWork.Repository<Feedback>().GetQueryable()
+                .Where(f => f.ReviewerUserId == userId && f.TrainingEvent.CompanyId == companyId)
+                .Select(f => f.TrainingEventId)
+                .ToListAsync();
+
+            var result = enrollments.Select(e => new MyClassDto
+            {
+                Id = e.TrainingEventId,
+                Title = e.TrainingEvent.Title,
+                CoverImageUrl = e.TrainingEvent.CoverImageUrl,
+                MentorName = e.TrainingEvent.Trainer?.FullName ?? "Unknown Mentor",
+                Status = e.Status,
+                Type = e.TrainingEvent.Type,
+                StartDate = e.TrainingEvent.StartDate,
+                EndDate = e.TrainingEvent.EndDate,
+                HasReviewed = feedbacks.Contains(e.TrainingEventId)
+            }).OrderByDescending(e => e.StartDate).ToList();
+
+            return result;
         }
     }
 }

@@ -562,51 +562,6 @@ export default function SchedulePage() {
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto pb-16">
       
-      {/* 1. AI SMART-SCHEDULER BANNER */}
-      <AnimatePresence>
-        {schedulerBannerVisible && (
-          <motion.div 
-            initial={{ opacity: 0, y: -15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            className="bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 rounded-3xl p-6 shadow-xl border border-indigo-500/25 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6"
-          >
-            {/* Ambient Background Light */}
-            <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-[#00C896]/5 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-indigo-500/10 rounded-full blur-[60px] -ml-16 -mb-16 pointer-events-none" />
-            
-            <div className="flex items-center gap-4 relative z-10">
-              <div className="size-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-300 border border-indigo-400/30 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(99,102,241,0.15)] animate-pulse">
-                <Sparkles className="size-6 text-indigo-300 animate-pulse" />
-              </div>
-              <div className="space-y-1 text-left">
-                <p className="text-[#00C896] text-[10px] font-extrabold uppercase tracking-widest flex items-center gap-1.5 leading-none">
-                  <span className="size-1.5 bg-[#00C896] rounded-full animate-ping inline-block" />
-                  AI Smart-Scheduler suggestion
-                </p>
-                <p className="text-slate-200 text-xs lg:text-sm leading-relaxed font-semibold">
-                  Based on the availability of <span className="font-extrabold text-white">12 Mentees</span> and Mentor <span className="font-extrabold text-white">Minh Dang</span>, the optimal slot for <span className="text-[#00C896] font-extrabold underline cursor-pointer">Advanced React</span> is <span className="font-extrabold text-white">Wed, at 03:00 PM</span>.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0 relative z-10">
-              <button 
-                onClick={handleScheduleNow}
-                className="bg-gradient-to-r from-[#00C896] to-[#00B083] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] font-extrabold px-6 py-3 rounded-2xl text-[10px] uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-[#00C896]/20"
-              >
-                Schedule Now
-              </button>
-              <button 
-                onClick={() => setSchedulerBannerVisible(false)}
-                className="bg-white/5 hover:bg-white/10 active:scale-[0.98] text-white font-extrabold px-6 py-3 rounded-2xl text-[10px] uppercase tracking-widest transition-all border border-white/10 cursor-pointer"
-              >
-                Ignore
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* 2. TITLE BAR */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">

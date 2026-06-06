@@ -18,7 +18,8 @@ import {
     CreditCard,
     FileClock,
     Shield,
-    Cog
+    Cog,
+    Library
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useRole } from '../lib/RoleContext';
@@ -36,6 +37,7 @@ const navItems = [
     { icon: BookOpen, label: 'Create Class', path: '/mentor/create', roles: ['mentor'] },
     { icon: Search, label: 'Explore / Marketplace', path: '/explore', roles: ['mentee', 'mentor'] },
     { icon: Calendar, label: 'My Schedule', path: '/schedule', roles: ['mentee', 'mentor'] },
+    { icon: Library, label: 'My Classes', path: '/my-classes', roles: ['mentee', 'mentor'] },
     { icon: Heart, label: 'Learning Wishlist', path: '/wishlist', roles: ['mentee', 'mentor'] },
     { icon: FolderOpen, label: 'Resource Hub', path: '/resources', roles: ['mentee', 'mentor', 'hr', 'admin'] },
     { icon: User, label: 'Profile', path: '/profile', roles: ['mentee', 'mentor', 'hr', 'admin'] },
