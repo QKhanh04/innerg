@@ -115,7 +115,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins(frontendUrls)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
