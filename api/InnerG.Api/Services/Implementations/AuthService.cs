@@ -106,21 +106,45 @@ namespace InnerG.Api.Services.Implementations
             if (!request.AllowExternalHrEmail && !EmailMatchesDomain(hrEmail, domain))
                 throw new BadRequestException("HR email must belong to the company domain");
 
-            if (await _context.Companies.IgnoreQueryFilters().AnyAsync(x => x.Domain == domain && x.DeletedAt == null))
-                throw new ConflictException("Company domain already exists");
-
             await using var transaction = await _context.Database.BeginTransactionAsync();
 
-            var company = new Company
-            {
-                Name = request.CompanyName.Trim(),
-                Domain = domain,
-                Timezone = request.Timezone.Trim(),
-                Language = request.Language.Trim(),
-                IsActive = false
-            };
+            var existingCompany = await _context.Companies
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Domain == domain && x.DeletedAt == null);
 
-            _context.Companies.Add(company);
+            Company company;
+            var action = "Create";
+            if (existingCompany != null)
+            {
+                var hasMembers = await _context.Users
+                    .IgnoreQueryFilters()
+                    .AnyAsync(x => x.CompanyId == existingCompany.Id && x.DeletedAt == null);
+
+                if (hasMembers)
+                    throw new ConflictException("Company domain already exists");
+
+                company = existingCompany;
+                company.Name = request.CompanyName.Trim();
+                company.Timezone = request.Timezone.Trim();
+                company.Language = request.Language.Trim();
+                company.IsActive = false;
+                company.UpdatedAt = DateTime.UtcNow;
+                action = "ResumeOnboarding";
+            }
+            else
+            {
+                company = new Company
+                {
+                    Name = request.CompanyName.Trim(),
+                    Domain = domain,
+                    Timezone = request.Timezone.Trim(),
+                    Language = request.Language.Trim(),
+                    IsActive = false
+                };
+
+                _context.Companies.Add(company);
+            }
+
             await _context.SaveChangesAsync();
 
             var invite = await _invitationService.CreateFirstHrInviteAsync(
@@ -136,7 +160,7 @@ namespace InnerG.Api.Services.Implementations
                 UserId = inviterId,
                 EntityType = "Company",
                 EntityId = company.Id,
-                Action = "Create",
+                Action = action,
                 NewValueJson = JsonSerializer.Serialize(new
                 {
                     company.Name,
