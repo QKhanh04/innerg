@@ -389,7 +389,11 @@ export default function LearningWishlist() {
                          
                          {/* Proposed By info */}
                          <div className="flex items-center gap-2">
-                            <img src={item.proposedByAvatar} className="size-6 rounded-full border border-slate-200 object-cover bg-slate-100" />
+                            <img 
+                              src={item.proposedByAvatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(item.proposedBy || 'User')}`} 
+                              alt="Proposer Avatar"
+                              className="size-6 rounded-full border border-slate-200 object-cover bg-slate-100" 
+                            />
                             <p className="text-[10px] text-slate-400 font-bold">By <span className="text-slate-700">{item.proposedBy}</span></p>
                          </div>
 
@@ -465,7 +469,11 @@ export default function LearningWishlist() {
 
                          {/* Proposed By Column */}
                          <div className="col-span-1 sm:col-span-2 flex items-center gap-2">
-                            <img src={item.proposedByAvatar} className="size-5 rounded-full object-cover border border-slate-200 bg-slate-100" />
+                            <img 
+                              src={item.proposedByAvatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(item.proposedBy || 'User')}`} 
+                              alt="Proposer Avatar"
+                              className="size-5 rounded-full object-cover border border-slate-200 bg-slate-100" 
+                            />
                             <span className="text-xs text-slate-600 font-bold">{item.proposedBy}</span>
                          </div>
 

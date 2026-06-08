@@ -27,6 +27,7 @@ import Explore from '../pages/common/Explore/Explore';
 import ExploreDetail from '../pages/common/ExploreDetail/ExploreDetail';
 import MyClasses from '../pages/common/MyClasses/MyClasses';
 import CreateClass from '../pages/mentor/CreateClass/CreateClass';
+import Profile from '../pages/common/Profile/Profile';
 import MentorDashboard from '../pages/mentor/MentorDashboard/MentorDashboard';
 import { useAuth } from '../hooks/useAuth';
 import { getDefaultRouteForUser } from '../utils/authRoute';
@@ -206,6 +207,11 @@ const AppRoutes = () => (
             <Route path="/mentor" element={
                 <ProtectedRoute allowedRoles={['mentor']}>
                     <MentorDashboard />
+                </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+                <ProtectedRoute allowedRoles={['mentee', 'mentor', 'hr', 'admin']}>
+                    <Profile />
                 </ProtectedRoute>
             } />
             {/* You can add more protected routes here for other roles */}
