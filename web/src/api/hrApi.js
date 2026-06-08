@@ -19,6 +19,9 @@ export const hrModerationApi = {
     reviewEvent: (id, data) => api.patch(`/hr/moderation/events/${id}/review`, data),
     pendingResources: () => api.get('/hr/moderation/resources').then((r) => r.data),
     reviewResource: (id, data) => api.patch(`/hr/moderation/resources/${id}/review`, data),
+    escalations: () => api.get('/hr/moderation/escalations').then((r) => r.data),
+    reportCenter: () => api.get('/hr/moderation/report-center').then((r) => r.data),
+    createEscalation: (data) => api.post('/hr/moderation/escalations', data).then((r) => r.data),
 };
 
 export const hrDepartmentsApi = {

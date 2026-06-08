@@ -34,12 +34,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { toastService } from '../../../services/toastService';
+import ActionDialog from '../../../components/common/ActionDialog';
 
 export default function MentorDashboard() {
   const navigate = useNavigate();
   const [activeLaunchSession, setActiveLaunchSession] = useState(null);
   const [rollCallList, setRollCallList] = useState([]);
   const [isLoadingRollCall, setIsLoadingRollCall] = useState(false);
+  const [cancelDialog, setCancelDialog] = useState(null);
 
   // Fetch enrolled users when launching a session
   useEffect(() => {
@@ -78,17 +80,21 @@ export default function MentorDashboard() {
   };
 
   const handleCancelClass = async (classId, classTitle) => {
-    if (!window.confirm(`Are you sure you want to cancel the class "${classTitle}"?`)) {
+    setCancelDialog({ classId, classTitle });
+  };
+
+  const confirmCancelClass = async () => {
+    if (!cancelDialog) {
       return;
     }
-
     try {
-      await mentorApi.cancelClass(classId);
-      showToast(`Successfully cancelled class "${classTitle}" 🎉`);
+      await mentorApi.cancelClass(cancelDialog.classId);
+      showToast(`Successfully cancelled class "${cancelDialog.classTitle}" 🎉`);
       
       // Refresh classes list
       const classesRes = await mentorApi.getHostedClasses();
       setClasses(classesRes);
+      setCancelDialog(null);
     } catch (error) {
       console.error('Failed to cancel class:', error);
       const errMsg = error.response?.data?.message || 'Failed to cancel class. Please try again.';
@@ -248,6 +254,7 @@ export default function MentorDashboard() {
   };
 
   return (
+    <>
     <div className="space-y-8 max-w-[1400px] mx-auto pb-16">
       
       {/* 1. HERO HEADER WITH GRADIENT & GENERAL STATS */}
@@ -918,5 +925,16 @@ export default function MentorDashboard() {
         )}
       </AnimatePresence>
     </div>
+    <ActionDialog
+      open={Boolean(cancelDialog)}
+      title="Cancel Class"
+      description="This will cancel the selected class and refresh your hosted classes list."
+      details={cancelDialog ? cancelDialog.classTitle : null}
+      confirmLabel="Cancel class"
+      intent="danger"
+      onClose={() => setCancelDialog(null)}
+      onConfirm={confirmCancelClass}
+    />
+    </>
   );
 }

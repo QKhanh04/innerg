@@ -179,6 +179,37 @@ builder.Services.AddAuthentication(options =>
         NameClaimType = ClaimTypes.Name,
         RoleClaimType = ClaimTypes.Role
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdValue, out var userId))
+            {
+                context.Fail("Invalid user identifier");
+                return;
+            }
+
+            using var scope = context.HttpContext.RequestServices.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var user = await dbContext.Users
+                .IgnoreQueryFilters()
+                .Include(x => x.Company)
+                .FirstOrDefaultAsync(x => x.Id == userId);
+
+            if (user == null || !user.IsActive || user.DeletedAt != null)
+            {
+                context.Fail("User account is inactive");
+                return;
+            }
+
+            if (user.CompanyId.HasValue && (user.Company == null || !user.Company.IsActive || user.Company.DeletedAt != null))
+            {
+                context.Fail("Company is inactive");
+            }
+        }
+    };
 });
 
 
