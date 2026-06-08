@@ -232,6 +232,30 @@ namespace InnerG.Api.Controllers
         }
 
         [Authorize]
+        [HttpPatch("users/{userId}")]
+        public async Task<IActionResult> UpdateProfile(string userId, [FromBody] UpdateProfileRequest request)
+        {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (currentUserId != userId)
+                return Forbid();
+
+            await _authService.UpdateProfileAsync(userId, request);
+            return NoContent();
+        }
+
+        [Authorize]
+        [HttpPost("change-password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            await _authService.ChangePasswordAsync(userId, request);
+            return NoContent();
+        }
+
+        [Authorize]
         [HttpGet("claims")]
         public IActionResult Claims()
         {
@@ -280,3 +304,4 @@ namespace InnerG.Api.Controllers
         }
     }
 }
+// Trigger watch rebuild

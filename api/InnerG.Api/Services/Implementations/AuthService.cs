@@ -661,8 +661,15 @@ namespace InnerG.Api.Services.Implementations
             var user = await _context.Users
                 .IgnoreQueryFilters()
                 .Include(x => x.Company)
+                .Include(x => x.Department)
+                .Include(x => x.UserSkills)
+                    .ThenInclude(x => x.Skill)
+                .Include(x => x.Badges)
+                    .ThenInclude(x => x.Badge)
                 .FirstOrDefaultAsync(x => x.Id == id)
                 ?? throw new NotFoundException("User not found");
+
+            var roles = await _userManager.GetRolesAsync(user);
 
             return new UserInfoResponse
             {
@@ -671,8 +678,59 @@ namespace InnerG.Api.Services.Implementations
                 Email = user.Email ?? string.Empty,
                 CompanyId = user.CompanyId,
                 CompanyName = user.Company?.Name,
-                Roles = await _userManager.GetRolesAsync(user)
+                Roles = roles,
+                AvatarUrl = user.AvatarUrl,
+                JobTitle = user.JobTitle,
+                PhoneInternal = user.PhoneInternal,
+                TotalInnerGPoints = user.TotalInnerGPoints,
+                DepartmentName = user.Department?.Name,
+                Skills = user.UserSkills.Select(us => new UserSkillDto
+                {
+                    SkillName = us.Skill.Name,
+                    Proficiency = us.Proficiency.ToString(),
+                    Source = us.Source.ToString()
+                }).ToList(),
+                Badges = user.Badges.Select(ub => new UserBadgeDto
+                {
+                    BadgeName = ub.Badge.Name,
+                    Description = ub.Badge.Description,
+                    IconUrl = ub.Badge.IconUrl,
+                    AwardedAt = ub.AwardedAt
+                }).ToList()
             };
+        }
+
+        public async Task UpdateProfileAsync(string userId, UpdateProfileRequest request)
+        {
+            if (!Guid.TryParse(userId, out var id))
+                throw new NotFoundException("User not found");
+
+            var user = await _context.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Id == id)
+                ?? throw new NotFoundException("User not found");
+
+            user.FullName = request.FullName.Trim();
+            user.AvatarUrl = request.AvatarUrl;
+            user.PhoneInternal = request.PhoneInternal?.Trim();
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+                throw IdentityErrorMapper.ToValidationException(result);
+        }
+
+        public async Task ChangePasswordAsync(string userId, ChangePasswordRequest request)
+        {
+            if (!Guid.TryParse(userId, out var id))
+                throw new NotFoundException("User not found");
+
+            var user = await _userManager.Users.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == id)
+                ?? throw new NotFoundException("User not found");
+
+            var result = await _userManager.ChangePasswordAsync(user, request.OldPassword, request.NewPassword);
+            if (!result.Succeeded)
+                throw IdentityErrorMapper.ToValidationException(result);
         }
 
         public Task ConfirmEmailAsync(string userId, string token)

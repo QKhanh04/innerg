@@ -160,7 +160,7 @@ export default function ExploreDetail() {
         className="relative w-full h-[400px] lg:h-[480px] rounded-[28px] overflow-hidden shadow-2xl mb-10 group"
       >
         <img
-          src={detail.image} alt={detail.title}
+          src={detail.image || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'} alt={detail.title}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-1000"
         />
         {/* gradient overlay */}
@@ -362,7 +362,7 @@ export default function ExploreDetail() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="size-11 bg-slate-100 rounded-full flex items-center justify-center overflow-hidden shrink-0 border border-slate-200">
-                          {fb.reviewerAvatarUrl ? (
+                          {fb.reviewerAvatarUrl && fb.reviewerAvatarUrl.trim() !== '' ? (
                             <img src={fb.reviewerAvatarUrl} alt={fb.reviewerName} className="w-full h-full object-cover" />
                           ) : (
                             <User className="size-5 text-slate-400" />
@@ -511,7 +511,7 @@ export default function ExploreDetail() {
             </p>
             <div className="flex items-center gap-4">
               <div className="size-14 rounded-2xl p-0.5 bg-gradient-to-tr from-indigo-500 via-purple-500 to-emerald-400 shadow-md shrink-0">
-                <img src={detail.mentor.avatar} alt={detail.mentor.name}
+                <img src={detail.mentor.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(detail.mentor.name || 'Mentor')}`} alt={detail.mentor.name}
                   className="w-full h-full rounded-[14px] object-cover border-2 border-white" />
               </div>
               <div className="min-w-0 flex-1">
