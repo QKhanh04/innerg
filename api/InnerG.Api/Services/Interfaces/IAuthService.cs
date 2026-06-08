@@ -25,6 +25,8 @@ namespace InnerG.Api.Services.Interfaces
         Task LogoutAsync(string refreshToken);
         Task LogoutAllAsync(string userId);
         Task<UserInfoResponse> GetCurrentUserInfoAsync(string userId, Guid? companyId);
+        Task UpdateProfileAsync(string userId, UpdateProfileRequest request);
+        Task ChangePasswordAsync(string userId, ChangePasswordRequest request);
         Task ConfirmEmailAsync(string userId, string token);
         Task ResendConfirmEmailAsync(string email);
         Task<AuthResponse> LoginWithGoogleAsync(string idToken, Guid? companyId);

@@ -123,6 +123,18 @@ const authService = {
     const response = await api.get(`/auth/users/${userId}`);
     return response.data;
   },
+
+  // Update current user profile
+  async updateProfile(userId, profileData) {
+    const response = await api.patch(`/auth/users/${userId}`, profileData);
+    return response.data;
+  },
+
+  // Change password for current user
+  async changePassword(passwordData) {
+    const response = await api.post('/auth/change-password', passwordData);
+    return response.data;
+  },
 };
 
 export default authService;

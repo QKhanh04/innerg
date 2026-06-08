@@ -152,6 +152,50 @@ namespace InnerG.Api.DTOs
         public Guid? CompanyId { get; set; }
         public string? CompanyName { get; set; }
         public IList<string> Roles { get; set; } = new List<string>();
+        public string? AvatarUrl { get; set; }
+        public string? JobTitle { get; set; }
+        public string? PhoneInternal { get; set; }
+        public int TotalInnerGPoints { get; set; }
+        public string? DepartmentName { get; set; }
+        public IList<UserSkillDto> Skills { get; set; } = new List<UserSkillDto>();
+        public IList<UserBadgeDto> Badges { get; set; } = new List<UserBadgeDto>();
+    }
+
+    public class UserSkillDto
+    {
+        public string SkillName { get; set; } = string.Empty;
+        public string Proficiency { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
+    }
+
+    public class UserBadgeDto
+    {
+        public string BadgeName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? IconUrl { get; set; }
+        public DateTime AwardedAt { get; set; }
+    }
+
+    public class UpdateProfileRequest
+    {
+        [Required]
+        [StringLength(100)]
+        public string FullName { get; set; } = string.Empty;
+
+        public string? AvatarUrl { get; set; }
+
+        [StringLength(20)]
+        public string? PhoneInternal { get; set; }
+    }
+
+    public class ChangePasswordRequest
+    {
+        [Required]
+        public string OldPassword { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(6)]
+        public string NewPassword { get; set; } = string.Empty;
     }
 
 }

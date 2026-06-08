@@ -28,7 +28,7 @@ import { toastService } from '../../../services/toastService';
 import { exploreApi } from '../../../api/exploreApi';
 
 export default function ExplorePage() {
-  const { role } = useRole();
+  const { role, user } = useRole();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -148,6 +148,12 @@ export default function ExplorePage() {
   const handleRegister = async (id) => {
     const cls = classes.find(c => c.id === id);
     if (!cls) return;
+
+    const isInstructor = cls.mentor?.userId === user?.userId;
+    if (isInstructor) {
+      showToast('error', "You are the mentor of this class and cannot register.");
+      return;
+    }
 
     const isPending = cls.registrationStatus === 'Pending';
     const isRegistered = cls.registrationStatus === 'Registered';
@@ -294,7 +300,7 @@ export default function ExplorePage() {
             >
               {/* Cover Image */}
               <div className="w-full sm:w-36 h-28 rounded-2xl overflow-hidden bg-slate-100 shrink-0">
-                <img src={item.image} className="size-full object-cover group-hover:scale-103 transition-transform duration-300" alt={item.title} />
+                <img src={item.image || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'} className="size-full object-cover group-hover:scale-103 transition-transform duration-300" alt={item.title} />
               </div>
 
               {/* Course Info */}
@@ -312,21 +318,24 @@ export default function ExplorePage() {
 
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center gap-2">
-                    <img src={item.mentor.avatar} className="size-5 rounded-full object-cover" alt={item.mentor.name} />
+                    <img src={item.mentor.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(item.mentor.name || 'Mentor')}`} className="size-5 rounded-full object-cover" alt={item.mentor.name} />
                     <span className="text-[10px] text-slate-600 font-bold">{item.mentor.name}</span>
                   </div>
                   <button
-                    onClick={() => handleRegister(item.id)}
+                    onClick={(e) => { e.stopPropagation(); handleRegister(item.id); }}
+                    disabled={item.mentor?.userId === user?.userId}
                     className={cn(
-                      "text-[9px] font-extrabold uppercase tracking-widest px-4 py-2 rounded-xl transition-all cursor-pointer",
-                      item.registrationStatus === 'Registered'
-                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                        : item.registrationStatus === 'Pending'
-                          ? "bg-amber-50 text-amber-600 border border-amber-200"
-                          : "bg-[#9333EA] hover:bg-[#7e22ce] text-white"
+                      "text-[9px] font-extrabold uppercase tracking-widest px-4 py-2 rounded-xl transition-all disabled:opacity-60",
+                      item.mentor?.userId === user?.userId
+                        ? "bg-indigo-50 text-indigo-650 border border-indigo-200 cursor-default"
+                        : item.registrationStatus === 'Registered'
+                          ? "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-pointer"
+                          : item.registrationStatus === 'Pending'
+                            ? "bg-amber-50 text-amber-600 border border-amber-200 cursor-pointer animate-pulse"
+                            : "bg-[#9333EA] hover:bg-[#7e22ce] text-white cursor-pointer"
                     )}
                   >
-                    {item.registrationStatus === 'Registered' ? "✓ Enrolled" : item.registrationStatus === 'Pending' ? "⌛ Pending" : "Register"}
+                    {item.mentor?.userId === user?.userId ? "Hosting" : item.registrationStatus === 'Registered' ? "✓ Enrolled" : item.registrationStatus === 'Pending' ? "⌛ Pending" : "Register"}
                   </button>
                 </div>
               </div>
@@ -447,7 +456,7 @@ export default function ExplorePage() {
                   >
                     {/* Card Header Image with Cover */}
                     <div className="h-44 w-full relative overflow-hidden bg-slate-100">
-                      <img src={item.image} className="size-full object-cover group-hover:scale-102 transition-transform duration-550" alt={item.title} />
+                      <img src={item.image || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'} className="size-full object-cover group-hover:scale-102 transition-transform duration-550" alt={item.title} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
                       {/* Floating Formats Badge */}
@@ -534,7 +543,7 @@ export default function ExplorePage() {
                       {/* Mentor Profile and Action Register Button */}
                       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
-                          <img src={item.mentor.avatar} className="size-8 rounded-full object-cover border-2 border-slate-200" alt={item.mentor.name} />
+                          <img src={item.mentor.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(item.mentor.name || 'Mentor')}`} className="size-8 rounded-full object-cover border-2 border-slate-200" alt={item.mentor.name} />
                           <div className="min-w-0 text-left">
                             <p className="text-[10px] font-extrabold text-slate-800 truncate leading-tight">{item.mentor.name}</p>
                             <p className="text-[8px] text-slate-400 font-semibold truncate mt-0.5">{item.mentor.position}</p>
@@ -542,20 +551,22 @@ export default function ExplorePage() {
                         </div>
 
                         <button
-                          onClick={() => handleRegister(item.id)}
-                          disabled={isFull && !isRegistered && !isPending}
+                          onClick={(e) => { e.stopPropagation(); handleRegister(item.id); }}
+                          disabled={item.mentor?.userId === user?.userId || (isFull && !isRegistered && !isPending)}
                           className={cn(
-                            "px-4 py-2.5 rounded-xl text-[9px] font-extrabold uppercase tracking-widest transition-all cursor-pointer active:scale-[0.98] border shadow-xs disabled:opacity-50 shrink-0",
-                            isRegistered
-                              ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100/50"
-                              : isPending
-                                ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100/50 animate-pulse"
-                                : isFull
-                                  ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                                  : "bg-slate-900 border-slate-900 hover:bg-slate-800 text-white"
+                            "px-4 py-2.5 rounded-xl text-[9px] font-extrabold uppercase tracking-widest transition-all border shadow-xs disabled:opacity-50 shrink-0",
+                            item.mentor?.userId === user?.userId
+                              ? "bg-indigo-50 text-indigo-650 border-indigo-200 cursor-default"
+                              : isRegistered
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100/50 cursor-pointer"
+                                : isPending
+                                  ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100/50 cursor-pointer animate-pulse"
+                                  : isFull
+                                    ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                                    : "bg-slate-900 border-slate-900 hover:bg-slate-800 text-white cursor-pointer"
                           )}
                         >
-                          {isRegistered ? "✓ Enrolled" : isPending ? "⌛ Pending" : isFull ? "FULL" : "Register"}
+                          {item.mentor?.userId === user?.userId ? "Hosting" : isRegistered ? "✓ Enrolled" : isPending ? "⌛ Pending" : isFull ? "FULL" : "Register"}
                         </button>
                       </div>
 
