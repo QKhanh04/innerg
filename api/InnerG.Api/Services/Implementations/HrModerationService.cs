@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using InnerG.Api.Data;
 using InnerG.Api.DTOs.Hr;
 using InnerG.Api.Exceptions;
+using InnerG.Api.Helpers;
 using InnerG.Api.Models;
 using InnerG.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -107,29 +108,292 @@ namespace InnerG.Api.Services.Implementations
         {
             return await _context.Resources
                 .Include(r => r.TrainingEvent)
-                .Where(r => r.CompanyId == companyId && !r.IsPublic)
+                .Where(r => r.CompanyId == companyId && r.ModerationStatus == ResourceModerationStatus.PendingReview)
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new HrPendingResourceDto
                 {
                     Id = r.Id,
                     Title = r.Title,
                     EventTitle = r.TrainingEvent.Title,
-                    Type = r.Type.ToString()
+                    Type = r.Type.ToString(),
+                    CreatedAt = r.CreatedAt,
+                    ModerationStatus = r.ModerationStatus,
+                    ReviewNotes = r.ReviewNotes
                 })
                 .ToListAsync();
         }
 
-        public async Task ReviewResourceAsync(Guid resourceId, Guid companyId, ReviewResourceRequest request)
+        public async Task ReviewResourceAsync(Guid resourceId, Guid companyId, Guid hrUserId, ReviewResourceRequest request)
         {
             var resource = await _context.Resources
+                .Include(r => r.TrainingEvent)
+                    .ThenInclude(e => e.Trainer)
                 .FirstOrDefaultAsync(r => r.Id == resourceId && r.CompanyId == companyId);
             if (resource == null)
                 throw new BusinessException("RESOURCE_NOT_FOUND", "Không tìm thấy tài nguyên.", 404);
 
-            if (request.Approved)
-                resource.IsPublic = true;
+            resource.IsPublic = request.Approved;
+            resource.ModerationStatus = request.Approved
+                ? ResourceModerationStatus.Approved
+                : ResourceModerationStatus.Rejected;
+            resource.ReviewedAt = DateTime.UtcNow;
+            resource.ReviewNotes = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
 
             await _context.SaveChangesAsync();
+            await HrAuditHelper.LogAsync(
+                _context,
+                companyId,
+                hrUserId,
+                "Resource",
+                resource.Id,
+                request.Approved ? "Approve" : "Reject",
+                null,
+                new
+                {
+                    resource.Title,
+                    resource.IsPublic,
+                    resource.ModerationStatus,
+                    resource.ReviewedAt,
+                    resource.ReviewNotes
+                });
+
+            var trainerUserId = resource.TrainingEvent?.Trainer?.UserId;
+            if (!trainerUserId.HasValue)
+                return;
+
+            if (request.Approved)
+            {
+                await _notificationService.SendAsync(
+                    trainerUserId.Value,
+                    "CONTENT_APPROVED",
+                    "Tai nguyen da duoc duyet",
+                    $"Tai nguyen \"{resource.Title}\" da duoc HR phe duyet va hien co the duoc truy cap.",
+                    referenceType: "Resource",
+                    referenceId: resource.Id);
+            }
+            else
+            {
+                await _notificationService.SendAsync(
+                    trainerUserId.Value,
+                    "CONTENT_REJECTED",
+                    "Tai nguyen can chinh sua",
+                    request.Reason?.Trim() ?? "Tai nguyen can duoc chinh sua truoc khi gui lai de duyet.",
+                    referenceType: "Resource",
+                    referenceId: resource.Id);
+            }
+        }
+
+        public async Task<HrModerationEscalationDto> CreateEscalationReportAsync(Guid companyId, Guid hrUserId, CreateModerationEscalationRequest request)
+        {
+            if (request.TargetId == Guid.Empty)
+                throw new BadRequestException("TargetId is required");
+
+            if (string.IsNullOrWhiteSpace(request.TargetType))
+                throw new BadRequestException("TargetType is required");
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                throw new BadRequestException("Reason is required");
+
+            var normalizedTargetType = request.TargetType.Trim();
+            var targetLabel = await ResolveTargetLabelAsync(companyId, normalizedTargetType, request.TargetId);
+
+            var existingPending = await _context.ModerationEscalationReports
+                .IgnoreQueryFilters()
+                .AnyAsync(x =>
+                    x.CompanyId == companyId &&
+                    x.TargetType == normalizedTargetType &&
+                    x.TargetId == request.TargetId &&
+                    x.Status == ModerationEscalationStatus.Pending &&
+                    x.DeletedAt == null);
+
+            if (existingPending)
+                throw new ConflictException("A pending escalation already exists for this target");
+
+            var report = new ModerationEscalationReport
+            {
+                CompanyId = companyId,
+                ReportedByUserId = hrUserId,
+                TargetType = normalizedTargetType,
+                TargetId = request.TargetId,
+                TargetLabel = targetLabel,
+                Reason = request.Reason.Trim(),
+                Severity = request.Severity,
+                SourceContext = string.IsNullOrWhiteSpace(request.SourceContext) ? null : request.SourceContext.Trim()
+            };
+
+            _context.ModerationEscalationReports.Add(report);
+            _context.AuditLogs.Add(new AuditLog
+            {
+                CompanyId = companyId,
+                UserId = hrUserId,
+                EntityType = "ModerationEscalationReport",
+                EntityId = report.Id,
+                Action = "Create",
+                Result = "SUCCESS",
+                NewValueJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    report.TargetType,
+                    report.TargetId,
+                    report.TargetLabel,
+                    report.Reason,
+                    report.Severity,
+                    report.SourceContext
+                })
+            });
+
+            await _context.SaveChangesAsync();
+            await NotifySystemAdminsAsync(companyId, report);
+
+            return ToEscalationDto(report);
+        }
+
+        public async Task<List<HrModerationEscalationDto>> GetEscalationReportsAsync(Guid companyId)
+        {
+            return await _context.ModerationEscalationReports
+                .Where(x => x.CompanyId == companyId)
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new HrModerationEscalationDto
+                {
+                    Id = x.Id,
+                    TargetId = x.TargetId,
+                    TargetType = x.TargetType,
+                    TargetLabel = x.TargetLabel,
+                    Reason = x.Reason,
+                    Severity = x.Severity,
+                    Status = x.Status,
+                    SourceContext = x.SourceContext,
+                    CreatedAt = x.CreatedAt
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<HrModerationReportCenterItemDto>> GetModerationReportCenterAsync(Guid companyId)
+        {
+            var pendingEvents = await _context.TrainingEvents
+                .Include(x => x.Trainer)
+                .Where(x => x.CompanyId == companyId && x.Status == TrainingEventStatus.PendingApproval)
+                .Select(x => new HrModerationReportCenterItemDto
+                {
+                    ItemType = "PendingEventReview",
+                    TargetId = x.Id,
+                    TargetType = "TrainingEvent",
+                    TargetLabel = x.Title,
+                    WorkflowStatus = "PendingHrReview",
+                    Summary = $"Awaiting HR approval for trainer {x.Trainer.FullName}",
+                    Detail = $"Start date: {x.StartDate:dd/MM/yyyy}",
+                    CreatedAt = x.CreatedAt
+                })
+                .ToListAsync();
+
+            var pendingResources = await _context.Resources
+                .Include(x => x.TrainingEvent)
+                .Where(x => x.CompanyId == companyId && x.ModerationStatus == ResourceModerationStatus.PendingReview)
+                .Select(x => new HrModerationReportCenterItemDto
+                {
+                    ItemType = "PendingResourceReview",
+                    TargetId = x.Id,
+                    TargetType = "Resource",
+                    TargetLabel = x.Title,
+                    WorkflowStatus = "PendingHrReview",
+                    Summary = $"Awaiting HR review for resource in {x.TrainingEvent.Title}",
+                    Detail = $"Resource type: {x.Type}",
+                    CreatedAt = x.CreatedAt
+                })
+                .ToListAsync();
+
+            var escalationReports = await _context.ModerationEscalationReports
+                .Where(x => x.CompanyId == companyId)
+                .Select(x => new HrModerationReportCenterItemDto
+                {
+                    ItemType = "EscalationReport",
+                    ItemId = x.Id,
+                    TargetId = x.TargetId,
+                    TargetType = x.TargetType,
+                    TargetLabel = x.TargetLabel,
+                    WorkflowStatus = x.Status.ToString(),
+                    Summary = x.Reason,
+                    Detail = x.ResolutionNotes,
+                    Severity = x.Severity.ToString(),
+                    SourceContext = x.SourceContext,
+                    CreatedAt = x.CreatedAt
+                })
+                .ToListAsync();
+
+            return pendingEvents
+                .Concat(pendingResources)
+                .Concat(escalationReports)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
+        }
+
+        private async Task<string> ResolveTargetLabelAsync(Guid companyId, string targetType, Guid targetId)
+        {
+            if (targetType.Equals("TrainingEvent", StringComparison.OrdinalIgnoreCase))
+            {
+                var trainingEvent = await _context.TrainingEvents
+                    .FirstOrDefaultAsync(x => x.Id == targetId && x.CompanyId == companyId)
+                    ?? throw new NotFoundException("Training event not found");
+
+                return trainingEvent.Title;
+            }
+
+            if (targetType.Equals("Resource", StringComparison.OrdinalIgnoreCase))
+            {
+                var resource = await _context.Resources
+                    .FirstOrDefaultAsync(x => x.Id == targetId && x.CompanyId == companyId)
+                    ?? throw new NotFoundException("Resource not found");
+
+                return resource.Title;
+            }
+
+            if (targetType.Equals("AppUser", StringComparison.OrdinalIgnoreCase))
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(x => x.Id == targetId && x.CompanyId == companyId && x.DeletedAt == null)
+                    ?? throw new NotFoundException("User not found");
+
+                return user.FullName;
+            }
+
+            throw new BadRequestException("Unsupported target type for escalation");
+        }
+
+        private async Task NotifySystemAdminsAsync(Guid companyId, ModerationEscalationReport report)
+        {
+            var systemAdminUserIds = await _context.UserRoles
+                .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
+                .Where(x => x.Name == AuthRoles.SystemAdmin)
+                .Select(x => x.UserId)
+                .Distinct()
+                .ToListAsync();
+
+            if (systemAdminUserIds.Count == 0)
+                return;
+
+            await _notificationService.SendToManyAsync(
+                systemAdminUserIds,
+                "HR_ESCALATION_REPORT",
+                $"New HR escalation: {report.TargetLabel}",
+                $"An HR team escalated {report.TargetType} for review. Reason: {report.Reason}",
+                NotificationChannel.Push,
+                "ModerationEscalationReport",
+                report.Id);
+        }
+
+        private static HrModerationEscalationDto ToEscalationDto(ModerationEscalationReport report)
+        {
+            return new HrModerationEscalationDto
+            {
+                Id = report.Id,
+                TargetId = report.TargetId,
+                TargetType = report.TargetType,
+                TargetLabel = report.TargetLabel,
+                Reason = report.Reason,
+                Severity = report.Severity,
+                Status = report.Status,
+                SourceContext = report.SourceContext,
+                CreatedAt = report.CreatedAt
+            };
         }
     }
 }

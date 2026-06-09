@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hrWishlistsApi } from '../../../api/hrApi';
 import { toastService } from '../../../services/toastService';
 import { cn } from '../../../lib/utils';
+import ActionDialog from '../../../components/common/ActionDialog';
 import InternalMentorModal from './InternalMentorModal';
 import { Award, Clock, Users, TrendingUp, Search, Info, X } from 'lucide-react';
 
@@ -12,6 +13,7 @@ export default function HrWishlistsPage() {
     const navigate = useNavigate();
     const [statusFilter, setStatusFilter] = useState('');
     const [findingTrainerFor, setFindingTrainerFor] = useState(null);
+    const [rejectDialog, setRejectDialog] = useState(null);
 
     const { data: items = [], isLoading } = useQuery({
         queryKey: ['hr', 'wishlists', statusFilter],
@@ -29,6 +31,31 @@ export default function HrWishlistsPage() {
             toastService.error(err?.response?.data?.message || 'Failed to update status');
         }
     });
+
+    const openRejectDialog = (wishlist, status = 'Rejected', initialReason = 'Not suitable') => {
+        setRejectDialog({
+            wishlist,
+            status,
+            initialReason: wishlist.rejectionReason || initialReason,
+        });
+    };
+
+    const handleRejectConfirm = (reason) => {
+        if (!rejectDialog) {
+            return;
+        }
+
+        statusMutation.mutate(
+            {
+                id: rejectDialog.wishlist.id,
+                status: rejectDialog.status,
+                rejectionReason: reason || 'Not suitable',
+            },
+            {
+                onSuccess: () => setRejectDialog(null),
+            }
+        );
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -168,10 +195,7 @@ export default function HrWishlistsPage() {
                                                     onChange={(e) => {
                                                         const newStatus = e.target.value;
                                                         if (newStatus === 'Rejected') {
-                                                            const reason = window.prompt("Reason for rejection:", w.rejectionReason || "Not suitable");
-                                                            if (reason !== null) {
-                                                                statusMutation.mutate({ id: w.id, status: newStatus, rejectionReason: reason || 'Not suitable' });
-                                                            }
+                                                            openRejectDialog(w, newStatus);
                                                         } else {
                                                             statusMutation.mutate({ id: w.id, status: newStatus });
                                                         }
@@ -234,10 +258,7 @@ export default function HrWishlistsPage() {
                                                 {!['Rejected', 'Completed', 'Scheduled'].includes(w.status) && (
                                                     <div className="flex gap-1.5 pl-3 border-l border-slate-100 ml-2">
                                                         <button
-                                                            onClick={() => {
-                                                                const reason = window.prompt("Reason for rejection:", "Not suitable");
-                                                                if (reason !== null) statusMutation.mutate({ id: w.id, status: 'Rejected', rejectionReason: reason || 'Not suitable' });
-                                                            }}
+                                                            onClick={() => openRejectDialog(w)}
                                                             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                                             title="Reject Proposal"
                                                         >
@@ -289,6 +310,22 @@ export default function HrWishlistsPage() {
                     onClose={() => setFindingTrainerFor(null)}
                 />
             )}
+
+            <ActionDialog
+                open={Boolean(rejectDialog)}
+                title="Reject Wishlist Proposal"
+                description="Share a short reason so the requester understands why this proposal was not accepted."
+                details={rejectDialog ? `${rejectDialog.wishlist.skillName} • ${rejectDialog.wishlist.proposerName}` : null}
+                reasonLabel="Rejection reason"
+                reasonPlaceholder="Explain why this topic is not being approved right now."
+                initialReason={rejectDialog?.initialReason || 'Not suitable'}
+                requireReason
+                confirmLabel="Reject proposal"
+                intent="danger"
+                isPending={statusMutation.isPending}
+                onClose={() => setRejectDialog(null)}
+                onConfirm={handleRejectConfirm}
+            />
         </div>
     );
 }

@@ -63,11 +63,17 @@ namespace InnerG.Api.Services.Implementations
                 bool isHrOrAdmin = userRole.Equals("HR", StringComparison.OrdinalIgnoreCase) || 
                                    userRole.Equals("Admin", StringComparison.OrdinalIgnoreCase);
                 bool isEnrolled = enrolledSet.Contains(te.Id);
+
+                if (r.ModerationStatus != ResourceModerationStatus.Approved && !isTrainer && !isHrOrAdmin)
+                    continue;
                 
                 // USER'S NEW REQUIREMENT: "sau buổi workshop đó thì tài nguyên được xem và tải bởi tất cả mọi người luôn (là public ấy)"
                 bool isWorkshopFinished = te.Status == TrainingEventStatus.Completed || te.EndDate <= DateTime.UtcNow || te.EndDate <= DateTime.Now;
 
-                bool hasAccess = r.IsPublic || isTrainer || isHrOrAdmin || isEnrolled || isWorkshopFinished;
+                bool hasAccess = isTrainer ||
+                                 isHrOrAdmin ||
+                                 (r.ModerationStatus == ResourceModerationStatus.Approved &&
+                                  (r.IsPublic || isEnrolled || isWorkshopFinished));
 
                 result.Add(new ResourceHubItemDto
                 {
