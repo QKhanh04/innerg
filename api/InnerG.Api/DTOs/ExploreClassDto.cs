@@ -25,6 +25,7 @@ namespace InnerG.Api.DTOs
         public int Points { get; set; }
         public string Image { get; set; } = string.Empty;
         public string RegistrationStatus { get; set; } = "NotRegistered"; // Pending, Registered, NotRegistered
+        public bool IsRegistrationClosed { get; set; }
     }
 
     public class ExploreMentorDto
