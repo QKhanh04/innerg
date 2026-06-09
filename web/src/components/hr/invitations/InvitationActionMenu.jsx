@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, RotateCcw, X, Trash2 } from 'lucide-react';
+import ActionDialog from '../../common/ActionDialog';
 import { useInvitationActions } from '../../../hooks/hr/useInvitationActions';
 
 export default function InvitationActionMenu({ invite }) {
     const [open, setOpen] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const menuRef = useRef(null);
     const { resendMutation, revokeMutation, deleteMutation } = useInvitationActions();
 
@@ -54,10 +56,8 @@ export default function InvitationActionMenu({ invite }) {
                     <div className="py-1">
                         <button
                             onClick={() => {
-                                if (window.confirm("Are you sure you want to delete this invitation?")) {
-                                    deleteMutation.mutate(invite.id);
-                                    setOpen(false);
-                                }
+                                setOpen(false);
+                                setShowDeleteConfirm(true);
                             }}
                             disabled={deleteMutation.isPending}
                             className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
@@ -68,6 +68,22 @@ export default function InvitationActionMenu({ invite }) {
                     </div>
                 </div>
             )}
+
+            <ActionDialog
+                open={showDeleteConfirm}
+                title="Delete Invitation"
+                description="Remove this invitation record from the HR invitation list."
+                details={invite.email}
+                confirmLabel="Delete invitation"
+                intent="danger"
+                isPending={deleteMutation.isPending}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={() => {
+                    deleteMutation.mutate(invite.id, {
+                        onSuccess: () => setShowDeleteConfirm(false),
+                    });
+                }}
+            />
         </div>
     );
 }

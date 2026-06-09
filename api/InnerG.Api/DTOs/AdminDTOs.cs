@@ -23,6 +23,7 @@ namespace InnerG.Api.DTOs
         public IList<AdminCompanyResponse> Companies { get; set; } = new List<AdminCompanyResponse>();
         public IList<RoleCountResponse> RoleDistribution { get; set; } = new List<RoleCountResponse>();
         public IList<AdminAuditLogResponse> RecentActivity { get; set; } = new List<AdminAuditLogResponse>();
+        public IList<AdminRetentionCohortResponse> RetentionCohorts { get; set; } = new List<AdminRetentionCohortResponse>();
     }
 
     public class AdminCompanyResponse
@@ -86,6 +87,19 @@ namespace InnerG.Api.DTOs
         public int Count { get; set; }
     }
 
+    public class AdminRetentionCohortResponse
+    {
+        public string CohortLabel { get; set; } = string.Empty;
+        public DateTime CohortStart { get; set; }
+        public int NewUsers { get; set; }
+        public int Retained30Days { get; set; }
+        public int Retained60Days { get; set; }
+        public int Retained90Days { get; set; }
+        public double Retained30DaysRate { get; set; }
+        public double Retained60DaysRate { get; set; }
+        public double Retained90DaysRate { get; set; }
+    }
+
     public class AdminAuditLogResponse
     {
         public Guid Id { get; set; }
@@ -140,6 +154,12 @@ namespace InnerG.Api.DTOs
         public bool IsActive { get; set; }
     }
 
+    public class BulkUpdateCompanyStatusRequest
+    {
+        public IList<Guid> CompanyIds { get; set; } = new List<Guid>();
+        public bool IsActive { get; set; }
+    }
+
     public class UpdateCompanyRequest
     {
         public string Name { get; set; } = string.Empty;
@@ -158,11 +178,57 @@ namespace InnerG.Api.DTOs
         public DateTime? TrialEndsAt { get; set; }
     }
 
+    public class AdminBillingRecordResponse
+    {
+        public Guid Id { get; set; }
+        public Guid CompanyId { get; set; }
+        public string CompanyName { get; set; } = string.Empty;
+        public Guid CompanySubscriptionId { get; set; }
+        public Guid SubscriptionPlanId { get; set; }
+        public string SubscriptionPlanName { get; set; } = string.Empty;
+        public string InvoiceNumber { get; set; } = string.Empty;
+        public BillingCycle BillingCycle { get; set; }
+        public BillingRecordStatus Status { get; set; }
+        public decimal Amount { get; set; }
+        public string Currency { get; set; } = "USD";
+        public int UserCountSnapshot { get; set; }
+        public DateTime PeriodStart { get; set; }
+        public DateTime PeriodEnd { get; set; }
+        public DateTime IssuedAt { get; set; }
+        public DateTime DueAt { get; set; }
+        public DateTime? PaidAt { get; set; }
+        public string? Notes { get; set; }
+    }
+
+    public class CreateBillingRecordRequest
+    {
+        public DateTime? DueAt { get; set; }
+        public string Currency { get; set; } = "USD";
+        public string? Notes { get; set; }
+    }
+
+    public class UpdateBillingRecordStatusRequest
+    {
+        public BillingRecordStatus Status { get; set; }
+        public string? Notes { get; set; }
+    }
+
     public class PlatformSettingsResponse
     {
         public string EnvironmentName { get; set; } = string.Empty;
         public bool GoogleOAuthConfigured { get; set; }
+        public string? GoogleClientId { get; set; }
         public bool SmtpConfigured { get; set; }
+        public string? SmtpHost { get; set; }
+        public int SmtpPort { get; set; }
+        public string? SmtpUsername { get; set; }
+        public string? SmtpFromName { get; set; }
+        public bool SmtpEnableSsl { get; set; }
+        public bool ZoomConfigured { get; set; }
+        public string? ZoomClientId { get; set; }
+        public bool MicrosoftOAuthConfigured { get; set; }
+        public string? MicrosoftClientId { get; set; }
+        public string? MicrosoftTenantId { get; set; }
         public int InviteExpiryDays { get; set; }
         public int RefreshTokenDays { get; set; }
         public bool MaintenanceMode { get; set; }
@@ -177,6 +243,19 @@ namespace InnerG.Api.DTOs
         public bool MaintenanceMode { get; set; }
         public string? SystemBanner { get; set; }
         public IList<string> FrontendUrls { get; set; } = new List<string>();
+        public string? GoogleClientId { get; set; }
+        public string? GoogleClientSecret { get; set; }
+        public string? SmtpHost { get; set; }
+        public int? SmtpPort { get; set; }
+        public string? SmtpUsername { get; set; }
+        public string? SmtpPassword { get; set; }
+        public string? SmtpFromName { get; set; }
+        public bool? SmtpEnableSsl { get; set; }
+        public string? ZoomClientId { get; set; }
+        public string? ZoomClientSecret { get; set; }
+        public string? MicrosoftClientId { get; set; }
+        public string? MicrosoftClientSecret { get; set; }
+        public string? MicrosoftTenantId { get; set; }
     }
 
     public class AdminModerationItemResponse

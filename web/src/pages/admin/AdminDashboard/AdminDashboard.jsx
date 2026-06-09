@@ -44,6 +44,11 @@ const initialCompanyForm = {
   allowExternalHrEmail: false,
 };
 
+const COMPANY_CREATE_ERROR_MESSAGES = {
+  EMAIL_ALREADY_IN_SYSTEM: 'This HR email is already used by another account in the system. Please use a different email address.',
+  COMPANY_MEMBER_EXISTS: 'This HR email already belongs to a member in this company.',
+};
+
 const initialEditCompanyForm = {
   name: '',
   domain: '',
@@ -68,6 +73,19 @@ const initialPlatformForm = {
   maintenanceMode: false,
   systemBanner: '',
   frontendUrlsText: '',
+  googleClientId: '',
+  googleClientSecret: '',
+  smtpHost: '',
+  smtpPort: 587,
+  smtpUsername: '',
+  smtpPassword: '',
+  smtpFromName: '',
+  smtpEnableSsl: true,
+  zoomClientId: '',
+  zoomClientSecret: '',
+  microsoftClientId: '',
+  microsoftClientSecret: '',
+  microsoftTenantId: '',
 };
 
 const initialSubscriptionPlanForm = {
@@ -77,6 +95,12 @@ const initialSubscriptionPlanForm = {
   pricePerUser: 0,
   billingCycle: 'Monthly',
   isActive: true,
+};
+
+const initialBillingRecordForm = {
+  dueAt: '',
+  currency: 'USD',
+  notes: '',
 };
 
 function normalizeDomainInput(value) {
@@ -109,11 +133,13 @@ export default function AdminDashboard() {
   const [overview, setOverview] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [billingRecords, setBillingRecords] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [companyForm, setCompanyForm] = useState(initialCompanyForm);
   const [companySubmitting, setCompanySubmitting] = useState(false);
+  const [companyCreateError, setCompanyCreateError] = useState('');
   const [lastHrInvite, setLastHrInvite] = useState(null);
   const [inviteLinkCopied, setInviteLinkCopied] = useState(false);
   const [editCompanyId, setEditCompanyId] = useState('');
@@ -122,6 +148,7 @@ export default function AdminDashboard() {
   const [subscriptionDrafts, setSubscriptionDrafts] = useState({});
   const [companySearch, setCompanySearch] = useState('');
   const [companyStatusFilter, setCompanyStatusFilter] = useState('all');
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState([]);
   const [auditFilters, setAuditFilters] = useState(initialAuditFilters);
   const [auditLoading, setAuditLoading] = useState(false);
   const [moderationQueue, setModerationQueue] = useState([]);
@@ -132,13 +159,21 @@ export default function AdminDashboard() {
   const [subscriptionCompanyId, setSubscriptionCompanyId] = useState('');
   const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
   const [companyActionDialog, setCompanyActionDialog] = useState(null);
+  const [bulkCompanyActionDialog, setBulkCompanyActionDialog] = useState(null);
   const [moderationDialog, setModerationDialog] = useState(null);
   const [moderationReason, setModerationReason] = useState('Policy violation');
+  const [moderationActionType, setModerationActionType] = useState('lock');
   const [subscriptionPlanDialogMode, setSubscriptionPlanDialogMode] = useState(null);
   const [editingSubscriptionPlanId, setEditingSubscriptionPlanId] = useState('');
   const [subscriptionPlanForm, setSubscriptionPlanForm] = useState(initialSubscriptionPlanForm);
   const [subscriptionPlanSubmitting, setSubscriptionPlanSubmitting] = useState(false);
   const [subscriptionPlanActionDialog, setSubscriptionPlanActionDialog] = useState(null);
+  const [billingDialogCompany, setBillingDialogCompany] = useState(null);
+  const [billingRecordForm, setBillingRecordForm] = useState(initialBillingRecordForm);
+  const [billingSubmitting, setBillingSubmitting] = useState(false);
+  const [billingStatusDialog, setBillingStatusDialog] = useState(null);
+  const [billingStatusValue, setBillingStatusValue] = useState('Pending');
+  const [billingStatusNotes, setBillingStatusNotes] = useState('');
 
   const loadAdminData = async ({ silent = false } = {}) => {
     if (silent) {
@@ -148,10 +183,11 @@ export default function AdminDashboard() {
     }
 
     try {
-      const [overviewData, companiesData, planData, auditData, moderationData] = await Promise.all([
+      const [overviewData, companiesData, planData, billingData, auditData, moderationData] = await Promise.all([
         adminService.getOverview(),
         adminService.getCompanies(),
         adminService.getSubscriptionPlans(),
+        adminService.getBillingRecords(),
         adminService.getAuditLogs(buildAuditQuery(auditFilters)),
         adminService.getModerationQueue(),
       ]);
@@ -159,6 +195,7 @@ export default function AdminDashboard() {
       setOverview(overviewData);
       setCompanies(companiesData);
       setPlans(planData);
+      setBillingRecords(billingData);
       setAuditLogs(auditData);
       setModerationQueue(moderationData);
       setSubscriptionDrafts(buildSubscriptionDrafts(companiesData, planData));
@@ -189,6 +226,13 @@ export default function AdminDashboard() {
       return matchesFilter && matchesKeyword;
     });
   }, [companies, companySearch, companyStatusFilter]);
+
+  const bulkEligibleCompanyRows = useMemo(
+    () => companyRows.filter((company) => !company.deletedAt),
+    [companyRows],
+  );
+
+  const allVisibleCompaniesSelected = bulkEligibleCompanyRows.length > 0 && bulkEligibleCompanyRows.every((company) => selectedCompanyIds.includes(company.id));
 
   const stats = useMemo(() => {
     if (!overview) {
@@ -284,6 +328,11 @@ export default function AdminDashboard() {
         ],
       }));
 
+    const retentionCohorts = (overview?.retentionCohorts || []).map((item) => ({
+      ...item,
+      strongestRate: Math.max(item.retained30DaysRate || 0, item.retained60DaysRate || 0, item.retained90DaysRate || 0),
+    }));
+
     return {
       totalCompanies,
       activeCompanies,
@@ -303,10 +352,12 @@ export default function AdminDashboard() {
       companyGrowthTrend,
       hottestDomains,
       coverageMatrix,
+      retentionCohorts,
     };
   }, [auditLogs, companies, overview]);
 
   const handleCompanyFormChange = (field, value) => {
+    setCompanyCreateError('');
     setCompanyForm((prev) => {
       const next = { ...prev, [field]: value };
 
@@ -330,10 +381,13 @@ export default function AdminDashboard() {
     event.preventDefault();
     setCompanySubmitting(true);
     setInviteLinkCopied(false);
+    setCompanyCreateError('');
 
     try {
       if (!companyForm.allowExternalHrEmail && !emailBelongsToDomain(companyForm.hrEmail, companyForm.emailDomain)) {
-        toastService.error(`HR email must use @${normalizeDomainInput(companyForm.emailDomain)}. Turn on "Allow external HR email" if this is a temporary onboarding address.`);
+        const domainError = `HR email must use @${normalizeDomainInput(companyForm.emailDomain)}. Turn on "Allow external HR email" if this is a temporary onboarding address.`;
+        setCompanyCreateError(domainError);
+        toastService.error(domainError);
         return;
       }
 
@@ -342,10 +396,14 @@ export default function AdminDashboard() {
       setLastHrInvite(hrInvite);
       toastService.success(`Company created. HR invite is ready for ${hrInvite?.email || companyForm.hrEmail}.`);
       setCompanyForm(initialCompanyForm);
+      setCompanyCreateError('');
       setCompanyDialogMode(null);
       await loadAdminData({ silent: true });
     } catch (err) {
-      toastService.error(extractErrorMessage(err, 'Unable to create company.'));
+      const errorCode = errorToCode(err);
+      const friendlyMessage = COMPANY_CREATE_ERROR_MESSAGES[errorCode] || extractErrorMessage(err, 'Unable to create company.');
+      setCompanyCreateError(friendlyMessage);
+      toastService.error(friendlyMessage);
     } finally {
       setCompanySubmitting(false);
     }
@@ -601,6 +659,7 @@ export default function AdminDashboard() {
 
     setModerationDialog(item);
     setModerationReason('Policy violation');
+    setModerationActionType(getDefaultModerationActionType(item));
   };
 
   const handleModerationAction = async () => {
@@ -613,8 +672,13 @@ export default function AdminDashboard() {
 
     try {
       if (moderationDialog.targetType === 'AppUser') {
-        await adminService.lockUser(moderationDialog.targetId, reason);
-        toastService.success('User account locked.');
+        if (moderationActionType === 'warn') {
+          await adminService.warnUser(moderationDialog.targetId, reason);
+          toastService.success('User warning sent.');
+        } else {
+          await adminService.lockUser(moderationDialog.targetId, reason);
+          toastService.success('User account locked.');
+        }
       } else if (moderationDialog.targetType === 'Resource') {
         await adminService.deleteModerationResource(moderationDialog.targetId, reason);
         toastService.success('Resource removed.');
@@ -636,8 +700,137 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDismissModerationReport = async () => {
+    if (!moderationDialog?.id || moderationDialog.source !== 'HrEscalation') {
+      return;
+    }
+
+    const reason = moderationReason.trim() || 'No further action required';
+    setModerationLoading(true);
+
+    try {
+      await adminService.dismissModerationReport(moderationDialog.id, reason);
+      toastService.success('Escalation report dismissed.');
+      setModerationDialog(null);
+      await handleRefreshModeration();
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to dismiss moderation report.'));
+    } finally {
+      setModerationLoading(false);
+    }
+  };
+
   const handlePlatformFormChange = (field, value) => {
     setPlatformForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleCompanySelection = (companyId) => {
+    setSelectedCompanyIds((prev) =>
+      prev.includes(companyId)
+        ? prev.filter((id) => id !== companyId)
+        : [...prev, companyId],
+    );
+  };
+
+  const toggleSelectVisibleCompanies = () => {
+    if (allVisibleCompaniesSelected) {
+      setSelectedCompanyIds((prev) => prev.filter((id) => !bulkEligibleCompanyRows.some((company) => company.id === id)));
+      return;
+    }
+
+    setSelectedCompanyIds((prev) => Array.from(new Set([...prev, ...bulkEligibleCompanyRows.map((company) => company.id)])));
+  };
+
+  const openBulkCompanyActionDialog = (isActive) => {
+    if (selectedCompanyIds.length === 0) {
+      toastService.error('Select at least one company first.');
+      return;
+    }
+
+    setBulkCompanyActionDialog({ isActive });
+  };
+
+  const handleConfirmBulkCompanyStatus = async () => {
+    if (!bulkCompanyActionDialog || selectedCompanyIds.length === 0) {
+      return;
+    }
+
+    setCompanyUpdating(true);
+    try {
+      await adminService.bulkUpdateCompanyStatus(selectedCompanyIds, bulkCompanyActionDialog.isActive);
+      toastService.success(bulkCompanyActionDialog.isActive ? 'Selected companies activated.' : 'Selected companies deactivated.');
+      setBulkCompanyActionDialog(null);
+      setSelectedCompanyIds([]);
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to update selected companies.'));
+    } finally {
+      setCompanyUpdating(false);
+    }
+  };
+
+  const openBillingDialog = (company) => {
+    setBillingDialogCompany(company);
+    setBillingRecordForm({
+      ...initialBillingRecordForm,
+      dueAt: toDateInputValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+    });
+  };
+
+  const handleBillingRecordFormChange = (field, value) => {
+    setBillingRecordForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateBillingRecord = async (event) => {
+    event.preventDefault();
+    if (!billingDialogCompany) {
+      return;
+    }
+
+    setBillingSubmitting(true);
+    try {
+      await adminService.createBillingRecord(billingDialogCompany.id, {
+        dueAt: billingRecordForm.dueAt || null,
+        currency: billingRecordForm.currency || 'USD',
+        notes: billingRecordForm.notes || null,
+      });
+      toastService.success('Billing record created.');
+      setBillingDialogCompany(null);
+      setBillingRecordForm(initialBillingRecordForm);
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to create billing record.'));
+    } finally {
+      setBillingSubmitting(false);
+    }
+  };
+
+  const openBillingStatusDialog = (record) => {
+    setBillingStatusDialog(record);
+    setBillingStatusValue(record.status || 'Pending');
+    setBillingStatusNotes(record.notes || '');
+  };
+
+  const handleUpdateBillingRecordStatus = async () => {
+    if (!billingStatusDialog) {
+      return;
+    }
+
+    setBillingSubmitting(true);
+    try {
+      await adminService.updateBillingRecordStatus(billingStatusDialog.id, {
+        status: billingStatusValue,
+        notes: billingStatusNotes || null,
+      });
+      toastService.success('Billing status updated.');
+      setBillingStatusDialog(null);
+      await loadAdminData({ silent: true });
+    } catch (err) {
+      toastService.error(extractErrorMessage(err, 'Unable to update billing status.'));
+    } finally {
+      setBillingSubmitting(false);
+    }
   };
 
   const handleSavePlatformSettings = async (event) => {
@@ -984,6 +1177,21 @@ export default function AdminDashboard() {
               </div>
             </div>
           </section>
+
+          <section className="space-y-4">
+            <SectionHeader
+              title="Retention Cohorts"
+              subtitle="Monthly signup cohorts with D30, D60, and D90 retention depth"
+              icon={TrendingUp}
+            />
+            <ChartPanel
+              title="Cohort Retention Table"
+              meta={`${overviewAnalytics.retentionCohorts.length} monthly cohorts tracked`}
+              footer={`Average retention: ${formatPercent((overview?.averageRetentionRate || 0) * 100)}`}
+            >
+              <RetentionCohortTable rows={overviewAnalytics.retentionCohorts} />
+            </ChartPanel>
+          </section>
         </div>
       ) : null}
 
@@ -1090,12 +1298,59 @@ export default function AdminDashboard() {
                   </select>
                 </div>
               </div>
+              {bulkEligibleCompanyRows.length > 0 ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleCompaniesSelected}
+                        onChange={toggleSelectVisibleCompanies}
+                        className="size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                      Select visible companies
+                    </label>
+                    <span className="text-sm text-slate-500">
+                      {selectedCompanyIds.length} selected
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openBulkCompanyActionDialog(true)}
+                      disabled={selectedCompanyIds.length === 0}
+                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      Activate selected
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openBulkCompanyActionDialog(false)}
+                      disabled={selectedCompanyIds.length === 0}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      Deactivate selected
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                 {companyRows.length === 0 ? (
                   <EmptyState label="No companies match the current filters." />
                 ) : null}
                 {companyRows.map((company) => (
                   <div key={company.id} className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-3">
+                      {!company.deletedAt ? (
+                        <input
+                          type="checkbox"
+                          checked={selectedCompanyIds.includes(company.id)}
+                          onChange={() => toggleCompanySelection(company.id)}
+                          className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      ) : (
+                        <span className="mt-1 block size-4" />
+                      )}
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="font-semibold text-slate-900">{company.name}</p>
@@ -1113,6 +1368,7 @@ export default function AdminDashboard() {
                       <p className="mt-1 text-xs text-slate-400">
                         Created {formatDate(company.createdAt)} · {company.timezone} · {company.language}
                       </p>
+                    </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="text-sm text-slate-500">{company.subscriptionPlanName || 'No plan'}</span>
@@ -1272,13 +1528,81 @@ export default function AdminDashboard() {
                       onClick={() => setSubscriptionCompanyId(company.id)}
                       className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-deep-blue transition hover:brightness-105"
                     >
-                      <BadgeDollarSign className="size-4" />
-                      Manage plan
+                        <BadgeDollarSign className="size-4" />
+                        Manage plan
+                      </button>
+                    <button
+                      type="button"
+                      onClick={() => openBillingDialog(company)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary/30 hover:bg-primary/5"
+                    >
+                      <Plus className="size-4" />
+                      Create invoice
                     </button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Billing History</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Track invoice-like billing records, payment status, and period snapshots per company subscription.
+                </p>
+              </div>
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                {billingRecords.length} records
+              </span>
+            </div>
+            <div className="mt-5 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.9fr_0.8fr] gap-4 border-b border-slate-200 bg-primary/5 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                <span>Invoice</span>
+                <span>Company</span>
+                <span>Amount</span>
+                <span>Period</span>
+                <span>Status</span>
+                <span>Action</span>
+              </div>
+              {billingRecords.length === 0 ? (
+                <EmptyState label="No billing records created yet." />
+              ) : (
+                billingRecords.map((record) => (
+                  <div key={record.id} className="grid grid-cols-[1.1fr_1fr_0.8fr_0.9fr_0.9fr_0.8fr] gap-4 border-b border-slate-100 bg-white px-4 py-4 text-sm last:border-b-0">
+                    <div>
+                      <p className="font-semibold text-slate-900">{record.invoiceNumber}</p>
+                      <p className="mt-1 text-xs text-slate-500">{record.subscriptionPlanName} · {record.billingCycle}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-800">{record.companyName}</p>
+                      <p className="mt-1 text-xs text-slate-500">{record.userCountSnapshot} users</p>
+                    </div>
+                    <div className="font-semibold text-slate-900">
+                      {record.currency} {formatDecimal(Number(record.amount || 0))}
+                    </div>
+                    <div className="text-slate-600">
+                      <p>{formatDate(record.periodStart)}</p>
+                      <p className="mt-1 text-xs text-slate-500">to {formatDate(record.periodEnd)}</p>
+                    </div>
+                    <div>
+                      <BillingStatusBadge status={record.status} />
+                      <p className="mt-1 text-xs text-slate-500">Due {formatDate(record.dueAt)}</p>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => openBillingStatusDialog(record)}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        Update
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       ) : null}
@@ -1419,7 +1743,7 @@ export default function AdminDashboard() {
             subtitle="Global integration, security posture, and editable runtime policy"
             icon={Cog}
           />
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <SettingCard
               icon={Cog}
               label="Environment"
@@ -1437,6 +1761,18 @@ export default function AdminDashboard() {
               label="SMTP"
               value={overview?.platformSettings?.smtpConfigured ? 'Configured' : 'Missing'}
               description="Email delivery for invites and security flows"
+            />
+            <SettingCard
+              icon={CalendarClock}
+              label="Zoom"
+              value={overview?.platformSettings?.zoomConfigured ? 'Configured' : 'Missing'}
+              description="Meeting provider credentials"
+            />
+            <SettingCard
+              icon={Globe2}
+              label="Microsoft OAuth"
+              value={overview?.platformSettings?.microsoftOAuthConfigured ? 'Configured' : 'Missing'}
+              description="Tenant-based identity integration"
             />
             <SettingCard
               icon={CalendarClock}
@@ -1534,10 +1870,18 @@ export default function AdminDashboard() {
                 <span className="mt-1 block text-sm text-slate-500">Use this only when the first HR invite needs a temporary external address.</span>
               </span>
             </label>
+            {companyCreateError ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {companyCreateError}
+              </div>
+            ) : null}
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setCompanyDialogMode(null)}
+                onClick={() => {
+                  setCompanyCreateError('');
+                  setCompanyDialogMode(null);
+                }}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 Cancel
@@ -1648,17 +1992,188 @@ export default function AdminDashboard() {
         </AdminDialog>
       ) : null}
 
+      {bulkCompanyActionDialog ? (
+        <AdminDialog
+          title={bulkCompanyActionDialog.isActive ? 'Activate Selected Companies' : 'Deactivate Selected Companies'}
+          description={`Apply this action to ${selectedCompanyIds.length} selected companies.`}
+          icon={ShieldAlert}
+          onClose={() => setBulkCompanyActionDialog(null)}
+        >
+          <div className="space-y-5">
+            <div className={`rounded-xl border px-4 py-3 text-sm ${
+              bulkCompanyActionDialog.isActive
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-amber-200 bg-amber-50 text-amber-700'
+            }`}>
+              {bulkCompanyActionDialog.isActive
+                ? 'Selected inactive workspaces will regain access after activation.'
+                : 'Selected active workspaces will be disabled until they are activated again.'}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Selected companies</p>
+              <p className="mt-2 text-sm text-slate-700">{selectedCompanyIds.length}</p>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setBulkCompanyActionDialog(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkCompanyStatus}
+                disabled={companyUpdating}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                  bulkCompanyActionDialog.isActive
+                    ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                    : 'border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                } disabled:opacity-60`}
+              >
+                {companyUpdating ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
+                {bulkCompanyActionDialog.isActive ? 'Activate selected' : 'Deactivate selected'}
+              </button>
+            </div>
+          </div>
+        </AdminDialog>
+      ) : null}
+
+      {billingDialogCompany ? (
+        <AdminDialog
+          title="Create Billing Record"
+          description={`Generate a billing record for ${billingDialogCompany.name} based on its current subscription.`}
+          icon={CreditCard}
+          onClose={() => setBillingDialogCompany(null)}
+        >
+          <form onSubmit={handleCreateBillingRecord} className="space-y-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              This record snapshots the company subscription, user count, billing cycle, and period at the time of creation.
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                type="date"
+                label="Due date"
+                value={billingRecordForm.dueAt}
+                onChange={(value) => handleBillingRecordFormChange('dueAt', value)}
+              />
+              <Input
+                label="Currency"
+                value={billingRecordForm.currency}
+                onChange={(value) => handleBillingRecordFormChange('currency', value)}
+                placeholder="USD"
+              />
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Notes</span>
+              <textarea
+                value={billingRecordForm.notes}
+                onChange={(event) => handleBillingRecordFormChange('notes', event.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Optional billing notes"
+              />
+            </label>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setBillingDialogCompany(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={billingSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {billingSubmitting ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+                Create record
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      ) : null}
+
+      {billingStatusDialog ? (
+        <AdminDialog
+          title="Update Billing Status"
+          description={`Update ${billingStatusDialog.invoiceNumber} for ${billingStatusDialog.companyName}.`}
+          icon={CreditCard}
+          onClose={() => setBillingStatusDialog(null)}
+        >
+          <div className="space-y-5">
+            <Select
+              label="Status"
+              value={billingStatusValue}
+              onChange={setBillingStatusValue}
+              options={[
+                { value: 'Pending', label: 'Pending' },
+                { value: 'Paid', label: 'Paid' },
+                { value: 'Failed', label: 'Failed' },
+                { value: 'Refunded', label: 'Refunded' },
+                { value: 'Voided', label: 'Voided' },
+              ]}
+            />
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Notes</span>
+              <textarea
+                value={billingStatusNotes}
+                onChange={(event) => setBillingStatusNotes(event.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Optional status notes"
+              />
+            </label>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setBillingStatusDialog(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateBillingRecordStatus}
+                disabled={billingSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-deep-blue transition hover:brightness-105 disabled:opacity-60"
+              >
+                {billingSubmitting ? <Loader2 className="size-4 animate-spin" /> : <CreditCard className="size-4" />}
+                Save status
+              </button>
+            </div>
+          </div>
+        </AdminDialog>
+      ) : null}
+
       {moderationDialog ? (
         <AdminDialog
           title="Moderation Action"
-          description={buildModerationDialogDescription(moderationDialog)}
+          description={buildModerationDialogDescription(moderationDialog, moderationActionType)}
           icon={ShieldAlert}
           onClose={() => setModerationDialog(null)}
         >
           <div className="space-y-5">
             <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {buildModerationImpactText(moderationDialog)}
+              {buildModerationImpactText(moderationDialog, moderationActionType)}
             </div>
+
+            {moderationDialog.targetType === 'AppUser' ? (
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Action</span>
+                <select
+                  value={moderationActionType}
+                  onChange={(event) => setModerationActionType(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="warn">Warn user</option>
+                  <option value="lock">Lock user</option>
+                </select>
+              </label>
+            ) : null}
 
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Reason</span>
@@ -1679,6 +2194,17 @@ export default function AdminDashboard() {
               >
                 Cancel
               </button>
+              {moderationDialog.source === 'HrEscalation' ? (
+                <button
+                  type="button"
+                  onClick={handleDismissModerationReport}
+                  disabled={moderationLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 disabled:opacity-60"
+                >
+                  {moderationLoading ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                  Dismiss report
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleModerationAction}
@@ -1686,7 +2212,7 @@ export default function AdminDashboard() {
                 className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
               >
                 {moderationLoading ? <Loader2 className="size-4 animate-spin" /> : <ShieldAlert className="size-4" />}
-                {getModerationActionLabel(moderationDialog)}
+                {getModerationActionLabel(moderationDialog, moderationActionType)}
               </button>
             </div>
           </div>
@@ -1891,7 +2417,8 @@ export default function AdminDashboard() {
           onClose={() => setPlatformDialogOpen(false)}
           size="max-w-3xl"
         >
-          <form onSubmit={handleSavePlatformSettings} className="grid gap-4 md:grid-cols-2">
+          <form onSubmit={handleSavePlatformSettings} className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
             <Input
               type="number"
               label="Invite expiry days"
@@ -1934,7 +2461,142 @@ export default function AdminDashboard() {
                 placeholder="One URL per line"
               />
             </label>
-            <div className="flex flex-wrap justify-end gap-3 md:col-span-2">
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Google OAuth</h3>
+                  <p className="mt-1 text-sm text-slate-500">Client ID is shared with the web app env. Leave secret blank to keep the current value.</p>
+                </div>
+                <IntegrationBadge active={overview?.platformSettings?.googleOAuthConfigured} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Google client ID"
+                  value={platformForm.googleClientId}
+                  onChange={(value) => handlePlatformFormChange('googleClientId', value)}
+                  placeholder="apps.googleusercontent.com client id"
+                />
+                <Input
+                  type="password"
+                  label="Google client secret"
+                  value={platformForm.googleClientSecret}
+                  onChange={(value) => handlePlatformFormChange('googleClientSecret', value)}
+                  placeholder="Leave blank to keep existing secret"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">SMTP</h3>
+                  <p className="mt-1 text-sm text-slate-500">Updates email delivery credentials used by invites and notifications.</p>
+                </div>
+                <IntegrationBadge active={overview?.platformSettings?.smtpConfigured} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="SMTP host"
+                  value={platformForm.smtpHost}
+                  onChange={(value) => handlePlatformFormChange('smtpHost', value)}
+                  placeholder="smtp.gmail.com"
+                />
+                <Input
+                  type="number"
+                  label="SMTP port"
+                  value={platformForm.smtpPort}
+                  onChange={(value) => handlePlatformFormChange('smtpPort', value)}
+                />
+                <Input
+                  label="SMTP username"
+                  value={platformForm.smtpUsername}
+                  onChange={(value) => handlePlatformFormChange('smtpUsername', value)}
+                  placeholder="mailer@example.com"
+                />
+                <Input
+                  type="password"
+                  label="SMTP password"
+                  value={platformForm.smtpPassword}
+                  onChange={(value) => handlePlatformFormChange('smtpPassword', value)}
+                  placeholder="Leave blank to keep existing password"
+                />
+                <Input
+                  label="From name"
+                  value={platformForm.smtpFromName}
+                  onChange={(value) => handlePlatformFormChange('smtpFromName', value)}
+                  placeholder="InnerG Support"
+                />
+                <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={platformForm.smtpEnableSsl}
+                    onChange={(event) => handlePlatformFormChange('smtpEnableSsl', event.target.checked)}
+                    className="mt-1 size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-900">Enable SSL</span>
+                    <span className="mt-1 block text-sm text-slate-500">Recommended for production email delivery.</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Meeting Integrations</h3>
+                  <p className="mt-1 text-sm text-slate-500">Store credentials now so Zoom or Microsoft-based flows can be enabled without editing server files later.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <IntegrationBadge label="Zoom" active={overview?.platformSettings?.zoomConfigured} />
+                  <IntegrationBadge label="Microsoft" active={overview?.platformSettings?.microsoftOAuthConfigured} />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input
+                  label="Zoom client ID"
+                  value={platformForm.zoomClientId}
+                  onChange={(value) => handlePlatformFormChange('zoomClientId', value)}
+                  placeholder="Zoom app client id"
+                />
+                <Input
+                  type="password"
+                  label="Zoom client secret"
+                  value={platformForm.zoomClientSecret}
+                  onChange={(value) => handlePlatformFormChange('zoomClientSecret', value)}
+                  placeholder="Leave blank to keep existing secret"
+                />
+                <Input
+                  label="Microsoft client ID"
+                  value={platformForm.microsoftClientId}
+                  onChange={(value) => handlePlatformFormChange('microsoftClientId', value)}
+                  placeholder="Azure app client id"
+                />
+                <Input
+                  type="password"
+                  label="Microsoft client secret"
+                  value={platformForm.microsoftClientSecret}
+                  onChange={(value) => handlePlatformFormChange('microsoftClientSecret', value)}
+                  placeholder="Leave blank to keep existing secret"
+                />
+                <div className="md:col-span-2">
+                  <Input
+                    label="Microsoft tenant ID"
+                    value={platformForm.microsoftTenantId}
+                    onChange={(value) => handlePlatformFormChange('microsoftTenantId', value)}
+                    placeholder="Azure tenant id"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Runtime note: API env changes apply after restarting the backend, and `VITE_GOOGLE_CLIENT_ID` changes apply after rebuilding the web app.
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setPlatformDialogOpen(false)}
@@ -2019,6 +2681,71 @@ function ChartPanel({ title, meta, footer, children }) {
       </div>
       <div className="mt-5">{children}</div>
     </div>
+  );
+}
+
+function IntegrationBadge({ active, label = null }) {
+  return (
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+      active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+    }`}>
+      {label ? `${label} · ` : ''}{active ? 'Configured' : 'Missing'}
+    </span>
+  );
+}
+
+function RetentionCohortTable({ rows }) {
+  if (!rows.length) {
+    return <EmptyState label="No retention cohorts available yet." />;
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200">
+      <div className="grid grid-cols-[1fr_0.7fr_0.7fr_0.7fr_0.7fr] gap-4 border-b border-slate-200 bg-primary/5 px-4 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+        <span>Cohort</span>
+        <span>New Users</span>
+        <span>D30</span>
+        <span>D60</span>
+        <span>D90</span>
+      </div>
+      {rows.map((row) => (
+        <div key={row.cohortLabel} className="grid grid-cols-[1fr_0.7fr_0.7fr_0.7fr_0.7fr] gap-4 border-b border-slate-100 bg-white px-4 py-4 text-sm last:border-b-0">
+          <div>
+            <p className="font-semibold text-slate-900">{row.cohortLabel}</p>
+            <p className="mt-1 text-xs text-slate-500">{formatDate(row.cohortStart)}</p>
+          </div>
+          <div className="font-semibold text-slate-800">{row.newUsers}</div>
+          <RetentionRateCell count={row.retained30Days} rate={row.retained30DaysRate} />
+          <RetentionRateCell count={row.retained60Days} rate={row.retained60DaysRate} />
+          <RetentionRateCell count={row.retained90Days} rate={row.retained90DaysRate} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RetentionRateCell({ count, rate }) {
+  return (
+    <div>
+      <p className="font-semibold text-slate-900">{count}</p>
+      <p className="mt-1 text-xs text-slate-500">{formatPercent(rate)}</p>
+    </div>
+  );
+}
+
+function BillingStatusBadge({ status }) {
+  const styles = {
+    Pending: 'bg-amber-50 text-amber-700',
+    Paid: 'bg-emerald-50 text-emerald-700',
+    Failed: 'bg-rose-50 text-rose-700',
+    Refunded: 'bg-sky-50 text-sky-700',
+    Voided: 'bg-slate-100 text-slate-600',
+  };
+
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] || 'bg-slate-100 text-slate-600'}`}>
+      {status}
+    </span>
   );
 }
 
@@ -2497,8 +3224,20 @@ function getAdminTabFromPath(pathname) {
   return 'overview';
 }
 
-function buildModerationDialogDescription(item) {
+function getDefaultModerationActionType(item) {
+  if (item?.targetType === 'AppUser') {
+    return 'warn';
+  }
+
+  return 'apply';
+}
+
+function buildModerationDialogDescription(item, actionType = getDefaultModerationActionType(item)) {
   if (item.targetType === 'AppUser') {
+    if (actionType === 'warn') {
+      return `Send a policy warning to the selected user in ${item.companyName || 'this workspace'}.`;
+    }
+
     return `Lock the selected user account for ${item.companyName || 'this workspace'}.`;
   }
 
@@ -2513,8 +3252,12 @@ function buildModerationDialogDescription(item) {
   return 'Apply a system-level moderation action to the selected item.';
 }
 
-function buildModerationImpactText(item) {
+function buildModerationImpactText(item, actionType = getDefaultModerationActionType(item)) {
   if (item.targetType === 'AppUser') {
+    if (actionType === 'warn') {
+      return 'This will send a platform warning notification to the user and record the action in the audit log.';
+    }
+
     return 'This will disable the user account and revoke active sessions.';
   }
 
@@ -2529,12 +3272,16 @@ function buildModerationImpactText(item) {
   return 'This action will be recorded in the audit log.';
 }
 
-function getModerationActionLabel(item) {
+function getModerationActionLabel(item, actionType = getDefaultModerationActionType(item)) {
   if (!item?.targetId) {
     return 'No direct action';
   }
 
   if (item.targetType === 'AppUser') {
+    if (actionType === 'warn') {
+      return 'Warn user';
+    }
+
     return 'Lock user';
   }
 
@@ -2564,6 +3311,19 @@ function buildPlatformForm(settings = {}) {
     maintenanceMode: Boolean(settings?.maintenanceMode),
     systemBanner: settings?.systemBanner || '',
     frontendUrlsText: (settings?.frontendUrls || []).join('\n'),
+    googleClientId: settings?.googleClientId || '',
+    googleClientSecret: '',
+    smtpHost: settings?.smtpHost || '',
+    smtpPort: settings?.smtpPort || 587,
+    smtpUsername: settings?.smtpUsername || '',
+    smtpPassword: '',
+    smtpFromName: settings?.smtpFromName || '',
+    smtpEnableSsl: settings?.smtpEnableSsl ?? true,
+    zoomClientId: settings?.zoomClientId || '',
+    zoomClientSecret: '',
+    microsoftClientId: settings?.microsoftClientId || '',
+    microsoftClientSecret: '',
+    microsoftTenantId: settings?.microsoftTenantId || '',
   };
 }
 
@@ -2577,6 +3337,19 @@ function parsePlatformForm(form) {
       .split(/\r?\n/)
       .map((item) => item.trim())
       .filter(Boolean),
+    googleClientId: form.googleClientId || null,
+    googleClientSecret: form.googleClientSecret || null,
+    smtpHost: form.smtpHost || null,
+    smtpPort: Number(form.smtpPort) || null,
+    smtpUsername: form.smtpUsername || null,
+    smtpPassword: form.smtpPassword || null,
+    smtpFromName: form.smtpFromName || null,
+    smtpEnableSsl: Boolean(form.smtpEnableSsl),
+    zoomClientId: form.zoomClientId || null,
+    zoomClientSecret: form.zoomClientSecret || null,
+    microsoftClientId: form.microsoftClientId || null,
+    microsoftClientSecret: form.microsoftClientSecret || null,
+    microsoftTenantId: form.microsoftTenantId || null,
   };
 }
 
@@ -2855,5 +3628,13 @@ function extractErrorMessage(error, fallback) {
     error?.response?.data?.title ||
     error?.message ||
     fallback
+  );
+}
+
+function errorToCode(error) {
+  return (
+    error?.response?.data?.error?.code ||
+    error?.response?.data?.code ||
+    ''
   );
 }

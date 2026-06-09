@@ -2,6 +2,7 @@
 bin/
 obj/
 api-build-temp/
+tmp_build_api/
 
 # Run logs
 *.log

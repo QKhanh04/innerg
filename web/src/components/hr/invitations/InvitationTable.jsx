@@ -3,6 +3,7 @@ import InvitationActionMenu from './InvitationActionMenu';
 import { Trash2 } from 'lucide-react';
 import { useInvitationActions } from '../../../hooks/hr/useInvitationActions';
 import { cn } from '../../../lib/utils';
+import ActionDialog from '../../common/ActionDialog';
 
 const statusConfig = {
     PENDING: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
@@ -17,6 +18,7 @@ function fmt(date) {
 
 export default function InvitationTable({ invitations, isLoading }) {
     const [selectedIds, setSelectedIds] = useState([]);
+    const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
     const { bulkDeleteMutation } = useInvitationActions();
 
     if (isLoading) return null;
@@ -47,11 +49,7 @@ export default function InvitationTable({ invitations, isLoading }) {
     };
 
     const handleBulkDelete = () => {
-        if (window.confirm(`Are you sure you want to delete ${selectedIds.length} invitations?`)) {
-            bulkDeleteMutation.mutate(selectedIds, {
-                onSuccess: () => setSelectedIds([])
-            });
-        }
+        setShowBulkDeleteConfirm(true);
     };
 
     return (
@@ -154,6 +152,25 @@ export default function InvitationTable({ invitations, isLoading }) {
                     </table>
                 </div>
             </div>
+
+            <ActionDialog
+                open={showBulkDeleteConfirm}
+                title="Delete Selected Invitations"
+                description="This will remove the selected invitation records from the table."
+                details={`${selectedIds.length} invitation(s) selected`}
+                confirmLabel="Delete selected"
+                intent="danger"
+                isPending={bulkDeleteMutation.isPending}
+                onClose={() => setShowBulkDeleteConfirm(false)}
+                onConfirm={() => {
+                    bulkDeleteMutation.mutate(selectedIds, {
+                        onSuccess: () => {
+                            setSelectedIds([]);
+                            setShowBulkDeleteConfirm(false);
+                        }
+                    });
+                }}
+            />
         </div>
     );
 }
