@@ -75,8 +75,18 @@ namespace InnerG.Api.Services.Implementations
                 })
                 .ToListAsync();
 
+            var menteeRoleIds = await _context.Roles
+                .Where(r => r.Name == AuthRoles.Mentee)
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            var menteeUserIds = await _context.UserRoles
+                .Where(ur => menteeRoleIds.Contains(ur.RoleId))
+                .Select(ur => ur.UserId)
+                .ToListAsync();
+
             var topLearners = await _context.Enrollments
-                .Where(e => e.CompanyId == companyId)
+                .Where(e => e.CompanyId == companyId && menteeUserIds.Contains(e.UserId))
                 .GroupBy(e => e.UserId)
                 .Select(g => new { UserId = g.Key, Points = g.Sum(e => e.EarnedPoints) })
                 .OrderByDescending(x => x.Points)

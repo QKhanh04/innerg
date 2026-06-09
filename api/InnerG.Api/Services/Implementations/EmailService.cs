@@ -89,8 +89,12 @@ namespace InnerG.Api.Services.Implementations
             }
             catch (SmtpException ex)
             {
-                Console.WriteLine($"[EmailService] SmtpException for {toEmail}: {ex.Message}");
-                throw new ExternalServiceException($"Failed to send email: {ex.Message}");
+                Console.WriteLine($"[EmailService] SmtpException for {toEmail}: Status={ex.StatusCode}, Message={ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"[EmailService] Inner Exception: {ex.InnerException.Message}");
+                }
+                throw new ExternalServiceException($"Failed to send email: {ex.Message} (Status: {ex.StatusCode})");
             }
             catch (Exception ex)
             {
