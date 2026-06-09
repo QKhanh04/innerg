@@ -398,7 +398,8 @@ namespace InnerG.Api.Services.Implementations
                         Url = resReq.Url,
                         FileType = resReq.FileType,
                         FileSizeBytes = resReq.FileSizeBytes,
-                        IsPublic = true
+                        IsPublic = false,
+                        ModerationStatus = ResourceModerationStatus.PendingReview
                     };
                     await _unitOfWork.Repository<Resource>().AddAsync(resource);
                 }
@@ -555,7 +556,8 @@ namespace InnerG.Api.Services.Implementations
                         Url = resReq.Url,
                         FileType = resReq.FileType,
                         FileSizeBytes = resReq.FileSizeBytes,
-                        IsPublic = true
+                        IsPublic = false,
+                        ModerationStatus = ResourceModerationStatus.PendingReview
                     };
                     await _unitOfWork.Repository<Resource>().AddAsync(resource);
                 }

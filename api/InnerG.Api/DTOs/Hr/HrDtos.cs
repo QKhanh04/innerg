@@ -162,6 +162,8 @@ namespace InnerG.Api.DTOs.Hr
         public string EventTitle { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public ResourceModerationStatus ModerationStatus { get; set; }
+        public string? ReviewNotes { get; set; }
     }
 
     public class ReviewResourceRequest

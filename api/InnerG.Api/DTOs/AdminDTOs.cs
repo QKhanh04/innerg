@@ -98,6 +98,9 @@ namespace InnerG.Api.DTOs
         public double Retained30DaysRate { get; set; }
         public double Retained60DaysRate { get; set; }
         public double Retained90DaysRate { get; set; }
+        public bool Is30DayMatured { get; set; }
+        public bool Is60DayMatured { get; set; }
+        public bool Is90DayMatured { get; set; }
     }
 
     public class AdminAuditLogResponse

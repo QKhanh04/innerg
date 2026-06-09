@@ -108,7 +108,7 @@ namespace InnerG.Api.Services.Implementations
         {
             return await _context.Resources
                 .Include(r => r.TrainingEvent)
-                .Where(r => r.CompanyId == companyId && !r.IsPublic)
+                .Where(r => r.CompanyId == companyId && r.ModerationStatus == ResourceModerationStatus.PendingReview)
                 .OrderByDescending(r => r.CreatedAt)
                 .Select(r => new HrPendingResourceDto
                 {
@@ -116,7 +116,9 @@ namespace InnerG.Api.Services.Implementations
                     Title = r.Title,
                     EventTitle = r.TrainingEvent.Title,
                     Type = r.Type.ToString(),
-                    CreatedAt = r.CreatedAt
+                    CreatedAt = r.CreatedAt,
+                    ModerationStatus = r.ModerationStatus,
+                    ReviewNotes = r.ReviewNotes
                 })
                 .ToListAsync();
         }
@@ -130,14 +132,12 @@ namespace InnerG.Api.Services.Implementations
             if (resource == null)
                 throw new BusinessException("RESOURCE_NOT_FOUND", "Không tìm thấy tài nguyên.", 404);
 
-            if (request.Approved)
-            {
-                resource.IsPublic = true;
-            }
-            else
-            {
-                resource.IsPublic = false;
-            }
+            resource.IsPublic = request.Approved;
+            resource.ModerationStatus = request.Approved
+                ? ResourceModerationStatus.Approved
+                : ResourceModerationStatus.Rejected;
+            resource.ReviewedAt = DateTime.UtcNow;
+            resource.ReviewNotes = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
 
             await _context.SaveChangesAsync();
             await HrAuditHelper.LogAsync(
@@ -152,7 +152,9 @@ namespace InnerG.Api.Services.Implementations
                 {
                     resource.Title,
                     resource.IsPublic,
-                    request.Reason
+                    resource.ModerationStatus,
+                    resource.ReviewedAt,
+                    resource.ReviewNotes
                 });
 
             var trainerUserId = resource.TrainingEvent?.Trainer?.UserId;
@@ -285,7 +287,7 @@ namespace InnerG.Api.Services.Implementations
 
             var pendingResources = await _context.Resources
                 .Include(x => x.TrainingEvent)
-                .Where(x => x.CompanyId == companyId && !x.IsPublic)
+                .Where(x => x.CompanyId == companyId && x.ModerationStatus == ResourceModerationStatus.PendingReview)
                 .Select(x => new HrModerationReportCenterItemDto
                 {
                     ItemType = "PendingResourceReview",

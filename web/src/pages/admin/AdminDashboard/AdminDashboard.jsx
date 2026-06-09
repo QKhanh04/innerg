@@ -234,6 +234,14 @@ export default function AdminDashboard() {
 
   const allVisibleCompaniesSelected = bulkEligibleCompanyRows.length > 0 && bulkEligibleCompanyRows.every((company) => selectedCompanyIds.includes(company.id));
 
+  useEffect(() => {
+    const visibleIds = new Set(bulkEligibleCompanyRows.map((company) => company.id));
+    setSelectedCompanyIds((prev) => {
+      const next = prev.filter((id) => visibleIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [bulkEligibleCompanyRows]);
+
   const stats = useMemo(() => {
     if (!overview) {
       return [];
@@ -333,6 +341,11 @@ export default function AdminDashboard() {
       strongestRate: Math.max(item.retained30DaysRate || 0, item.retained60DaysRate || 0, item.retained90DaysRate || 0),
     }));
 
+    const maturedD30Cohorts = retentionCohorts.filter((item) => item.is30DayMatured);
+    const averageCohortRetention = maturedD30Cohorts.length
+      ? maturedD30Cohorts.reduce((sum, item) => sum + (item.retained30DaysRate || 0), 0) / maturedD30Cohorts.length
+      : null;
+
     return {
       totalCompanies,
       activeCompanies,
@@ -353,6 +366,7 @@ export default function AdminDashboard() {
       hottestDomains,
       coverageMatrix,
       retentionCohorts,
+      averageCohortRetention,
     };
   }, [auditLogs, companies, overview]);
 
@@ -1187,7 +1201,9 @@ export default function AdminDashboard() {
             <ChartPanel
               title="Cohort Retention Table"
               meta={`${overviewAnalytics.retentionCohorts.length} monthly cohorts tracked`}
-              footer={`Average retention: ${formatPercent((overview?.averageRetentionRate || 0) * 100)}`}
+              footer={overviewAnalytics.averageCohortRetention == null
+                ? 'Waiting for the first mature D30 cohort'
+                : `Average D30 retention: ${formatPercent(overviewAnalytics.averageCohortRetention)}`}
             >
               <RetentionCohortTable rows={overviewAnalytics.retentionCohorts} />
             </ChartPanel>
@@ -2715,16 +2731,25 @@ function RetentionCohortTable({ rows }) {
             <p className="mt-1 text-xs text-slate-500">{formatDate(row.cohortStart)}</p>
           </div>
           <div className="font-semibold text-slate-800">{row.newUsers}</div>
-          <RetentionRateCell count={row.retained30Days} rate={row.retained30DaysRate} />
-          <RetentionRateCell count={row.retained60Days} rate={row.retained60DaysRate} />
-          <RetentionRateCell count={row.retained90Days} rate={row.retained90DaysRate} />
+          <RetentionRateCell count={row.retained30Days} rate={row.retained30DaysRate} matured={row.is30DayMatured} />
+          <RetentionRateCell count={row.retained60Days} rate={row.retained60DaysRate} matured={row.is60DayMatured} />
+          <RetentionRateCell count={row.retained90Days} rate={row.retained90DaysRate} matured={row.is90DayMatured} />
         </div>
       ))}
     </div>
   );
 }
 
-function RetentionRateCell({ count, rate }) {
+function RetentionRateCell({ count, rate, matured }) {
+  if (!matured) {
+    return (
+      <div>
+        <p className="font-semibold text-slate-400">-</p>
+        <p className="mt-1 text-xs text-slate-400">Not mature yet</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <p className="font-semibold text-slate-900">{count}</p>

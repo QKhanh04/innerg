@@ -20,6 +20,15 @@ namespace InnerG.Api.Controllers
     [Authorize(Roles = AuthRoles.SystemAdmin)]
     public class AdminController : ControllerBase
     {
+        private sealed class PersistedAppSettings
+        {
+            public int RefreshTokenDays { get; set; } = 7;
+            public int InviteExpiryDays { get; set; } = 7;
+            public bool MaintenanceMode { get; set; }
+            public string? SystemBanner { get; set; }
+            public IList<string> FrontendUrls { get; set; } = new List<string>();
+        }
+
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly IWebHostEnvironment _environment;
@@ -754,8 +763,9 @@ namespace InnerG.Api.Controllers
 
                     var oldValue = new { record.Status, record.PaidAt, record.Notes };
                     record.Status = request.Status;
-                    record.PaidAt = request.Status == BillingRecordStatus.Paid ? DateTime.UtcNow : null;
-                    record.Notes = string.IsNullOrWhiteSpace(request.Notes) ? record.Notes : request.Notes.Trim();
+                    if (request.Status == BillingRecordStatus.Paid && record.PaidAt == null)
+                        record.PaidAt = DateTime.UtcNow;
+                    record.Notes = NormalizeOptional(request.Notes);
 
                     await AddAuditLogAsync(
                         record.CompanyId,
@@ -1073,6 +1083,7 @@ namespace InnerG.Api.Controllers
         public async Task<IActionResult> UpdatePlatformSettingsAsync([FromBody] UpdatePlatformSettingsRequest request)
         {
             var sanitizedRequest = SanitizePlatformSettingsForAudit(request);
+            var previousSettings = BuildPlatformSettings();
 
             return await ExecuteAdminMutationAsync(
                 Guid.Empty,
@@ -1096,7 +1107,7 @@ namespace InnerG.Api.Controllers
                         "PlatformSettings",
                         null,
                         "Update",
-                        BuildPlatformSettings(),
+                        previousSettings,
                         sanitizedRequest);
 
                     await _context.SaveChangesAsync();
@@ -1348,9 +1359,19 @@ namespace InnerG.Api.Controllers
                     .Where(user => user.CreatedAt >= cohortStart && user.CreatedAt < cohortEnd)
                     .ToList();
 
-                var retained30 = cohortUsers.Count(user => user.LastLoginAt.HasValue && user.LastLoginAt.Value >= cohortStart.AddDays(30));
-                var retained60 = cohortUsers.Count(user => user.LastLoginAt.HasValue && user.LastLoginAt.Value >= cohortStart.AddDays(60));
-                var retained90 = cohortUsers.Count(user => user.LastLoginAt.HasValue && user.LastLoginAt.Value >= cohortStart.AddDays(90));
+                var is30DayMatured = now >= cohortEnd.AddDays(30);
+                var is60DayMatured = now >= cohortEnd.AddDays(60);
+                var is90DayMatured = now >= cohortEnd.AddDays(90);
+
+                var retained30 = is30DayMatured
+                    ? cohortUsers.Count(user => user.LastLoginAt.HasValue && user.LastLoginAt.Value >= cohortStart.AddDays(30))
+                    : 0;
+                var retained60 = is60DayMatured
+                    ? cohortUsers.Count(user => user.LastLoginAt.HasValue && user.LastLoginAt.Value >= cohortStart.AddDays(60))
+                    : 0;
+                var retained90 = is90DayMatured
+                    ? cohortUsers.Count(user => user.LastLoginAt.HasValue && user.LastLoginAt.Value >= cohortStart.AddDays(90))
+                    : 0;
                 var newUsers = cohortUsers.Count;
 
                 return new AdminRetentionCohortResponse
@@ -1361,9 +1382,12 @@ namespace InnerG.Api.Controllers
                     Retained30Days = retained30,
                     Retained60Days = retained60,
                     Retained90Days = retained90,
-                    Retained30DaysRate = newUsers == 0 ? 0 : Math.Round((double)retained30 / newUsers * 100, 2),
-                    Retained60DaysRate = newUsers == 0 ? 0 : Math.Round((double)retained60 / newUsers * 100, 2),
-                    Retained90DaysRate = newUsers == 0 ? 0 : Math.Round((double)retained90 / newUsers * 100, 2)
+                    Retained30DaysRate = !is30DayMatured || newUsers == 0 ? 0 : Math.Round((double)retained30 / newUsers * 100, 2),
+                    Retained60DaysRate = !is60DayMatured || newUsers == 0 ? 0 : Math.Round((double)retained60 / newUsers * 100, 2),
+                    Retained90DaysRate = !is90DayMatured || newUsers == 0 ? 0 : Math.Round((double)retained90 / newUsers * 100, 2),
+                    Is30DayMatured = is30DayMatured,
+                    Is60DayMatured = is60DayMatured,
+                    Is90DayMatured = is90DayMatured
                 };
             }).ToList();
         }
@@ -1386,8 +1410,9 @@ namespace InnerG.Api.Controllers
 
         private PlatformSettingsResponse BuildPlatformSettings()
         {
+            var appSettings = LoadAppSettingsValues();
             var apiEnv = LoadEnvFileValues(_apiEnvPath);
-            var frontendUrls = _configuration.GetSection("Frontend:Urls").Get<string[]>() ?? [];
+            var frontendUrls = appSettings.FrontendUrls;
             var googleClientId = GetPersistedValue(apiEnv, "GOOGLE_CLIENT_ID", _configuration["GOOGLE_CLIENT_ID"]);
             var googleClientSecret = GetPersistedValue(apiEnv, "GOOGLE_CLIENT_SECRET", _configuration["GOOGLE_CLIENT_SECRET"]);
             var smtpHost = GetPersistedValue(apiEnv, "SMTP_HOST", _configuration["SMTP_HOST"]);
@@ -1428,10 +1453,10 @@ namespace InnerG.Api.Controllers
                     !string.IsNullOrWhiteSpace(microsoftTenantId),
                 MicrosoftClientId = microsoftClientId,
                 MicrosoftTenantId = microsoftTenantId,
-                InviteExpiryDays = int.TryParse(_configuration["Invites:ExpireDays"], out var inviteDays) && inviteDays > 0 ? inviteDays : 7,
-                RefreshTokenDays = int.TryParse(_configuration["Jwt:RefreshTokenDays"], out var refreshDays) && refreshDays > 0 ? refreshDays : 7,
-                MaintenanceMode = bool.TryParse(_configuration["Platform:MaintenanceMode"], out var maintenanceMode) && maintenanceMode,
-                SystemBanner = _configuration["Platform:SystemBanner"],
+                InviteExpiryDays = appSettings.InviteExpiryDays,
+                RefreshTokenDays = appSettings.RefreshTokenDays,
+                MaintenanceMode = appSettings.MaintenanceMode,
+                SystemBanner = appSettings.SystemBanner,
                 FrontendUrls = frontendUrls
             };
         }
@@ -1529,11 +1554,33 @@ namespace InnerG.Api.Controllers
             await WriteEnvFileAsync(_apiEnvPath, apiEnv);
 
             var webEnv = LoadEnvFileValues(_webEnvPath);
-            if (!string.IsNullOrWhiteSpace(request.GoogleClientId))
+            UpsertEnvValue(webEnv, "VITE_GOOGLE_CLIENT_ID", NormalizeOptional(request.GoogleClientId), preserveExistingWhenBlank: false);
+            await WriteEnvFileAsync(_webEnvPath, webEnv);
+        }
+
+        private PersistedAppSettings LoadAppSettingsValues()
+        {
+            var settingsPath = Path.Combine(_environment.ContentRootPath, "appsettings.json");
+            if (!System.IO.File.Exists(settingsPath))
             {
-                UpsertEnvValue(webEnv, "VITE_GOOGLE_CLIENT_ID", request.GoogleClientId.Trim(), preserveExistingWhenBlank: false);
-                await WriteEnvFileAsync(_webEnvPath, webEnv);
+                return new PersistedAppSettings();
             }
+
+            var json = System.IO.File.ReadAllText(settingsPath);
+            var root = JsonNode.Parse(json)?.AsObject();
+            if (root == null)
+            {
+                return new PersistedAppSettings();
+            }
+
+            return new PersistedAppSettings
+            {
+                RefreshTokenDays = ReadIntValue(root, "Jwt", "RefreshTokenDays", 7),
+                InviteExpiryDays = ReadIntValue(root, "Invites", "ExpireDays", 7),
+                MaintenanceMode = ReadBoolValue(root, "Platform", "MaintenanceMode"),
+                SystemBanner = ReadStringValue(root, "Platform", "SystemBanner"),
+                FrontendUrls = ReadStringArray(root, "Frontend", "Urls")
+            };
         }
 
         private static Dictionary<string, string> LoadEnvFileValues(string path)
@@ -1618,6 +1665,42 @@ namespace InnerG.Api.Controllers
             return envValues.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : fallback;
+        }
+
+        private static int ReadIntValue(JsonObject root, string sectionKey, string propertyKey, int fallback)
+        {
+            var section = root[sectionKey] as JsonObject;
+            return section?[propertyKey]?.GetValue<int?>() is int value && value > 0
+                ? value
+                : fallback;
+        }
+
+        private static bool ReadBoolValue(JsonObject root, string sectionKey, string propertyKey)
+        {
+            var section = root[sectionKey] as JsonObject;
+            return section?[propertyKey]?.GetValue<bool?>() ?? false;
+        }
+
+        private static string? ReadStringValue(JsonObject root, string sectionKey, string propertyKey)
+        {
+            var section = root[sectionKey] as JsonObject;
+            return section?[propertyKey]?.GetValue<string?>();
+        }
+
+        private static IList<string> ReadStringArray(JsonObject root, string sectionKey, string propertyKey)
+        {
+            var section = root[sectionKey] as JsonObject;
+            var array = section?[propertyKey] as JsonArray;
+            if (array == null)
+            {
+                return new List<string>();
+            }
+
+            return array
+                .Select(item => item?.GetValue<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .ToList();
         }
 
         private static JsonObject GetOrCreateObject(JsonObject root, string key)
