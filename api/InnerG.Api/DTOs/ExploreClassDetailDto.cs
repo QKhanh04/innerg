@@ -28,6 +28,7 @@ namespace InnerG.Api.DTOs
         
         public string RegistrationStatus { get; set; } = "NotRegistered"; // For Mentee
         public string EventStatus { get; set; } = string.Empty; // "Draft", "Published", etc. for Mentor/HR
+        public bool IsRegistrationClosed { get; set; }
 
         public List<TrainingSessionDto> Sessions { get; set; } = new List<TrainingSessionDto>();
         public List<ExploreResourceDto> Resources { get; set; } = new List<ExploreResourceDto>();

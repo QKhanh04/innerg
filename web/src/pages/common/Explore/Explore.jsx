@@ -157,6 +157,7 @@ export default function ExplorePage() {
 
     const isPending = cls.registrationStatus === 'Pending';
     const isRegistered = cls.registrationStatus === 'Registered';
+    const isClosed = cls.isRegistrationClosed;
 
     try {
       if (isPending || isRegistered) {
@@ -194,7 +195,8 @@ export default function ExplorePage() {
       }
     } catch (err) {
       console.error("Failed to register/unregister:", err);
-      showToast('error', "Operation failed. Please try again.");
+      const errorMessage = err.response?.data?.message || "Operation failed. Please try again.";
+      showToast('error', errorMessage);
     }
   };
 
@@ -323,7 +325,7 @@ export default function ExplorePage() {
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleRegister(item.id); }}
-                    disabled={item.mentor?.userId === user?.userId}
+                    disabled={item.mentor?.userId === user?.userId || (item.isRegistrationClosed && item.registrationStatus === 'NotRegistered')}
                     className={cn(
                       "text-[9px] font-extrabold uppercase tracking-widest px-4 py-2 rounded-xl transition-all disabled:opacity-60",
                       item.mentor?.userId === user?.userId
@@ -332,10 +334,12 @@ export default function ExplorePage() {
                           ? "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-pointer"
                           : item.registrationStatus === 'Pending'
                             ? "bg-amber-50 text-amber-600 border border-amber-200 cursor-pointer animate-pulse"
-                            : "bg-[#9333EA] hover:bg-[#7e22ce] text-white cursor-pointer"
+                            : item.isRegistrationClosed
+                              ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                              : "bg-[#9333EA] hover:bg-[#7e22ce] text-white cursor-pointer"
                     )}
                   >
-                    {item.mentor?.userId === user?.userId ? "Hosting" : item.registrationStatus === 'Registered' ? "✓ Enrolled" : item.registrationStatus === 'Pending' ? "⌛ Pending" : "Register"}
+                    {item.mentor?.userId === user?.userId ? "Hosting" : item.registrationStatus === 'Registered' ? "✓ Enrolled" : item.registrationStatus === 'Pending' ? "⌛ Pending" : item.isRegistrationClosed ? "Closed" : "Register"}
                   </button>
                 </div>
               </div>
@@ -482,7 +486,7 @@ export default function ExplorePage() {
                             ? "bg-amber-600/85"
                             : "bg-emerald-600/85"
                       )}>
-                        {isFull ? "FULL HOUSE" : `${spotsLeft} Slots Left`}
+                        {item.isRegistrationClosed && item.registrationStatus === 'NotRegistered' ? "REGISTRATION CLOSED" : isFull ? "FULL HOUSE" : `${spotsLeft} Slots Left`}
                       </span>
                     </div>
 
@@ -552,7 +556,7 @@ export default function ExplorePage() {
 
                         <button
                           onClick={(e) => { e.stopPropagation(); handleRegister(item.id); }}
-                          disabled={item.mentor?.userId === user?.userId || (isFull && !isRegistered && !isPending)}
+                          disabled={item.mentor?.userId === user?.userId || (item.isRegistrationClosed && item.registrationStatus === 'NotRegistered') || (isFull && !isRegistered && !isPending)}
                           className={cn(
                             "px-4 py-2.5 rounded-xl text-[9px] font-extrabold uppercase tracking-widest transition-all border shadow-xs disabled:opacity-50 shrink-0",
                             item.mentor?.userId === user?.userId
@@ -561,12 +565,14 @@ export default function ExplorePage() {
                                 ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100/50 cursor-pointer"
                                 : isPending
                                   ? "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100/50 cursor-pointer animate-pulse"
-                                  : isFull
+                                  : item.isRegistrationClosed
                                     ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
-                                    : "bg-slate-900 border-slate-900 hover:bg-slate-800 text-white cursor-pointer"
+                                    : isFull
+                                      ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed"
+                                      : "bg-slate-900 border-slate-900 hover:bg-slate-800 text-white cursor-pointer"
                           )}
                         >
-                          {item.mentor?.userId === user?.userId ? "Hosting" : isRegistered ? "✓ Enrolled" : isPending ? "⌛ Pending" : isFull ? "FULL" : "Register"}
+                          {item.mentor?.userId === user?.userId ? "Hosting" : isRegistered ? "✓ Enrolled" : isPending ? "⌛ Pending" : item.isRegistrationClosed ? "CLOSED" : isFull ? "FULL" : "Register"}
                         </button>
                       </div>
 
