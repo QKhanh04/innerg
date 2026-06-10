@@ -60,8 +60,8 @@ var jwtIssuer = Require("Jwt:Issuer");
 var jwtAudience = Require("Jwt:Audience");
 
 // Email provider
-_ = Require("RESEND_API_KEY");
-_ = Require("Mail_From");
+_ = Require("SENDGRID_API_KEY");
+_ = Require("MAIL_FROM");
 var googleClientId = Require("GOOGLE_CLIENT_ID");
 var googleClientSecret = Require("GOOGLE_CLIENT_SECRET");
 
@@ -251,7 +251,7 @@ builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddHttpClient<IEmailService, EmailService>(client =>
 {
-    client.BaseAddress = new Uri("https://api.resend.com/");
+    client.BaseAddress = new Uri("https://api.sendgrid.com/v3/");
 });
 builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
