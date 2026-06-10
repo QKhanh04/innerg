@@ -59,19 +59,25 @@ var jwtKey = Require("JWT_KEY");
 var jwtIssuer = Require("Jwt:Issuer");
 var jwtAudience = Require("Jwt:Audience");
 
-// SMTP
-var smtpHost = Require("SMTP_HOST");
-var smtpPort = Require("SMTP_PORT");
-var smtpUser = Require("SMTP_USERNAME");
-var smtpPass = Require("SMTP_PASSWORD");
-var smtpFromName = Require("SMTP_FROM_NAME");
+// Email provider
+_ = Require("RESEND_API_KEY");
+_ = Require("Mail_From");
 var googleClientId = Require("GOOGLE_CLIENT_ID");
 var googleClientSecret = Require("GOOGLE_CLIENT_SECRET");
 
 // Frontend
-var frontendUrls =
-    builder.Configuration.GetSection("Frontend:Urls").Get<string[]>()
-    ?? throw new ConfigurationException("Frontend:Urls");
+var frontendUrls = builder.Configuration.GetSection("Frontend:Urls").Get<string[]>() ?? [];
+var frontendUrl = builder.Configuration["FRONTEND_URL"];
+if (!string.IsNullOrWhiteSpace(frontendUrl))
+{
+    frontendUrls = frontendUrls
+        .Append(frontendUrl.TrimEnd('/'))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
+if (frontendUrls.Length == 0)
+    throw new ConfigurationException("Frontend:Urls or FRONTEND_URL");
 
 /* =========================
    MVC & VALIDATION
@@ -243,7 +249,10 @@ builder.Services.AddScoped<IHrBroadcastService, HrBroadcastService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHttpClient<IEmailService, EmailService>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+});
 builder.Services.AddScoped<IUserSessionRepository, UserSessionRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));

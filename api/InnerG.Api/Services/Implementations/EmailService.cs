@@ -1,6 +1,6 @@
-using MimeKit;
-using MailKit.Net.Smtp;
-using MailKit.Security;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using InnerG.Api.Exceptions;
 using InnerG.Api.Services.Interfaces;
 
@@ -9,10 +9,14 @@ namespace InnerG.Api.Services.Implementations
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _config;
+        private readonly HttpClient _httpClient;
+        private readonly ILogger<EmailService> _logger;
 
-        public EmailService(IConfiguration config)
+        public EmailService(IConfiguration config, HttpClient httpClient, ILogger<EmailService> logger)
         {
             _config = config;
+            _httpClient = httpClient;
+            _logger = logger;
         }
 
         public Task SendEmailConfirmationAsync(string toEmail, string subject, string html)
@@ -47,54 +51,52 @@ namespace InnerG.Api.Services.Implementations
 
         private async Task SendHtmlEmailAsync(string toEmail, string subject, string html)
         {
-            var host = _config["SMTP_HOST"] ?? "smtp.gmail.com";
-            var portValue = _config["SMTP_PORT"] ?? "587";
-            var username = _config["SMTP_USERNAME"];
-            var password = _config["SMTP_PASSWORD"];
-            var fromName = _config["SMTP_FROM_NAME"] ?? "InnerG Support";
+            var apiKey = _config["RESEND_API_KEY"];
+            var from = _config["Mail_From"] ?? "onboarding@resend.dev";
+            var fromName = _config["MAIL_FROM_NAME"] ?? "InnerG Support";
 
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
-            {
-                Console.WriteLine("[EmailService] SMTP credentials are not configured properly.");
-                throw new ConfigurationException("SMTP_USERNAME or SMTP_PASSWORD is missing.");
-            }
-
-            if (!int.TryParse(portValue, out var port))
-                port = 587;
-
-            // Xóa khoảng trắng thừa trong mật khẩu sinh ra từ App Password
-            password = password.Trim().Trim('"', '\'');
-            if (host.Contains("gmail", StringComparison.OrdinalIgnoreCase))
-                password = password.Replace(" ", string.Empty);
+            if (string.IsNullOrWhiteSpace(apiKey))
+                throw new ConfigurationException("RESEND_API_KEY is missing.");
 
             try
             {
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress(fromName, username));
-                message.To.Add(MailboxAddress.Parse(toEmail));
-                message.Subject = subject;
+                using var request = new HttpRequestMessage(HttpMethod.Post, "emails");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                request.Content = new StringContent(
+                    JsonSerializer.Serialize(new ResendEmailRequest
+                    {
+                        From = $"{fromName} <{from}>",
+                        To = [toEmail],
+                        Subject = subject,
+                        Html = html
+                    }),
+                    Encoding.UTF8,
+                    "application/json");
 
-                var builder = new BodyBuilder { HtmlBody = html };
-                message.Body = builder.ToMessageBody();
+                using var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                    return;
 
-                // Xác định Option bảo mật dựa theo Port giống hệt mẫu
-                var secureOption = SecureSocketOptions.StartTls;
-                if (port == 465) secureOption = SecureSocketOptions.SslOnConnect;
-
-                using var smtp = new SmtpClient();
-                // Bỏ qua chứng chỉ SSL giả mạo trên Docker (tuỳ chọn an toàn cho Render)
-                smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
-
-                await smtp.ConnectAsync(host, port, secureOption);
-                await smtp.AuthenticateAsync(username, password);
-                await smtp.SendAsync(message);
-                await smtp.DisconnectAsync(true);
+                var responseBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Resend email sending failed with status {StatusCode}: {ResponseBody}", response.StatusCode, responseBody);
+                throw new ExternalServiceException($"Failed to send email via Resend: {(int)response.StatusCode} {response.ReasonPhrase}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EmailService] Failed to send email: {ex.Message}");
-                throw new ExternalServiceException($"Failed to send email: {ex.Message}");
+                if (ex is ExternalServiceException or ConfigurationException)
+                    throw;
+
+                _logger.LogError(ex, "Unexpected error while sending email via Resend");
+                throw new ExternalServiceException($"Failed to send email via Resend: {ex.Message}");
             }
+        }
+
+        private sealed class ResendEmailRequest
+        {
+            public string From { get; set; } = string.Empty;
+            public string[] To { get; set; } = [];
+            public string Subject { get; set; } = string.Empty;
+            public string Html { get; set; } = string.Empty;
         }
     }
 }
