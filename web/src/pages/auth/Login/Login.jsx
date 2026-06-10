@@ -84,65 +84,61 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white">
-      {/* Left Side: Illustration & Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#1f2927] relative overflow-hidden flex-col justify-between p-12 shrink-0 sticky top-0 h-screen">
+    <div className="fixed top-0 left-0 w-screen h-screen overflow-hidden m-0 p-0">
+      <div className="flex w-full h-full">
+        {/* Left Side: Illustration & Branding */}
+        <div className="hidden lg:flex lg:w-5/12 xl:w-1/2 bg-[#1f2927] relative overflow-hidden flex-col justify-between p-10 xl:p-12 shrink-0">
           {/* Decorative Background Elements */}
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[100px]"></div>
           <div className="absolute bottom-[-5%] right-[-5%] w-80 h-80 bg-primary/10 rounded-full blur-[100px]"></div>
 
           {/* Logo */}
-          <div className="relative z-10 flex items-center gap-2 text-white">
+          <div className="relative z-10 flex items-center gap-2 text-white mb-6 xl:mb-0">
             <div className="w-8 h-8 text-primary">
               <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
                 <path clipRule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fill="currentColor" fillRule="evenodd"></path>
               </svg>
             </div>
-            <h2 className="text-2xl font-extrabold tracking-tight">InnerG</h2>
+            <h2 className="text-xl xl:text-2xl font-extrabold tracking-tight">InnerG</h2>
           </div>
 
           {/* Heading */}
           <div className="relative z-10">
-            <h1 className="text-white text-5xl font-extrabold leading-tight mb-6">
-              Empower your team's <br />
+            <h1 className="text-white text-3xl xl:text-4xl font-extrabold leading-tight mb-3 xl:mb-4">
+              Empower your team's <br className="hidden xl:block" />
               <span className="text-primary">collective intelligence.</span>
             </h1>
-            <p className="text-slate-400 text-lg max-w-md leading-relaxed">
+            <p className="text-slate-400 text-sm xl:text-base max-w-sm leading-relaxed">
               The central hub for internal knowledge management and enterprise-wide skill exchange.
             </p>
           </div>
 
           {/* Illustration */}
-          <div className="relative z-10 w-full flex-grow mx-auto flex justify-center items-center mt-8 mb-8 max-h-[65vh]">
-            <div className="relative w-full max-w-lg aspect-square rounded-2xl overflow-hidden shadow-2xl group">
+          <div className="relative z-10 w-full flex-1 min-h-0 mx-auto flex justify-center items-center py-2 xl:py-4">
+            <div className="relative w-full max-w-[min(100%,_55vh)] aspect-square rounded-2xl overflow-hidden shadow-2xl group">
               <img
                 alt="Corporate collaboration and knowledge sharing illustration"
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
                 src={loginIllustration}
               />
               {/* Glassmorphism Overlay Card */}
-              <div className="absolute bottom-4 left-4 right-4 bg-black/20 backdrop-blur-md border border-white/10 rounded-xl p-4 flex items-center gap-4">
-                <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined">hub</span>
+              <div className="absolute bottom-3 left-3 right-3 bg-black/20 backdrop-blur-md border border-white/10 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-9 h-9 shrink-0 bg-primary/20 rounded-lg flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined text-[20px]">hub</span>
                 </div>
-                <div>
-                  <p className="text-white font-bold text-sm drop-shadow-sm">Skill Exchange Active</p>
-                  <p className="text-slate-200 text-xs font-mono mt-0.5">4.2k Team Members Online</p>
+                <div className="min-w-0">
+                  <p className="text-white font-bold text-[13px] truncate drop-shadow-sm">Skill Exchange Active</p>
+                  <p className="text-slate-200 text-[11px] font-mono mt-0.5 truncate">4.2k Team Members</p>
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Copyright */}
-          <div className="relative z-10 text-slate-500 text-sm">
-            © 2024 InnerG Technologies Inc. All rights reserved.
-          </div>
         </div>
 
         {/* Right Side: Login Form */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-center min-h-screen relative p-6 sm:p-12 lg:p-24">
+        <div className="w-full lg:w-7/12 xl:w-1/2 flex flex-col justify-center bg-white p-8 md:p-16 lg:px-24 overflow-auto shrink-0 relative">
           
-          <div className="w-full max-w-[400px] mx-auto flex flex-col relative z-10 py-12">
+          <div className="w-full max-w-[400px] mx-auto flex flex-col relative z-10">
             {/* Mobile Logo */}
             <div className="lg:hidden flex items-center gap-2 text-deep-blue mb-8">
               <div className="w-8 h-8 text-primary">
@@ -320,11 +316,12 @@ const Login = () => {
           </div>
           
           {/* Privacy and Terms bottom right */}
-          <div className="absolute bottom-6 left-0 right-0 lg:left-auto lg:right-12 text-[#64748b] text-[11px] font-sans font-bold tracking-widest flex justify-center gap-6 pb-6 lg:pb-0">
+          <div className="absolute bottom-8 right-12 text-[#64748b] text-[11px] font-sans font-bold tracking-widest flex gap-6 hidden md:flex">
             <a href="#" className="hover:text-[#0a192f] transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-[#0a192f] transition-colors">Terms of Service</a>
           </div>
         </div>
+      </div>
     </div>
   );
 };
