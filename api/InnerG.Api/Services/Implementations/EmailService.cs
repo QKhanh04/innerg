@@ -41,8 +41,6 @@ namespace InnerG.Api.Services.Implementations
                 await SendHtmlEmailAsync(to, subject, body);
             else
             {
-                // Simple plain text send if needed, but SendHtmlEmailAsync currently handles html
-                // For now, reuse SendHtmlEmailAsync as it's the core sender
                 await SendHtmlEmailAsync(to, subject, body);
             }
         }
@@ -54,7 +52,6 @@ namespace InnerG.Api.Services.Implementations
             var username = _config["SMTP_USERNAME"] ?? throw new ConfigurationException("SMTP_USERNAME");
             var password = _config["SMTP_PASSWORD"] ?? throw new ConfigurationException("SMTP_PASSWORD");
             var fromName = _config["SMTP_FROM_NAME"] ?? "Support";
-            var enableSsl = bool.TryParse(_config["SMTP_ENABLE_SSL"], out var configuredSsl) ? configuredSsl : true;
 
             if (!int.TryParse(portValue, out var port) || port <= 0)
                 throw new ConfigurationException("SMTP_PORT");
@@ -65,7 +62,7 @@ namespace InnerG.Api.Services.Implementations
 
             try
             {
-                Console.WriteLine($"[EmailService] Preparing to send email to {toEmail} via {host}:{port}");
+                Console.WriteLine($"[EmailService] Preparing to send email to {toEmail}");
                 
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, username));
@@ -76,22 +73,32 @@ namespace InnerG.Api.Services.Implementations
                 message.Body = builder.ToMessageBody();
 
                 using var smtp = new SmtpClient();
-                smtp.Timeout = 30000; // 30 seconds timeout
+                smtp.Timeout = 15000; // Giảm xuống 15s để bắt lỗi nhanh hơn nếu kẹt mạng
                 
-                // SecureSocketOptions.Auto allows MailKit to automatically select the most secure
-                // protocol (SSL, TLS, StartTLS) based on the port and server capabilities.
-                var secureOption = enableSsl ? SecureSocketOptions.Auto : SecureSocketOptions.None;
+                // Render có thể chặn cơ chế nâng cấp STARTTLS trên port 587.
+                // Nếu dùng 465, bắt buộc SslOnConnect. 587 dùng StartTls.
+                var secureOption = SecureSocketOptions.Auto;
+                if (port == 465) secureOption = SecureSocketOptions.SslOnConnect;
+                else if (port == 587) secureOption = SecureSocketOptions.StartTls;
                 
+                // Bỏ qua lỗi Check SSL giả mạo (rất hay gặp trên Docker/Linux cloud)
+                smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                
+                Console.WriteLine($"[EmailService] 1. Attempting ConnectAsync to {host}:{port} with Option: {secureOption}");
                 await smtp.ConnectAsync(host, port, secureOption);
-                await smtp.AuthenticateAsync(username, password);
-                await smtp.SendAsync(message);
-                await smtp.DisconnectAsync(true);
                 
-                Console.WriteLine($"[EmailService] SMTP send completed for {toEmail}");
+                Console.WriteLine($"[EmailService] 2. Connected! Attempting AuthenticateAsync as {username}");
+                await smtp.AuthenticateAsync(username, password);
+                
+                Console.WriteLine($"[EmailService] 3. Authenticated! Attempting SendAsync...");
+                await smtp.SendAsync(message);
+                
+                Console.WriteLine($"[EmailService] 4. Sent successfully. Disconnecting...");
+                await smtp.DisconnectAsync(true);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EmailService] General exception for {toEmail}: {ex.Message}");
+                Console.WriteLine($"[EmailService] FATAL ERROR: {ex.GetType().Name} - {ex.Message}");
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine($"[EmailService] Inner Exception: {ex.InnerException.Message}");
