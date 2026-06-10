@@ -50,6 +50,25 @@ namespace InnerG.Api.Data.Seed
                 context.Companies.Add(company);
                 await context.SaveChangesAsync();
             }
+            else
+            {
+                var companyChanged = false;
+                if (!company.IsActive)
+                {
+                    company.IsActive = true;
+                    companyChanged = true;
+                }
+                if (company.DeletedAt != null)
+                {
+                    company.DeletedAt = null;
+                    companyChanged = true;
+                }
+                if (companyChanged)
+                {
+                    context.Companies.Update(company);
+                    await context.SaveChangesAsync();
+                }
+            }
 
             var seedUsers = new List<SeedUserDefinition>();
 
@@ -75,7 +94,7 @@ namespace InnerG.Api.Data.Seed
                 seedUsers.Add(new SeedUserDefinition(configuration["SEED_USER_HOA"], configuration["SEED_NAME_HOA"] ?? "InnerG User", company.Id, new[] { AuthRoles.Mentee }));
 
             foreach (var seedUser in seedUsers)
-                await EnsureSeedUserAsync(userManager, seedUser, seedPassword);
+                await EnsureSeedUserAsync(context, userManager, seedUser, seedPassword);
 
             if (!await context.SubscriptionPlans.AnyAsync())
             {
@@ -335,6 +354,7 @@ namespace InnerG.Api.Data.Seed
         }
 
         private static async Task EnsureSeedUserAsync(
+            AppDbContext context,
             UserManager<AppUser> userManager,
             SeedUserDefinition definition,
             string seedPassword)
@@ -344,14 +364,7 @@ namespace InnerG.Api.Data.Seed
 
             var user = await userManager.Users
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(x => x.CompanyId == definition.CompanyId && x.Email == normalizedEmail && x.DeletedAt == null);
-
-            if (user == null && definition.CompanyId == null)
-            {
-                user = await userManager.Users
-                    .IgnoreQueryFilters()
-                    .FirstOrDefaultAsync(x => x.Email == normalizedEmail && x.DeletedAt == null);
-            }
+                .FirstOrDefaultAsync(x => x.Email == normalizedEmail);
 
             if (user == null)
             {
@@ -368,8 +381,7 @@ namespace InnerG.Api.Data.Seed
                 var createResult = await userManager.CreateAsync(user, seedPassword);
                 if (!createResult.Succeeded)
                 {
-                    throw new InvalidOperationException(
-                        $"Failed to seed user '{normalizedEmail}': {string.Join("; ", createResult.Errors.Select(x => x.Description))}");
+                    Console.WriteLine($"[WARNING] Failed to seed user '{normalizedEmail}': {string.Join("; ", createResult.Errors.Select(x => x.Description))}");
                 }
             }
             else
@@ -412,14 +424,20 @@ namespace InnerG.Api.Data.Seed
                     changed = true;
                 }
 
+                var passVerification = user.PasswordHash != null 
+                    ? userManager.PasswordHasher.VerifyHashedPassword(user, user.PasswordHash, seedPassword) 
+                    : PasswordVerificationResult.Failed;
+
+                if (passVerification != PasswordVerificationResult.Success)
+                {
+                    user.PasswordHash = userManager.PasswordHasher.HashPassword(user, seedPassword);
+                    changed = true;
+                }
+
                 if (changed)
                 {
-                    var updateResult = await userManager.UpdateAsync(user);
-                    if (!updateResult.Succeeded)
-                    {
-                        throw new InvalidOperationException(
-                            $"Failed to update seed user '{normalizedEmail}': {string.Join("; ", updateResult.Errors.Select(x => x.Description))}");
-                    }
+                    context.Users.Update(user);
+                    await context.SaveChangesAsync();
                 }
             }
 
@@ -434,8 +452,7 @@ namespace InnerG.Api.Data.Seed
             var addRolesResult = await userManager.AddToRolesAsync(user, missingRoles);
             if (!addRolesResult.Succeeded)
             {
-                throw new InvalidOperationException(
-                    $"Failed to assign roles to seed user '{normalizedEmail}': {string.Join("; ", addRolesResult.Errors.Select(x => x.Description))}");
+                Console.WriteLine($"[WARNING] Failed to assign roles to seed user '{normalizedEmail}': {string.Join("; ", addRolesResult.Errors.Select(x => x.Description))}");
             }
 
         }
