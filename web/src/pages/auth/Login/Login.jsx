@@ -5,6 +5,8 @@ import GoogleLoginButton from '../../../components/login/GoogleLoginButton';
 import { useApiForm } from '../../../hooks/useApiForm';
 import { toastService } from '../../../services/toastService';
 import { getDefaultRouteFromRoles } from '../../../utils/authRoute';
+import loginIllustration from '../../../assets/login-illustration.png';
+
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,10 +87,10 @@ const Login = () => {
     <div className="fixed top-0 left-0 w-screen h-screen overflow-hidden m-0 p-0">
       <div className="flex w-full h-full">
         {/* Left Side: Illustration & Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-deep-blue relative overflow-hidden flex-col justify-between p-12 shrink-0">
+        <div className="hidden lg:flex lg:w-1/2 bg-[#1f2927] relative overflow-hidden flex-col justify-between p-12 shrink-0">
           {/* Decorative Background Elements */}
-          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-[-5%] right-[-5%] w-80 h-80 bg-primary/20 rounded-full blur-3xl"></div>
+          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[100px]"></div>
+          <div className="absolute bottom-[-5%] right-[-5%] w-80 h-80 bg-primary/10 rounded-full blur-[100px]"></div>
 
           {/* Logo */}
           <div className="relative z-10 flex items-center gap-2 text-white">
@@ -112,23 +114,24 @@ const Login = () => {
           </div>
 
           {/* Illustration */}
-          <div
-            className="
-    relative z-10 w-full mx-auto aspect-square
-    max-w-xs
-    sm:max-w-sm
-    lg:max-w-md
-    xl:max-w-lg
-    max-h-[55vh]
-  "
-          >
-
-
-            <img
-              alt="Corporate collaboration and knowledge sharing illustration"
-              className="w-full h-full object-contain drop-shadow-2xl"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAb_3N3oPrzb8T8_69jUoPQoy2JFID76fctd1eFKKf-wLmJNXfoSmpfN2r-C-wN7QpPJQypnjA_i8Rlxb3HRq1scgLd60vE6TX1AdwI3Nwc4V_0mL9tXEmYXNC5kB8PNAVGx-W6V9Mxxi1JsugbyaHMyP60mNNvuIUY-voSGorPuZ74XKln3i5ODSd9K7bx25Zj26mxT-RTrHaRmgqMxh3Tu2Hly9d76ZqIaHJ4BfPr78RFKYUauS8H1oyjlVLIj9qOVg8guy4cm43s"
-            />
+          <div className="relative z-10 w-full flex-grow mx-auto flex justify-center items-center mt-8 mb-8 max-h-[65vh]">
+            <div className="relative w-full max-w-lg aspect-square rounded-2xl overflow-hidden shadow-2xl group">
+              <img
+                alt="Corporate collaboration and knowledge sharing illustration"
+                className="w-full h-full object-cover"
+                src={loginIllustration}
+              />
+              {/* Glassmorphism Overlay Card */}
+              <div className="absolute bottom-4 left-4 right-4 bg-black/20 backdrop-blur-md border border-white/10 rounded-xl p-4 flex items-center gap-4">
+                <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined">hub</span>
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm drop-shadow-sm">Skill Exchange Active</p>
+                  <p className="text-slate-200 text-xs font-mono mt-0.5">4.2k Team Members Online</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Copyright */}
@@ -138,8 +141,9 @@ const Login = () => {
         </div>
 
         {/* Right Side: Login Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center bg-bg-light p-8 md:p-16 overflow-auto shrink-0">
-          <div className="w-full max-w-md flex flex-col">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center bg-white p-8 md:p-16 lg:px-24 overflow-auto shrink-0 relative">
+          
+          <div className="w-full max-w-[400px] mx-auto flex flex-col relative z-10">
             {/* Mobile Logo */}
             <div className="lg:hidden flex items-center gap-2 text-deep-blue mb-8">
               <div className="w-8 h-8 text-primary">
@@ -151,11 +155,11 @@ const Login = () => {
             </div>
 
             {/* Header */}
-            <div className="mb-10 text-center lg:text-left">
-              <h1 className="text-slate-900 tracking-tight text-3xl font-bold leading-tight mb-2">
+            <div className="mb-8 text-left">
+              <h1 className="text-[#0a192f] tracking-tight text-3xl font-extrabold leading-tight mb-2">
                 Welcome Back
               </h1>
-              <p className="text-slate-500 text-base font-normal">
+              <p className="text-slate-500 text-[15px]">
                 Enter your corporate credentials to access InnerG.
               </p>
             </div>
@@ -190,20 +194,19 @@ const Login = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
 
               {/* Email Field */}
-              <div className="flex flex-col gap-2">
-                <label className="text-slate-900 text-sm font-semibold leading-normal">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[#3b4c68] text-[11px] font-bold tracking-widest uppercase font-sans">
                   Corporate Email
                 </label>
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
                     mail
                   </span>
                   <input
-                    className={`w-full h-14 pl-12 pr-4 rounded-lg text-slate-900 focus:outline-0 focus:ring-2 focus:ring-primary/50 border ${errors.emailOrUsername ? 'border-red-500' : 'border-slate-200'
-                      } bg-white placeholder:text-slate-400 text-base font-normal`}
+                    className={`w-full h-12 pl-11 pr-4 rounded-md bg-white text-slate-900 focus:outline-0 focus:ring-1 focus:ring-primary border ${errors.emailOrUsername ? 'border-red-500' : 'border-slate-200 focus:border-primary'} placeholder:text-slate-300 text-[15px] transition-colors`}
                     placeholder="name@company.com"
                     type="text"
                     name="emailOrUsername"
@@ -214,30 +217,29 @@ const Login = () => {
                   />
                 </div>
                 {errors.emailOrUsername && (
-                  <span className="text-red-500 text-sm">{errors.emailOrUsername}</span>
+                  <span className="text-red-500 text-xs">{errors.emailOrUsername}</span>
                 )}
               </div>
 
               {/* Password Field */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-slate-900 text-sm font-semibold leading-normal">
+                  <label className="text-[#3b4c68] text-[11px] font-bold tracking-widest uppercase font-sans">
                     Password
                   </label>
                   <Link
                     to="/forgot-password"
-                    className="text-primary text-sm font-semibold hover:underline"
+                    className="text-[#13ecb6] text-[12px] font-bold hover:underline"
                   >
                     Forgot password?
                   </Link>
                 </div>
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
                     lock
                   </span>
                   <input
-                    className={`w-full h-14 pl-12 pr-12 rounded-lg text-slate-900 focus:outline-0 focus:ring-2 focus:ring-primary/50 border ${errors.password ? 'border-red-500' : 'border-slate-200'
-                      } bg-white placeholder:text-slate-400 text-base font-normal`}
+                    className={`w-full h-12 pl-11 pr-10 rounded-md bg-white text-slate-900 focus:outline-0 focus:ring-1 focus:ring-primary border ${errors.password ? 'border-red-500' : 'border-slate-200 focus:border-primary'} placeholder:text-slate-300 text-[15px] transition-colors`}
                     placeholder="••••••••"
                     type={showPassword ? "text" : "password"}
                     name="password"
@@ -247,32 +249,31 @@ const Login = () => {
                     autoComplete="current-password"
                   />
                   <button
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    <span className="material-symbols-outlined text-xl">
+                    <span className="material-symbols-outlined text-[20px]">
                       {showPassword ? 'visibility_off' : 'visibility'}
                     </span>
                   </button>
                 </div>
                 {errors.password && (
-                  <span className="text-red-500 text-sm">{errors.password}</span>
+                  <span className="text-red-500 text-xs">{errors.password}</span>
                 )}
               </div>
 
               {requiresTwoFactor && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-slate-900 text-sm font-semibold leading-normal">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[#3b4c68] text-[11px] font-bold tracking-widest uppercase font-sans">
                     Verification Code
                   </label>
                   <div className="relative">
-                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
                       shield
                     </span>
                     <input
-                      className={`w-full h-14 pl-12 pr-4 rounded-lg text-slate-900 focus:outline-0 focus:ring-2 focus:ring-primary/50 border ${errors.twoFactorCode ? 'border-red-500' : 'border-slate-200'
-                        } bg-white placeholder:text-slate-400 text-base font-normal`}
+                      className={`w-full h-12 pl-11 pr-4 rounded-md bg-white text-slate-900 focus:outline-0 focus:ring-1 focus:ring-primary border ${errors.twoFactorCode ? 'border-red-500' : 'border-slate-200 focus:border-primary'} placeholder:text-slate-300 text-[15px] transition-colors`}
                       placeholder="6-digit code"
                       type="text"
                       name="twoFactorCode"
@@ -285,14 +286,14 @@ const Login = () => {
                     />
                   </div>
                   {errors.twoFactorCode && (
-                    <span className="text-red-500 text-sm">{errors.twoFactorCode}</span>
+                    <span className="text-red-500 text-xs">{errors.twoFactorCode}</span>
                   )}
                 </div>
               )}
 
               {/* Sign In Button */}
               <button
-                className="w-full flex h-14 items-center justify-center overflow-hidden rounded-lg bg-primary text-deep-blue text-base font-extrabold leading-normal tracking-wide hover:brightness-105 active:scale-[0.98] transition-all shadow-lg shadow-primary/20 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-12 flex items-center justify-center rounded-md bg-[#13ecb6] text-[#0a192f] text-[15px] font-bold hover:bg-[#0bc99b] active:bg-[#0aa37e] transition-colors mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 type="submit"
                 disabled={isLoading}
               >
@@ -301,11 +302,11 @@ const Login = () => {
 
               {/* Divider */}
               <div className="relative py-4 flex items-center">
-                <div className="grow border-t border-slate-100"></div>
-                <span className="shrink-0 mx-4 text-slate-400 text-xs font-bold uppercase tracking-widest">
+                <div className="grow border-t border-slate-200/60"></div>
+                <span className="shrink-0 mx-4 text-[#94a3b8] text-[10px] font-bold uppercase tracking-widest font-sans">
                   Or continue with
                 </span>
-                <div className="grow border-t border-slate-100"></div>
+                <div className="grow border-t border-slate-200/60"></div>
               </div>
 
               {/* SSO Button */}
@@ -313,11 +314,16 @@ const Login = () => {
             </form>
 
             {/* Footer Link */}
-            <div className="mt-10 text-center">
-              <p className="text-slate-500 text-sm font-medium">
-                New to InnerG? Ask your HR team for an invite link.
-              </p>
+            <div className="mt-8 text-center text-[15px]">
+              <span className="text-slate-500">New to InnerG? </span>
+              <a href="#" className="text-[#0aa37e] font-bold hover:underline">Ask your HR team for an invite link.</a>
             </div>
+          </div>
+          
+          {/* Privacy and Terms bottom right */}
+          <div className="absolute bottom-8 right-12 text-[#64748b] text-[11px] font-sans font-bold tracking-widest flex gap-6 hidden md:flex">
+            <a href="#" className="hover:text-[#0a192f] transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-[#0a192f] transition-colors">Terms of Service</a>
           </div>
         </div>
       </div>
