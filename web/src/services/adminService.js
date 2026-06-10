@@ -20,6 +20,10 @@ const adminService = {
     await api.patch(`/admin/companies/${companyId}/status`, { isActive });
   },
 
+  async bulkUpdateCompanyStatus(companyIds, isActive) {
+    await api.patch('/admin/companies/bulk-status', { companyIds, isActive });
+  },
+
   async updateCompany(companyId, payload) {
     await api.patch(`/admin/companies/${companyId}`, payload);
   },
@@ -51,6 +55,20 @@ const adminService = {
     await api.post(`/admin/companies/${companyId}/subscription`, payload);
   },
 
+  async getBillingRecords(companyId = null) {
+    const response = await api.get('/admin/billing-records', { params: companyId ? { companyId } : {} });
+    return response.data;
+  },
+
+  async createBillingRecord(companyId, payload = {}) {
+    const response = await api.post(`/admin/companies/${companyId}/billing-records`, payload);
+    return response.data;
+  },
+
+  async updateBillingRecordStatus(billingRecordId, payload) {
+    await api.patch(`/admin/billing-records/${billingRecordId}/status`, payload);
+  },
+
   async getAuditLogs(params = 50) {
     const query = typeof params === 'number' ? { take: params } : params;
     const response = await api.get('/admin/audit-logs', { params: query });
@@ -74,12 +92,20 @@ const adminService = {
     await api.post(`/admin/moderation/users/${userId}/lock`, { reason });
   },
 
+  async warnUser(userId, reason) {
+    await api.post(`/admin/moderation/users/${userId}/warn`, { reason });
+  },
+
   async deleteModerationResource(resourceId, reason) {
     await api.delete(`/admin/moderation/resources/${resourceId}`, { data: { reason } });
   },
 
   async deleteModerationEvent(eventId, reason) {
     await api.delete(`/admin/moderation/events/${eventId}`, { data: { reason } });
+  },
+
+  async dismissModerationReport(reportId, reason) {
+    await api.post(`/admin/moderation/reports/${reportId}/dismiss`, { reason });
   },
 
   async updatePlatformSettings(payload) {

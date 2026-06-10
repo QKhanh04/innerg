@@ -8,6 +8,13 @@ export function useInvitationActions() {
     const invalidate = () =>
         queryClient.invalidateQueries({ queryKey: ['invitations'] });
 
+    const getErrorMsg = (err, fallback) => {
+        return err?.response?.data?.error?.message ||
+            err?.response?.data?.detail ||
+            err?.response?.data?.message ||
+            fallback;
+    };
+
     const createMutation = useMutation({
         mutationFn: (data) => invitationsApi.createSingle(data),
         onSuccess: (_data, vars) => {
@@ -15,8 +22,7 @@ export function useInvitationActions() {
             invalidate();
         },
         onError: (err) => {
-            const msg = err?.response?.data?.error?.message || 'Failed to send invitation';
-            toastService.error(msg);
+            toastService.error(getErrorMsg(err, 'Failed to send invitation'));
         },
     });
 
@@ -27,8 +33,7 @@ export function useInvitationActions() {
             invalidate();
         },
         onError: (err) => {
-            const msg = err?.response?.data?.error?.message || 'Failed to resend';
-            toastService.error(msg);
+            toastService.error(getErrorMsg(err, 'Failed to resend'));
         },
     });
 
@@ -39,8 +44,7 @@ export function useInvitationActions() {
             invalidate();
         },
         onError: (err) => {
-            const msg = err?.response?.data?.error?.message || 'Failed to revoke';
-            toastService.error(msg);
+            toastService.error(getErrorMsg(err, 'Failed to revoke'));
         },
     });
 
@@ -51,8 +55,7 @@ export function useInvitationActions() {
             invalidate();
         },
         onError: (err) => {
-            const msg = err?.response?.data?.error?.message || 'Failed to delete';
-            toastService.error(msg);
+            toastService.error(getErrorMsg(err, 'Failed to delete'));
         },
     });
 
@@ -63,8 +66,7 @@ export function useInvitationActions() {
             invalidate();
         },
         onError: (err) => {
-            const msg = err?.response?.data?.error?.message || 'Failed to delete selected';
-            toastService.error(msg);
+            toastService.error(getErrorMsg(err, 'Failed to delete selected'));
         },
     });
 

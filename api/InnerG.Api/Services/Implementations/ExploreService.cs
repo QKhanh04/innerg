@@ -117,7 +117,8 @@ namespace InnerG.Api.Services.Implementations
                     TakenSlots = te.Enrollments.Count(e => e.Status == EnrollmentStatus.Confirmed && e.DeletedAt == null),
                     Points = te.RewardPoints,
                     Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
-                    RegistrationStatus = regStatus
+                    RegistrationStatus = regStatus,
+                    IsRegistrationClosed = te.StartDate <= DateTime.UtcNow
                 });
             }
 
@@ -326,6 +327,7 @@ namespace InnerG.Api.Services.Implementations
                 Points = te.RewardPoints,
                 Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
                 RegistrationStatus = regStatus,
+                IsRegistrationClosed = te.StartDate <= DateTime.UtcNow,
                 Resources = resourcesDto,
                 Sessions = sessionsDto
             };
@@ -648,7 +650,8 @@ namespace InnerG.Api.Services.Implementations
                     TakenSlots = te.Enrollments?.Count(e => e.Status == EnrollmentStatus.Confirmed) ?? 0,
                     Points = te.RewardPoints,
                     Image = te.CoverImageUrl ?? "https://images.unsplash.com/photo-1633356122544-f134324a6cee?q=80&w=400&auto=format&fit=crop",
-                    RegistrationStatus = recRegStatus
+                    RegistrationStatus = recRegStatus,
+                    IsRegistrationClosed = te.StartDate <= DateTime.UtcNow
                 });
             }
 

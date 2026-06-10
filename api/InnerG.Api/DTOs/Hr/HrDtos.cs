@@ -161,11 +161,52 @@ namespace InnerG.Api.DTOs.Hr
         public string Title { get; set; } = string.Empty;
         public string EventTitle { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public ResourceModerationStatus ModerationStatus { get; set; }
+        public string? ReviewNotes { get; set; }
     }
 
     public class ReviewResourceRequest
     {
         public bool Approved { get; set; }
+        public string? Reason { get; set; }
+    }
+
+    public class CreateModerationEscalationRequest
+    {
+        public string TargetType { get; set; } = string.Empty;
+        public Guid TargetId { get; set; }
+        public string Reason { get; set; } = string.Empty;
+        public ModerationEscalationSeverity Severity { get; set; } = ModerationEscalationSeverity.Medium;
+        public string? SourceContext { get; set; }
+    }
+
+    public class HrModerationEscalationDto
+    {
+        public Guid Id { get; set; }
+        public Guid TargetId { get; set; }
+        public string TargetType { get; set; } = string.Empty;
+        public string TargetLabel { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public ModerationEscalationSeverity Severity { get; set; }
+        public ModerationEscalationStatus Status { get; set; }
+        public string? SourceContext { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class HrModerationReportCenterItemDto
+    {
+        public string ItemType { get; set; } = string.Empty;
+        public Guid? ItemId { get; set; }
+        public Guid TargetId { get; set; }
+        public string TargetType { get; set; } = string.Empty;
+        public string TargetLabel { get; set; } = string.Empty;
+        public string WorkflowStatus { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
+        public string? Detail { get; set; }
+        public string? Severity { get; set; }
+        public string? SourceContext { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     // Department

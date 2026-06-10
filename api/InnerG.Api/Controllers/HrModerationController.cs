@@ -35,8 +35,23 @@ namespace InnerG.Api.Controllers
         [HttpPatch("resources/{resourceId:guid}/review")]
         public async Task<IActionResult> ReviewResource(Guid resourceId, [FromBody] ReviewResourceRequest request)
         {
-            await _service.ReviewResourceAsync(resourceId, GetCurrentCompanyId(), request);
+            await _service.ReviewResourceAsync(resourceId, GetCurrentCompanyId(), GetCurrentUserId(), request);
             return NoContent();
+        }
+
+        [HttpGet("escalations")]
+        public async Task<IActionResult> Escalations() =>
+            Ok(await _service.GetEscalationReportsAsync(GetCurrentCompanyId()));
+
+        [HttpGet("report-center")]
+        public async Task<IActionResult> ReportCenter() =>
+            Ok(await _service.GetModerationReportCenterAsync(GetCurrentCompanyId()));
+
+        [HttpPost("escalations")]
+        public async Task<IActionResult> CreateEscalation([FromBody] CreateModerationEscalationRequest request)
+        {
+            var report = await _service.CreateEscalationReportAsync(GetCurrentCompanyId(), GetCurrentUserId(), request);
+            return StatusCode(StatusCodes.Status201Created, report);
         }
     }
 }

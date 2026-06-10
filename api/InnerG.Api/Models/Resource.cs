@@ -11,6 +11,13 @@ namespace InnerG.Api.Models
         Quiz
     }
 
+    public enum ResourceModerationStatus
+    {
+        PendingReview,
+        Approved,
+        Rejected
+    }
+
     public class Resource : TenantEntity
     {
         public Guid TrainingEventId { get; set; }
@@ -23,6 +30,9 @@ namespace InnerG.Api.Models
         public long? FileSizeBytes { get; set; }
         
         public bool IsPublic { get; set; } = false; // Accessible without enrollment?
+        public ResourceModerationStatus ModerationStatus { get; set; } = ResourceModerationStatus.PendingReview;
+        public DateTime? ReviewedAt { get; set; }
+        public string? ReviewNotes { get; set; }
 
         // Navigation properties
         public virtual TrainingEvent TrainingEvent { get; set; } = null!;

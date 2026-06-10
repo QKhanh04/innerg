@@ -219,8 +219,8 @@ namespace InnerG.Api.Data.Seed
                         Status = TrainingEventStatus.Published,
                         SkillId = techSkill.Id,
                         TrainerId = trainer.Id,
-                        StartDate = DateTime.UtcNow.AddDays(-1),
-                        EndDate = DateTime.UtcNow.AddDays(7),
+                        StartDate = DateTime.UtcNow.AddDays(7),
+                        EndDate = DateTime.UtcNow.AddDays(7).AddHours(2),
                         MaxParticipants = 20,
                         RewardPoints = 50
                     };
@@ -275,8 +275,8 @@ namespace InnerG.Api.Data.Seed
                         Status = TrainingEventStatus.Published,
                         SkillId = softSkill.Id,
                         TrainerId = externalTrainer.Id,
-                        StartDate = DateTime.UtcNow.AddDays(-2),
-                        EndDate = DateTime.UtcNow.AddDays(5),
+                        StartDate = DateTime.UtcNow.AddDays(10),
+                        EndDate = DateTime.UtcNow.AddDays(10).AddHours(3),
                         MaxParticipants = 30,
                         RewardPoints = 100
                     };
@@ -324,6 +324,33 @@ namespace InnerG.Api.Data.Seed
                 }
             }
 
+            // Always ensure the demo events have future dates even if they already exist
+            var existingEvents = await context.TrainingEvents.IgnoreQueryFilters()
+                .Where(te => te.CompanyId == company.Id && (te.Title == "Advanced React & Design Systems" || te.Title == "Vinyasa Yoga & Breathwork for High-Productivity"))
+                .ToListAsync();
+
+            foreach (var te in existingEvents)
+            {
+                if (te.StartDate <= DateTime.UtcNow)
+                {
+                    if (te.Title == "Advanced React & Design Systems")
+                    {
+                        te.StartDate = DateTime.UtcNow.AddDays(7);
+                        te.EndDate = DateTime.UtcNow.AddDays(7).AddHours(2);
+                    }
+                    else
+                    {
+                        te.StartDate = DateTime.UtcNow.AddDays(10);
+                        te.EndDate = DateTime.UtcNow.AddDays(10).AddHours(3);
+                    }
+                    te.Status = TrainingEventStatus.Published; // Ensure it's published so it shows in Explore
+                }
+            }
+
+            if (existingEvents.Any())
+            {
+                await context.SaveChangesAsync();
+            }
         }
 
         private static async Task EnsureSeedUserAsync(
@@ -427,6 +454,7 @@ namespace InnerG.Api.Data.Seed
             {
                 Console.WriteLine($"[WARNING] Failed to assign roles to seed user '{normalizedEmail}': {string.Join("; ", addRolesResult.Errors.Select(x => x.Description))}");
             }
+
         }
 
         private static string BuildUserName(string email)

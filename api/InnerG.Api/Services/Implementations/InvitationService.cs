@@ -43,8 +43,16 @@ namespace InnerG.Api.Services.Implementations
             if (!allowExternalEmail && !EmailMatchesDomain(email, company.Domain))
                 throw new BadRequestException("HR email must belong to the company domain");
 
-            if (await _context.Users.IgnoreQueryFilters().AnyAsync(x => x.CompanyId == companyId && x.Email == email && x.DeletedAt == null))
-                throw new ConflictException("User is already a member of this company");
+            var existingUser = await _context.Users.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Email == email && x.DeletedAt == null);
+
+            if (existingUser != null)
+            {
+                if (existingUser.CompanyId == companyId)
+                    throw new BusinessException("COMPANY_MEMBER_EXISTS", "Email này đã thuộc công ty hiện tại", 409);
+
+                throw new BusinessException("EMAIL_ALREADY_IN_SYSTEM", "Email này đã tồn tại trong hệ thống ở một thư mục công ty khác", 409);
+            }
 
             var pendingInvite = await _context.Invites
                 .IgnoreQueryFilters()
