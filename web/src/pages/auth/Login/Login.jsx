@@ -84,10 +84,9 @@ const Login = () => {
   };
 
   return (
-    <div className="fixed top-0 left-0 w-screen h-screen overflow-hidden m-0 p-0">
-      <div className="flex w-full h-full">
-        {/* Left Side: Illustration & Branding */}
-        <div className="hidden lg:flex lg:w-1/2 bg-[#1f2927] relative overflow-hidden flex-col justify-between p-12 shrink-0">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white">
+      {/* Left Side: Illustration & Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#1f2927] relative overflow-hidden flex-col justify-between p-12 shrink-0 sticky top-0 h-screen">
           {/* Decorative Background Elements */}
           <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-[100px]"></div>
           <div className="absolute bottom-[-5%] right-[-5%] w-80 h-80 bg-primary/10 rounded-full blur-[100px]"></div>
@@ -141,9 +140,9 @@ const Login = () => {
         </div>
 
         {/* Right Side: Login Form */}
-        <div className="w-full lg:w-1/2 flex flex-col justify-center bg-white p-8 md:p-16 lg:px-24 overflow-auto shrink-0 relative">
+        <div className="w-full lg:w-1/2 flex flex-col justify-center min-h-screen relative p-6 sm:p-12 lg:p-24">
           
-          <div className="w-full max-w-[400px] mx-auto flex flex-col relative z-10">
+          <div className="w-full max-w-[400px] mx-auto flex flex-col relative z-10 py-12">
             {/* Mobile Logo */}
             <div className="lg:hidden flex items-center gap-2 text-deep-blue mb-8">
               <div className="w-8 h-8 text-primary">
@@ -321,12 +320,11 @@ const Login = () => {
           </div>
           
           {/* Privacy and Terms bottom right */}
-          <div className="absolute bottom-8 right-12 text-[#64748b] text-[11px] font-sans font-bold tracking-widest flex gap-6 hidden md:flex">
+          <div className="absolute bottom-6 left-0 right-0 lg:left-auto lg:right-12 text-[#64748b] text-[11px] font-sans font-bold tracking-widest flex justify-center gap-6 pb-6 lg:pb-0">
             <a href="#" className="hover:text-[#0a192f] transition-colors">Privacy Policy</a>
             <a href="#" className="hover:text-[#0a192f] transition-colors">Terms of Service</a>
           </div>
         </div>
-      </div>
     </div>
   );
 };
