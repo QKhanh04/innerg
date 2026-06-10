@@ -388,12 +388,6 @@ namespace InnerG.Api.Data.Seed
             {
                 var changed = false;
 
-                if (user.CompanyId != definition.CompanyId)
-                {
-                    user.CompanyId = definition.CompanyId;
-                    changed = true;
-                }
-
                 if (user.DeletedAt != null)
                 {
                     user.DeletedAt = null;

@@ -143,8 +143,12 @@ namespace InnerG.Api.Controllers
                         return NoContent();
 
                     var oldValue = company.IsActive;
+                    var revokedSessionCount = 0;
                     company.IsActive = request.IsActive;
                     company.UpdatedAt = DateTime.UtcNow;
+
+                    if (!request.IsActive)
+                        revokedSessionCount = await RevokeCompanySessionsAsync(companyId);
 
                     await AddAuditLogAsync(
                         companyId,
@@ -152,7 +156,7 @@ namespace InnerG.Api.Controllers
                         company.Id,
                         auditAction,
                         new { isActive = oldValue },
-                        new { isActive = request.IsActive });
+                        new { isActive = request.IsActive, revokedSessionCount });
 
                     await _context.SaveChangesAsync();
                     return NoContent();
@@ -194,8 +198,12 @@ namespace InnerG.Api.Controllers
                             continue;
 
                         var oldValue = company.IsActive;
+                        var revokedSessionCount = 0;
                         company.IsActive = request.IsActive;
                         company.UpdatedAt = DateTime.UtcNow;
+
+                        if (!request.IsActive)
+                            revokedSessionCount = await RevokeCompanySessionsAsync(company.Id);
 
                         await AddAuditLogAsync(
                             company.Id,
@@ -203,14 +211,15 @@ namespace InnerG.Api.Controllers
                             company.Id,
                             request.IsActive ? "Activate" : "Deactivate",
                             new { isActive = oldValue },
-                            new { isActive = request.IsActive, bulkAction = true });
+                            new { isActive = request.IsActive, bulkAction = true, revokedSessionCount });
 
                         updatedCompanies.Add(new
                         {
                             company.Id,
                             company.Name,
                             PreviousIsActive = oldValue,
-                            company.IsActive
+                            company.IsActive,
+                            RevokedSessionCount = revokedSessionCount
                         });
                     }
 
