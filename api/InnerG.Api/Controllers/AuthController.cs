@@ -264,7 +264,7 @@ namespace InnerG.Api.Controllers
 
         private void SetRefreshTokenCookie(string refreshToken)
         {
-            var isHttps = Request.IsHttps;
+            var isHttps = IsSecureRequest();
             var options = new CookieOptions
             {
                 HttpOnly = true,
@@ -279,7 +279,7 @@ namespace InnerG.Api.Controllers
 
         private void DeleteRefreshTokenCookie()
         {
-            var isHttps = Request.IsHttps;
+            var isHttps = IsSecureRequest();
             var options = new CookieOptions
             {
                 SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
@@ -287,6 +287,17 @@ namespace InnerG.Api.Controllers
                 Path = "/api/auth"
             };
             Response.Cookies.Delete("refresh_token", options);
+        }
+
+        private bool IsSecureRequest()
+        {
+            if (Request.IsHttps)
+                return true;
+
+            if (Request.Headers.TryGetValue("X-Forwarded-Proto", out var forwardedProto))
+                return string.Equals(forwardedProto.ToString(), "https", StringComparison.OrdinalIgnoreCase);
+
+            return false;
         }
 
         private Guid? GetCurrentCompanyId()
