@@ -115,7 +115,7 @@ const GoogleLoginButton = () => {
                 type="button"
                 onClick={handleCustomButtonClick}
                 disabled={isLoading}
-                className="w-full flex h-14 items-center justify-center gap-3 rounded-lg border-2 border-slate-200 bg-white text-slate-700 text-base font-semibold hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex h-12 items-center justify-center gap-3 rounded-md border border-slate-200 bg-white text-[#334155] text-[15px] font-bold hover:bg-slate-50 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {/* Google Icon SVG */}
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
