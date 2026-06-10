@@ -5,6 +5,7 @@ import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
 import AppLayout from '../layouts/AppLayout';
 
+import LandingPage from '../pages/public/LandingPage/LandingPage';
 import Login from '../pages/auth/Login/Login';
 import AcceptInvite from '../pages/auth/AcceptInvite/AcceptInvite';
 import VerifyEmail from '../pages/auth/VerifyEmail/VerifyEmail';
@@ -37,19 +38,11 @@ const LegacyRegisterRedirect = () => {
     return <Navigate to={`/accept-invite${location.search}`} replace />;
 };
 
-const HomeRedirect = () => {
-    const { user, loading } = useAuth();
-
-    if (loading) {
-        return null;
-    }
-
-    return <Navigate to={getDefaultRouteForUser(user)} replace />;
-};
-
 const AppRoutes = () => (
     <Routes>
         {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        
         <Route path="/login" element={
             <PublicRoute>
                 <Login />
@@ -217,7 +210,6 @@ const AppRoutes = () => (
             {/* You can add more protected routes here for other roles */}
         </Route>
 
-        <Route path="/" element={<HomeRedirect />} />
         <Route path="*" element={<Navigate to="/" />} />
     </Routes>
 );

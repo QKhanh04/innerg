@@ -47,23 +47,28 @@ namespace InnerG.Api.Services.Implementations
 
         private async Task SendHtmlEmailAsync(string toEmail, string subject, string html)
         {
-            var host = _config["SMTP_HOST"] ?? throw new ConfigurationException("SMTP_HOST");
-            var portValue = _config["SMTP_PORT"] ?? throw new ConfigurationException("SMTP_PORT");
-            var username = _config["SMTP_USERNAME"] ?? throw new ConfigurationException("SMTP_USERNAME");
-            var password = _config["SMTP_PASSWORD"] ?? throw new ConfigurationException("SMTP_PASSWORD");
-            var fromName = _config["SMTP_FROM_NAME"] ?? "Support";
+            var host = _config["SMTP_HOST"] ?? "smtp.gmail.com";
+            var portValue = _config["SMTP_PORT"] ?? "587";
+            var username = _config["SMTP_USERNAME"];
+            var password = _config["SMTP_PASSWORD"];
+            var fromName = _config["SMTP_FROM_NAME"] ?? "InnerG Support";
 
-            if (!int.TryParse(portValue, out var port) || port <= 0)
-                throw new ConfigurationException("SMTP_PORT");
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+            {
+                Console.WriteLine("[EmailService] SMTP credentials are not configured properly.");
+                throw new ConfigurationException("SMTP_USERNAME or SMTP_PASSWORD is missing.");
+            }
 
+            if (!int.TryParse(portValue, out var port))
+                port = 587;
+
+            // Xóa khoảng trắng thừa trong mật khẩu sinh ra từ App Password
             password = password.Trim().Trim('"', '\'');
             if (host.Contains("gmail", StringComparison.OrdinalIgnoreCase))
                 password = password.Replace(" ", string.Empty);
 
             try
             {
-                Console.WriteLine($"[EmailService] Preparing to send email to {toEmail}");
-                
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(fromName, username));
                 message.To.Add(MailboxAddress.Parse(toEmail));
@@ -72,37 +77,22 @@ namespace InnerG.Api.Services.Implementations
                 var builder = new BodyBuilder { HtmlBody = html };
                 message.Body = builder.ToMessageBody();
 
-                using var smtp = new SmtpClient();
-                smtp.Timeout = 15000; // Giảm xuống 15s để bắt lỗi nhanh hơn nếu kẹt mạng
-                
-                // Render có thể chặn cơ chế nâng cấp STARTTLS trên port 587.
-                // Nếu dùng 465, bắt buộc SslOnConnect. 587 dùng StartTls.
-                var secureOption = SecureSocketOptions.Auto;
+                // Xác định Option bảo mật dựa theo Port giống hệt mẫu
+                var secureOption = SecureSocketOptions.StartTls;
                 if (port == 465) secureOption = SecureSocketOptions.SslOnConnect;
-                else if (port == 587) secureOption = SecureSocketOptions.StartTls;
-                
-                // Bỏ qua lỗi Check SSL giả mạo (rất hay gặp trên Docker/Linux cloud)
+
+                using var smtp = new SmtpClient();
+                // Bỏ qua chứng chỉ SSL giả mạo trên Docker (tuỳ chọn an toàn cho Render)
                 smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                
-                Console.WriteLine($"[EmailService] 1. Attempting ConnectAsync to {host}:{port} with Option: {secureOption}");
+
                 await smtp.ConnectAsync(host, port, secureOption);
-                
-                Console.WriteLine($"[EmailService] 2. Connected! Attempting AuthenticateAsync as {username}");
                 await smtp.AuthenticateAsync(username, password);
-                
-                Console.WriteLine($"[EmailService] 3. Authenticated! Attempting SendAsync...");
                 await smtp.SendAsync(message);
-                
-                Console.WriteLine($"[EmailService] 4. Sent successfully. Disconnecting...");
                 await smtp.DisconnectAsync(true);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EmailService] FATAL ERROR: {ex.GetType().Name} - {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"[EmailService] Inner Exception: {ex.InnerException.Message}");
-                }
+                Console.WriteLine($"[EmailService] Failed to send email: {ex.Message}");
                 throw new ExternalServiceException($"Failed to send email: {ex.Message}");
             }
         }
