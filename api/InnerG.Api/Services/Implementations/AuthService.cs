@@ -555,6 +555,11 @@ namespace InnerG.Api.Services.Implementations
                 _logger.LogWarning("User {Email} is inactive or locked out", user.Email);
                 throw new UnauthorizedException("User account is locked");
             }
+            if (user.CompanyId.HasValue && (user.Company == null || !user.Company.IsActive || user.Company.DeletedAt != null))
+            {
+                _logger.LogWarning("User {Email} belongs to inactive company {CompanyId}", user.Email, user.CompanyId);
+                throw new UnauthorizedException("Company is inactive");
+            }
 
             session.IsActive = false;
             session.RevokedAt = DateTime.UtcNow;
@@ -773,6 +778,9 @@ namespace InnerG.Api.Services.Implementations
             {
                 company = user.Company ?? await _context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(x => x.Id == user.CompanyId.Value)
                     ?? throw new NotFoundException("Company not found");
+
+                if (!company.IsActive || company.DeletedAt != null)
+                    throw new UnauthorizedException("Company is inactive");
             }
 
             var accessToken = _tokenService.GenerateAccessToken(user, roles, user.CompanyId, company?.Name);

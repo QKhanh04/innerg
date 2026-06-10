@@ -278,8 +278,12 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await context.Database.MigrateAsync();
     await UserNameNormalizationSeeder.NormalizeAsync(context);
-    await DataSeeder.SeedAsync(scope.ServiceProvider);
-    await DemoBusinessDataSeeder.SeedAsync(scope.ServiceProvider);
+
+    if (app.Environment.IsDevelopment())
+    {
+        await DataSeeder.SeedAsync(scope.ServiceProvider);
+        await DemoBusinessDataSeeder.SeedAsync(scope.ServiceProvider);
+    }
 }
 
 app.UseForwardedHeaders();
