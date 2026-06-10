@@ -1,5 +1,6 @@
-using System.Net;
-using System.Net.Mail;
+using MimeKit;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using InnerG.Api.Exceptions;
 using InnerG.Api.Services.Interfaces;
 
@@ -65,41 +66,37 @@ namespace InnerG.Api.Services.Implementations
             try
             {
                 Console.WriteLine($"[EmailService] Preparing to send email to {toEmail} via {host}:{port}");
-                var message = new MailMessage
-                {
-                    Subject = subject,
-                    Body = html,
-                    IsBodyHtml = true,
-                    From = new MailAddress(username, fromName)
-                };
+                
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(fromName, username));
+                message.To.Add(MailboxAddress.Parse(toEmail));
+                message.Subject = subject;
 
-                message.To.Add(toEmail);
+                var builder = new BodyBuilder { HtmlBody = html };
+                message.Body = builder.ToMessageBody();
 
-                using var smtp = new SmtpClient(host, port)
-                {
-                    UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(username, password),
-                    EnableSsl = enableSsl,
-                    DeliveryMethod = SmtpDeliveryMethod.Network,
-                    Timeout = 30000 // 30 seconds
-                };
-
-                await smtp.SendMailAsync(message);
+                using var smtp = new SmtpClient();
+                smtp.Timeout = 30000; // 30 seconds timeout
+                
+                // SecureSocketOptions.Auto allows MailKit to automatically select the most secure
+                // protocol (SSL, TLS, StartTLS) based on the port and server capabilities.
+                var secureOption = enableSsl ? SecureSocketOptions.Auto : SecureSocketOptions.None;
+                
+                await smtp.ConnectAsync(host, port, secureOption);
+                await smtp.AuthenticateAsync(username, password);
+                await smtp.SendAsync(message);
+                await smtp.DisconnectAsync(true);
+                
                 Console.WriteLine($"[EmailService] SMTP send completed for {toEmail}");
-            }
-            catch (SmtpException ex)
-            {
-                Console.WriteLine($"[EmailService] SmtpException for {toEmail}: Status={ex.StatusCode}, Message={ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"[EmailService] Inner Exception: {ex.InnerException.Message}");
-                }
-                throw new ExternalServiceException($"Failed to send email: {ex.Message} (Status: {ex.StatusCode})");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[EmailService] General exception for {toEmail}: {ex.Message}");
-                throw;
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"[EmailService] Inner Exception: {ex.InnerException.Message}");
+                }
+                throw new ExternalServiceException($"Failed to send email: {ex.Message}");
             }
         }
     }
