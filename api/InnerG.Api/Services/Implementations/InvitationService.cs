@@ -621,7 +621,8 @@ namespace InnerG.Api.Services.Implementations
             if (!string.IsNullOrWhiteSpace(configuredUrl))
                 return $"{configuredUrl}?token={Uri.EscapeDataString(rawToken)}";
 
-            var frontendUrl = _configuration.GetSection("Frontend:Urls").Get<string[]>()?.FirstOrDefault()
+            var frontendUrl = _configuration["FRONTEND_URL"]
+                ?? _configuration.GetSection("Frontend:Urls").Get<string[]>()?.FirstOrDefault()
                 ?? "http://localhost:5173";
 
             return $"{frontendUrl.TrimEnd('/')}/accept-invite?token={Uri.EscapeDataString(rawToken)}";
