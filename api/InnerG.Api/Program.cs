@@ -62,22 +62,11 @@ var jwtAudience = Require("Jwt:Audience");
 // Email provider
 _ = Require("SENDGRID_API_KEY");
 _ = Require("MAIL_FROM");
-var googleClientId = Require("GOOGLE_CLIENT_ID");
-var googleClientSecret = Require("GOOGLE_CLIENT_SECRET");
+_ = Require("GOOGLE_CLIENT_ID");
+_ = Require("GOOGLE_CLIENT_SECRET");
 
 // Frontend
-var frontendUrls = builder.Configuration.GetSection("Frontend:Urls").Get<string[]>() ?? [];
-var frontendUrl = builder.Configuration["FRONTEND_URL"];
-if (!string.IsNullOrWhiteSpace(frontendUrl))
-{
-    frontendUrls = frontendUrls
-        .Append(frontendUrl.TrimEnd('/'))
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-}
-
-if (frontendUrls.Length == 0)
-    throw new ConfigurationException("Frontend:Urls or FRONTEND_URL");
+var frontendUrl = Require("FRONTEND_URL").TrimEnd('/');
 
 /* =========================
    MVC & VALIDATION
@@ -133,7 +122,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReact", policy =>
-        policy.WithOrigins(frontendUrls)
+        policy.WithOrigins(frontendUrl)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
