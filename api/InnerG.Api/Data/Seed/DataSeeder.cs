@@ -19,6 +19,8 @@ namespace InnerG.Api.Data.Seed
             var context = serviceProvider.GetRequiredService<AppDbContext>();
             var roleManager = serviceProvider.GetRequiredService<RoleManager<AppRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<AppUser>>();
+            var seedCompanyDomain = configuration["SEED_COMPANY_DOMAIN"]?.Trim().ToLowerInvariant() ?? "innerg.com";
+            var seedCompanyName = configuration["SEED_COMPANY_NAME"]?.Trim() ?? "InnerG Corporation";
 
             var roles = new[]
             {
@@ -34,14 +36,15 @@ namespace InnerG.Api.Data.Seed
                     await roleManager.CreateAsync(new AppRole(roleName));
             }
 
-            var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync();
+            var company = await context.Companies.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Domain == seedCompanyDomain && x.DeletedAt == null);
             if (company == null)
             {
                 company = new Company
                 {
                     Id = Guid.NewGuid(),
-                    Name = "InnerG Corporation",
-                    Domain = "innerg.com",
+                    Name = seedCompanyName,
+                    Domain = seedCompanyDomain,
                     Timezone = "Asia/Ho_Chi_Minh",
                     Language = "vi",
                     IsActive = true
@@ -53,6 +56,11 @@ namespace InnerG.Api.Data.Seed
             else
             {
                 var companyChanged = false;
+                if (!string.Equals(company.Name, seedCompanyName, StringComparison.Ordinal))
+                {
+                    company.Name = seedCompanyName;
+                    companyChanged = true;
+                }
                 if (!company.IsActive)
                 {
                     company.IsActive = true;

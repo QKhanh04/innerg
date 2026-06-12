@@ -11,11 +11,13 @@ namespace InnerG.Api.Data.Seed
         public static async Task SeedAsync(IServiceProvider serviceProvider)
         {
             var context = serviceProvider.GetRequiredService<AppDbContext>();
+            var configuration = serviceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var seedCompanyDomain = configuration["SEED_COMPANY_DOMAIN"]?.Trim().ToLowerInvariant() ?? "innerg.com";
 
-            var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync();
+            var company = await context.Companies.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(x => x.Domain == seedCompanyDomain && x.DeletedAt == null);
             if (company == null) return;
 
-            var configuration = serviceProvider.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
             var mentorEmail = configuration["SEED_MENTOR_EMAIL"];
             var menteeEmail = configuration["SEED_MENTEE_EMAIL"];
             var sysAdminEmail = configuration["SEED_SYSADMIN_EMAIL"];
