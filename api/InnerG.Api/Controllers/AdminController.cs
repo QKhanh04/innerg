@@ -327,6 +327,12 @@ namespace InnerG.Api.Controllers
                     if (company.DeletedAt != null)
                         return NoContent();
 
+                    var memberCount = await _context.Users.IgnoreQueryFilters()
+                        .CountAsync(x => x.CompanyId == companyId && x.DeletedAt == null);
+
+                    if (memberCount > 0)
+                        throw new BadRequestException("Cannot delete a company that still has members. Deactivate it instead.");
+
                     var revokedSessionCount = await RevokeCompanySessionsAsync(companyId);
 
                     company.IsActive = false;

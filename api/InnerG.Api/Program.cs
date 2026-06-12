@@ -51,6 +51,9 @@ string Require(string key) =>
     builder.Configuration[key]
     ?? throw new ConfigurationException(key);
 
+bool IsTrue(string? value) =>
+    string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
 // Database
 var dbConnection = Require("DB_CONNECTION");
 
@@ -279,7 +282,8 @@ using (var scope = app.Services.CreateScope())
     await context.Database.MigrateAsync();
     await UserNameNormalizationSeeder.NormalizeAsync(context);
 
-    if (app.Environment.IsDevelopment())
+    var enableDemoSeeding = IsTrue(builder.Configuration["ENABLE_DEMO_SEEDING"]);
+    if (app.Environment.IsDevelopment() && enableDemoSeeding)
     {
         await DataSeeder.SeedAsync(scope.ServiceProvider);
         await DemoBusinessDataSeeder.SeedAsync(scope.ServiceProvider);
