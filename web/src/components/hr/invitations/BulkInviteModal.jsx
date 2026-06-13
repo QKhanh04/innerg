@@ -30,9 +30,7 @@ export default function BulkInviteModal({ onClose }) {
 
     const handleDownloadTemplate = async () => {
         try {
-            console.log('Fetching template...');
             const blob = await invitationsApi.getTemplate();
-            console.log('Template fetched instance:', blob);
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
