@@ -4,6 +4,8 @@ import { useCallback } from 'react';
 import { buildAuthUser } from '../utils/auth';
 import { AuthContext } from './AuthContextBase';
 
+const AUTH_SESSION_HINT_KEY = 'innerg_has_session';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,7 @@ export const AuthProvider = ({ children }) => {
     if (!data) {
       setAccessToken(null);
       setUser(null);
+      localStorage.removeItem(AUTH_SESSION_HINT_KEY);
       return false;
     }
 
@@ -30,6 +33,7 @@ export const AuthProvider = ({ children }) => {
 
     setAccessToken(data.token);
     setUser(buildAuthUser(data));
+    localStorage.setItem(AUTH_SESSION_HINT_KEY, 'true');
     return true;
   }, [setAccessToken]);
 
@@ -42,18 +46,18 @@ export const AuthProvider = ({ children }) => {
     isInitialized.current = true;
 
     const initAuth = async () => {
-  
+      if (localStorage.getItem(AUTH_SESSION_HINT_KEY) !== 'true') {
+        setLoading(false);
+        return;
+      }
 
       try {
-        console.log('🔄 Attempting to refresh token...');
         // Try to get new token from refresh token cookie
         const data = await authService.refreshToken();
-        
         setAuthenticatedUser(data);
       } catch {
         // No valid refresh token - user needs to login
         // This is normal for first visit or expired session
-        console.log(' No valid refresh token - user not authenticated');
         setAuthenticatedUser(null);
       } finally {
         setLoading(false);
@@ -153,7 +157,6 @@ export const AuthProvider = ({ children }) => {
   };
 
   const refreshAccessToken = async () => {
-
     try {
       const data = await authService.refreshToken();
       setAuthenticatedUser(data);

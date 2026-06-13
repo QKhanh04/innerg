@@ -507,7 +507,6 @@ export default function SchedulePage() {
           endDate: endDateStr
         }
       });
-      console.log("Fetched schedule events from backend:", response.data);
       setEvents(response.data);
     } catch (err) {
       console.error("Error fetching schedule data from backend", err);
