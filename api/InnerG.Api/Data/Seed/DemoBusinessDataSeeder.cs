@@ -138,6 +138,70 @@ namespace InnerG.Api.Data.Seed
                 context.InnerGPointsLedger.Add(menteeLedger);
             }
 
+            // 5. Seed Professional Skills for Mentor
+            var skills = await context.Skills.IgnoreQueryFilters().Where(s => s.CompanyId == company.Id).ToListAsync();
+            foreach (var skill in skills)
+            {
+                var existingUserSkill = await context.UserSkills.IgnoreQueryFilters().AnyAsync(us => us.UserId == mentorUser.Id && us.SkillId == skill.Id);
+                if (!existingUserSkill)
+                {
+                    context.UserSkills.Add(new UserSkill
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = mentorUser.Id,
+                        SkillId = skill.Id,
+                        Proficiency = ProficiencyLevel.Expert,
+                        IsMentorSkill = true,
+                        Source = SkillSource.HRVerified,
+                        VerifiedAt = DateTime.UtcNow.AddMonths(-3)
+                    });
+                }
+            }
+
+            // 6. Seed Badges and UserBadges for Mentor
+            var badge1 = await context.Badges.IgnoreQueryFilters().FirstOrDefaultAsync(b => b.Name == "Top Mentor 2026");
+            if (badge1 == null)
+            {
+                badge1 = new Badge
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    Name = "Top Mentor 2026",
+                    Description = "Awarded for being the most highly rated mentor.",
+                    IconUrl = "https://cdn-icons-png.flaticon.com/512/1785/1785236.png",
+                    ConditionType = BadgeConditionType.TopRankedMonthly,
+                    IsSystem = false
+                };
+                var badge2 = new Badge
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    Name = "First Teaching Session",
+                    Description = "Awarded for completing the first teaching session.",
+                    IconUrl = "https://cdn-icons-png.flaticon.com/512/3274/3274116.png",
+                    ConditionType = BadgeConditionType.FirstTeach,
+                    IsSystem = false
+                };
+
+                context.Badges.AddRange(badge1, badge2);
+
+                context.UserBadges.Add(new UserBadge
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = mentorUser.Id,
+                    BadgeId = badge1.Id,
+                    AwardedAt = DateTime.UtcNow.AddMonths(-1)
+                });
+
+                context.UserBadges.Add(new UserBadge
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = mentorUser.Id,
+                    BadgeId = badge2.Id,
+                    AwardedAt = DateTime.UtcNow.AddMonths(-6)
+                });
+            }
+
             await context.SaveChangesAsync();
         }
     }
