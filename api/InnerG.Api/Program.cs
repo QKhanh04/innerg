@@ -119,7 +119,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 
 /* =========================
-   CORS
+   CORS (Cross-Origin Resource Sharing)
    ========================= */ 
 
 builder.Services.AddCors(options =>
