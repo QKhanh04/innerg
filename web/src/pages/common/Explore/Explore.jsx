@@ -233,53 +233,59 @@ export default function ExplorePage() {
     <div className="space-y-8 max-w-[1400px] mx-auto pb-16">
 
       {/* 1. HERO BANNER WITH GRADIENT & STATS */}
-      <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-violet-950 rounded-3xl p-8 lg:p-10 shadow-xl border border-indigo-500/25 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-8">
-        {/* Glowing Background Orbs */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#00C896]/5 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] -ml-24 -mb-24 pointer-events-none" />
+      <section className="relative">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative bg-gradient-to-br from-[#0F1F3D] via-[#162747] to-[#0A1224] rounded-3xl p-8 lg:p-10 overflow-hidden border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-6"
+        >
+          {/* Ambient Background Glows */}
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#00C896]/10 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[250px] h-[250px] bg-blue-500/10 rounded-full blur-[80px] -ml-24 -mb-24 pointer-events-none" />
 
-        <div className="space-y-4 max-w-2xl text-left relative z-10">
-          <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[#00C896] uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-            <Sparkles className="size-3.5" />
-            Empower Skills & Growth
-          </span>
-          <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
-            Skill Marketplace & Training Portal
-          </h1>
-          <p className="text-slate-350 text-sm leading-relaxed max-w-xl">
-            Explore company-internal mentoring sessions, workshops, peer learning groups, and earn learning rewards points while growing your career.
-          </p>
+          <div className="relative z-10 space-y-3 max-w-2xl text-left">
+            <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#00C896]/10 border border-[#00C896]/20 rounded-full w-fit backdrop-blur-sm shadow-inner shadow-white/5">
+              <Sparkles className="size-3.5 text-[#00C896] animate-pulse" />
+              <span className="text-[#00C896] text-[10px] font-bold uppercase tracking-widest">Empower Skills & Growth</span>
+            </div>
+            <h1 className="text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Skill Marketplace & Training Portal
+            </h1>
+            <p className="text-slate-300 text-sm leading-relaxed max-w-xl font-medium">
+              Explore company-internal mentoring sessions, workshops, peer learning groups, and earn learning rewards points while growing your career.
+            </p>
 
           {/* Quick Metrics */}
-          <div className="flex gap-6 pt-2">
+          <div className="relative z-10 flex gap-6 pt-2">
             <div>
-              <p className="text-2xl font-extrabold text-white">{stats.activeClasses}</p>
-              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Active Classes</p>
+              <p className="text-2xl font-black text-white">{stats.activeClasses}</p>
+              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest">Active Classes</p>
             </div>
             <div className="border-l border-white/10 pl-6">
-              <p className="text-2xl font-extrabold text-white">{stats.skillsExchanged}</p>
-              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Skills Exchanged</p>
+              <p className="text-2xl font-black text-white">{stats.skillsExchanged}</p>
+              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest">Skills Exchanged</p>
             </div>
             <div className="border-l border-white/10 pl-6">
-              <p className="text-2xl font-extrabold text-white">{stats.activeMentors}</p>
-              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Active Mentors</p>
+              <p className="text-2xl font-black text-white">{stats.activeMentors}</p>
+              <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest">Active Mentors</p>
             </div>
           </div>
         </div>
 
         {/* Dynamic CTA for Mentor Role to Teach */}
         {(role === 'mentor' || role === 'hr') && (
-          <div className="shrink-0 relative z-10">
+          <div className="shrink-0 relative z-10 self-start md:self-end mt-4 md:mt-0">
             <button
               onClick={() => showToast('info', "Redirecting to Create Class form...")}
-              className="bg-gradient-to-r from-[#00C896] to-[#00B083] hover:brightness-105 active:scale-[0.98] text-[#0F1F3D] font-extrabold px-6 py-3.5 rounded-2xl text-xs uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-[#00C896]/20 flex items-center gap-2"
+              className="bg-gradient-to-r from-[#00C896] to-[#00B083] hover:from-[#00E0A8] hover:to-[#00C896] text-[#0F1F3D] font-extrabold px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-[0.98] shadow-md shadow-[#00C896]/20 flex items-center gap-2 cursor-pointer"
             >
-              <Plus className="size-4.5 stroke-[3]" />
+              <Plus className="size-4.5 stroke-[2.5]" />
               Host a Class
             </button>
           </div>
         )}
-      </div>
+        </motion.div>
+      </section>
 
       {/* 2. AI RECOMMENDED COURSES (PERSONALIZED MATCHES) */}
       <section className="space-y-5 text-left">

@@ -63,6 +63,20 @@ namespace InnerG.Api.Services.Implementations
             return trainer;
         }
 
+        private (string currentLevel, string nextLevel, int pointsToNext) CalculateMentorLevel(int points)
+        {
+            if (points < 1000)
+                return ("🌱 Novice Mentor", "🥉 Bronze Mentor", 1000 - points);
+            if (points < 3000)
+                return ("🥉 Bronze Mentor", "🥈 Silver Mentor", 3000 - points);
+            if (points < 7000)
+                return ("🥈 Silver Mentor", "🥇 Gold Mentor", 7000 - points);
+            if (points < 15000)
+                return ("🥇 Gold Mentor", "💎 Diamond Mentor", 15000 - points);
+            
+            return ("💎 Diamond Mentor", "MAX LEVEL", 0);
+        }
+
         public async Task<MentorStatsResponse> GetDashboardStatsAsync(Guid userId)
         {
             var trainer = await GetTrainerByUserIdAsync(userId);
@@ -71,15 +85,47 @@ namespace InnerG.Api.Services.Implementations
             var user = await _unitOfWork.Repository<AppUser>().GetByIdAsync(userId);
             int currentPoints = user?.TotalInnerGPoints ?? 0;
 
+            // Dynamically calculate stats to ensure real-time accuracy
+            var hostedEvents = await _unitOfWork.Repository<TrainingEvent>()
+                .GetQueryable()
+                .Where(e => e.TrainerId == trainer.Id)
+                .Include(e => e.Enrollments)
+                .ToListAsync();
+
+            // Classes that are active or finished
+            int totalClasses = hostedEvents.Count(e => e.Status == TrainingEventStatus.Published || e.Status == TrainingEventStatus.Completed);
+            
+            // Confirmed or completed students
+            int totalStudents = hostedEvents.Sum(e => e.Enrollments.Count(en => en.Status == EnrollmentStatus.Confirmed || en.Status == EnrollmentStatus.Completed));
+            
+            // Calculate real average rating from Feedback table
+            var feedbacks = await _unitOfWork.Repository<Feedback>()
+                .GetQueryable()
+                .Where(f => f.RevieweeUserId == userId || f.RevieweeTrainerId == trainer.Id)
+                .ToListAsync();
+
+            double avgRating = feedbacks.Any() ? Math.Round(feedbacks.Average(f => f.OverallRating), 1) : 0.0;
+
+            // Compute dynamic Mentor Level based on total InnerG points
+            var (currentLevel, nextLevel, pointsToNext) = CalculateMentorLevel(currentPoints);
+
+            // Tự động cập nhật MentorStatus nếu có thay đổi
+            if (trainer.MentorStatus != currentLevel)
+            {
+                trainer.MentorStatus = currentLevel;
+                await _unitOfWork.Repository<Trainer>().UpdateAsync(trainer);
+                await _unitOfWork.CommitAsync();
+            }
+
             return new MentorStatsResponse
             {
-                TotalClassesTaught = trainer.TotalClassesTaught,
-                TotalStudents = trainer.TotalStudents,
-                AverageRating = trainer.AvgRating,
+                TotalClassesTaught = totalClasses,
+                TotalStudents = totalStudents,
+                AverageRating = avgRating,
                 CurrentPoints = currentPoints,
-                MentorStatus = trainer.MentorStatus,
-                NextLevel = "Senior Mentor", // Giả lập logic level
-                PointsToNextLevel = 5000 - currentPoints > 0 ? 5000 - currentPoints : 0
+                MentorStatus = currentLevel,
+                NextLevel = nextLevel,
+                PointsToNextLevel = pointsToNext
             };
         }
 
