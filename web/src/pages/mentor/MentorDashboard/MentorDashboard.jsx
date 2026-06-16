@@ -169,106 +169,102 @@ export default function MentorDashboard() {
     <div className="min-h-screen bg-[#FAFAFC] font-sans pb-20">
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 pt-8 space-y-8">
         
-        {/* 1. HERO & BENTO STATS */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Hero Banner (Spans 3 cols) */}
+        {/* 1. HERO BANNER (Full Width) */}
+        <section className="relative">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-3 relative overflow-hidden rounded-[2rem] bg-slate-900 p-8 md:p-10 shadow-2xl shadow-slate-900/10 flex flex-col justify-between min-h-[280px]"
+            className="relative bg-gradient-to-br from-[#0F1F3D] via-[#162747] to-[#0A1224] rounded-3xl p-8 lg:p-10 overflow-hidden border border-slate-800 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-6"
           >
-            {/* Mesh Gradient Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/40 via-purple-500/20 to-transparent mix-blend-overlay"></div>
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-fuchsia-500/30 rounded-full blur-[100px]"></div>
+            {/* Ambient Background Glows */}
+            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#00C896]/10 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-[250px] h-[250px] bg-blue-500/10 rounded-full blur-[80px] -ml-24 -mb-24 pointer-events-none" />
             
-            <div className="relative z-10 flex flex-col h-full justify-between">
-              <div className="space-y-2 max-w-xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white text-xs font-bold mb-4">
-                  <Sparkles className="size-3.5" /> Welcome to your workspace
-                </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                  Shape the future,<br />one class at a time.
-                </h1>
-                <p className="text-slate-300 font-medium text-sm md:text-base mt-2 max-w-md leading-relaxed">
-                  You have {pendingApprovals.length} pending requests and {classes.filter(c => getEventStatus(c.status) === 'Published').length} active classes. Let's make an impact today.
-                </p>
-              </div>
-              
-              <div className="mt-8 flex items-center gap-4">
-                <button 
-                  onClick={() => navigate('/mentor/create')}
-                  className="bg-white hover:bg-slate-50 text-slate-900 font-extrabold px-6 py-3.5 rounded-2xl text-[13px] transition-all active:scale-[0.98] shadow-xl shadow-white/10 flex items-center gap-2"
-                >
-                  <Plus className="size-4.5" /> Host New Class
-                </button>
-              </div>
+            {/* Decorative Graphic */}
+            <div className="absolute bottom-0 right-48 opacity-[0.03] pointer-events-none hidden lg:block translate-y-12">
+              <BookOpen className="w-56 h-56 text-white" strokeWidth={0.5} />
             </div>
             
-            {/* Decorative SVG */}
-            <div className="absolute bottom-0 right-0 p-8 opacity-20 pointer-events-none hidden md:block">
-              <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
+            <div className="relative z-10 space-y-3 max-w-3xl">
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#00C896]/10 border border-[#00C896]/20 rounded-full w-fit backdrop-blur-sm shadow-inner shadow-white/5">
+                 <Sparkles className="size-3.5 text-[#00C896] animate-pulse" />
+                 <span className="text-[#00C896] text-[10px] font-bold uppercase tracking-widest">Mentor Workspace</span>
+              </div>
+              <h1 className="text-2xl lg:text-4xl font-extrabold text-white leading-tight tracking-tight">
+                Shape the future, one class at a time.
+              </h1>
+              <p className="text-slate-300 text-xs lg:text-sm leading-relaxed font-medium">
+                You have {pendingApprovals.length} pending requests and {classes.filter(c => getEventStatus(c.status) === 'Published').length} active classes. Let's make an impact today.
+              </p>
+            </div>
+            
+            <div className="relative z-10 shrink-0 self-start md:self-end">
+               <button 
+                 onClick={() => navigate('/mentor/create')}
+                 className="bg-gradient-to-r from-[#00C896] to-[#00B083] hover:from-[#00E0A8] hover:to-[#00C896] text-[#0F1F3D] font-extrabold px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-[0.98] shadow-md shadow-[#00C896]/20 flex items-center gap-2 cursor-pointer"
+               >
+                  <Plus className="size-4.5 stroke-[2.5]" /> Host New Class
+               </button>
             </div>
           </motion.div>
+        </section>
 
-          {/* Primary Bento Stat (Spans 1 col) */}
+        {/* 2. STATS GRID (4 items) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Points Stat */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="lg:col-span-1 bg-white border border-slate-200/60 rounded-[2rem] p-8 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-center min-h-[280px]"
+            className="bg-white border border-slate-200/60 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between group"
           >
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-50 rounded-full blur-3xl"></div>
-            <div className="relative z-10">
-              <div className="size-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-indigo-500/20">
-                <Zap className="size-6" />
-              </div>
-              <p className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">Available Points</p>
-              {isLoading ? (
-                <div className="h-12 w-24 bg-slate-100 animate-pulse rounded-lg mt-2"></div>
-              ) : (
-                <>
-                  <p className="text-5xl font-black text-slate-900 tracking-tight">{stats?.currentPoints || 0}</p>
-                  <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 text-[11px] font-bold">
-                    <TrendingUp className="size-3.5" /> +15% vs last month
-                  </div>
-                </>
-              )}
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-indigo-50/50 rounded-full blur-2xl group-hover:bg-indigo-50 transition-colors"></div>
+            <div className="relative z-10 flex items-center justify-between mb-4">
+               <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Available Points</p>
+               <div className="size-10 rounded-2xl flex items-center justify-center bg-indigo-50 text-indigo-500">
+                  <Zap className="size-5" />
+               </div>
+            </div>
+            <div className="relative z-10 flex items-end justify-between">
+               {isLoading ? (
+                  <div className="h-8 w-16 bg-slate-100 animate-pulse rounded"></div>
+               ) : (
+                  <p className="text-3xl font-black text-slate-800">{stats?.currentPoints || 0}</p>
+               )}
+               <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-extrabold bg-emerald-50 px-2 py-1 rounded-lg">
+                  <TrendingUp className="size-3" /> +15%
+               </div>
             </div>
           </motion.div>
-        </div>
 
-        {/* 2. SECONDARY STATS (3 items) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { label: 'Classes Taught', value: stats?.totalClassesTaught || 0, icon: BookOpen, color: 'text-blue-500', bg: 'bg-blue-50', gradient: 'from-blue-500/10 to-transparent' },
             { label: 'Total Students', value: stats?.totalStudents || 0, icon: Users, color: 'text-emerald-500', bg: 'bg-emerald-50', gradient: 'from-emerald-500/10 to-transparent' },
-            { label: 'Average Rating', value: stats?.averageRating?.toFixed(1) || '0.0', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', gradient: 'from-amber-500/10 to-transparent', suffix: <Star className="size-5 fill-amber-500 text-amber-500 inline-block ml-1" /> }
+            { label: 'Average Rating', value: stats?.averageRating?.toFixed(1) || '0.0', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50', gradient: 'from-amber-500/10 to-transparent', suffix: <Star className="size-4.5 fill-amber-500 text-amber-500 inline-block ml-1 mb-0.5" /> }
           ].map((stat, idx) => (
             <motion.div 
               key={idx}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + idx * 0.1 }}
-              className="bg-white border border-slate-200/60 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group"
+              className="bg-white border border-slate-200/60 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col justify-between group"
             >
-              <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50 transition-opacity group-hover:opacity-100", stat.gradient)}></div>
-              <div className="relative z-10 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-                  {isLoading ? (
+              <div className={cn("absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity group-hover:opacity-100", stat.gradient)}></div>
+              <div className="relative z-10 flex items-center justify-between mb-4">
+                 <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                 <div className={cn("size-10 rounded-2xl flex items-center justify-center", stat.bg, stat.color)}>
+                    <stat.icon className="size-5" />
+                 </div>
+              </div>
+              <div className="relative z-10">
+                 {isLoading ? (
                     <div className="h-8 w-16 bg-slate-100 animate-pulse rounded"></div>
-                  ) : (
-                    <div className="flex items-end gap-2">
-                      <p className="text-3xl font-black text-slate-800">{stat.value}</p>
-                      {stat.suffix}
+                 ) : (
+                    <div className="flex items-end gap-1.5">
+                       <p className="text-3xl font-black text-slate-800">{stat.value}</p>
+                       {stat.suffix}
                     </div>
-                  )}
-                </div>
-                <div className={cn("size-12 rounded-2xl flex items-center justify-center", stat.bg, stat.color)}>
-                  <stat.icon className="size-6" />
-                </div>
+                 )}
               </div>
             </motion.div>
           ))}

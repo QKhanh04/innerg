@@ -21,12 +21,71 @@ import {
   ArrowUpDown,
   BookOpen,
   User,
-  Loader2
+  Loader2,
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { wishlistApi } from '../../../api/wishlistApi';
 import { toastService } from '../../../services/toastService';
+
+const CustomSelect = ({ value, onChange, options, name, className }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className={cn("relative", className)} ref={selectRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex justify-between items-center cursor-pointer h-full"
+      >
+        <span className="font-medium truncate mr-2">{selectedOption?.label}</span>
+        <ChevronDown className={cn("size-3.5 transition-transform duration-300 shrink-0", isOpen && "rotate-180")} />
+      </div>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 z-50 w-48 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden py-1.5"
+          >
+            {options.map((opt) => (
+              <div 
+                key={opt.value}
+                onClick={() => {
+                  onChange({ target: { name, value: opt.value } });
+                  setIsOpen(false);
+                }}
+                className={cn(
+                  "px-4 py-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between",
+                  value === opt.value ? "bg-indigo-50/80 text-indigo-700 font-bold" : "text-slate-600 hover:bg-slate-50 font-medium"
+                )}
+              >
+                {opt.label}
+                {value === opt.value && <Check className="size-3.5 text-indigo-600" />}
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default function LearningWishlist() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -222,14 +281,14 @@ export default function LearningWishlist() {
             <div className="relative shrink-0 flex items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 gap-2 hover:bg-slate-100 transition-colors">
                <ArrowUpDown className="size-3.5 text-slate-400" />
                <span>Sort by:</span>
-               <select 
+               <CustomSelect 
                  value={sortBy} 
                  onChange={(e) => setSortBy(e.target.value)}
-                 className="bg-transparent focus:outline-none cursor-pointer pr-1"
-               >
-                  <option value="votes">Most Upvotes</option>
-                  <option value="recent">Recently Proposed</option>
-               </select>
+                 options={[
+                   { value: "votes", label: "Most Upvotes" },
+                   { value: "recent", label: "Recently Proposed" }
+                 ]}
+               />
             </div>
          </div>
 
@@ -587,16 +646,18 @@ export default function LearningWishlist() {
 
                       <div className="flex flex-col gap-1.5">
                          <label className="text-slate-800 text-[10px] font-extrabold uppercase tracking-wider">Category</label>
-                         <select 
+                         <CustomSelect 
+                           name="category"
                            value={newRequest.category}
                            onChange={(e) => setNewRequest(prev => ({ ...prev, category: e.target.value }))}
-                           className="w-full bg-slate-50 border border-slate-200 focus:border-[#00C896] focus:bg-white text-slate-800 text-xs px-4 py-3 rounded-xl focus:outline-none transition-all cursor-pointer"
-                         >
-                            <option value="Technical">Technical (Coding, Tools, Engineering)</option>
-                            <option value="Soft Skill">Soft Skill (Communication, Strategy)</option>
-                            <option value="Design">Design (UI/UX, Branding)</option>
-                            <option value="Product">Product Management</option>
-                         </select>
+                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 hover:border-[#00C896] focus:border-[#00C896] focus:bg-white text-slate-800 text-xs rounded-xl transition-all"
+                           options={[
+                             { value: "Technical", label: "Technical (Coding, Tools, Engineering)" },
+                             { value: "Soft Skill", label: "Soft Skill (Communication, Strategy)" },
+                             { value: "Design", label: "Design (UI/UX, Branding)" },
+                             { value: "Product", label: "Product Management" }
+                           ]}
+                         />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
