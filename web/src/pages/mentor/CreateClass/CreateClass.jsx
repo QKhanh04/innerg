@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, 
   Sparkles, 
@@ -22,7 +22,8 @@ import {
   UploadCloud,
   FileText,
   Trash2,
-  Loader2
+  Loader2,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
@@ -31,6 +32,63 @@ import { mentorApi } from '../../../api/mentorApi';
 import { exploreApi } from '../../../api/exploreApi';
 import { uploadApi } from '../../../api/uploadApi';
 import { toastService } from '../../../services/toastService';
+
+const CustomSelect = ({ value, onChange, options, name }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={selectRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 hover:border-indigo-400 focus:border-indigo-400 focus:bg-white text-sm rounded-2xl outline-none transition-all text-slate-700 cursor-pointer flex justify-between items-center shadow-sm"
+      >
+        <span className="font-medium">{selectedOption?.label}</span>
+        <ChevronDown className={cn("size-4 text-slate-400 transition-transform duration-300", isOpen && "rotate-180")} />
+      </div>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="absolute z-50 w-full mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden py-1.5"
+          >
+            {options.map((opt) => (
+              <div 
+                key={opt.value}
+                onClick={() => {
+                  onChange({ target: { name, value: opt.value } });
+                  setIsOpen(false);
+                }}
+                className={cn(
+                  "px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between",
+                  value === opt.value ? "bg-indigo-50/80 text-indigo-700 font-bold" : "text-slate-600 hover:bg-slate-50 font-medium"
+                )}
+              >
+                {opt.label}
+                {value === opt.value && <Check className="size-3.5 text-indigo-600" />}
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 export default function CreateClassPage() {
   const navigate = useNavigate();
@@ -530,32 +588,32 @@ export default function CreateClassPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block">Category</label>
-                <select 
+                <CustomSelect 
                   name="category"
                   value={formData.category}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-sm rounded-2xl outline-none transition-all text-slate-700 cursor-pointer"
-                >
-                  <option value="Technical">Technical</option>
-                  <option value="Soft Skills">Soft Skills</option>
-                  <option value="Design">Design</option>
-                  <option value="Leadership">Leadership</option>
-                  <option value="Wellness">Wellness</option>
-                </select>
+                  options={[
+                    { value: "Technical", label: "Technical" },
+                    { value: "Soft Skills", label: "Soft Skills" },
+                    { value: "Design", label: "Design" },
+                    { value: "Leadership", label: "Leadership" },
+                    { value: "Wellness", label: "Wellness" }
+                  ]}
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block">Difficulty Level</label>
-                <select 
+                <CustomSelect 
                   name="level"
                   value={formData.level}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-400 focus:bg-white text-sm rounded-2xl outline-none transition-all text-slate-700 cursor-pointer"
-                >
-                  <option value="Beginner">Beginner (All Levels)</option>
-                  <option value="Intermediate">Intermediate</option>
-                  <option value="Expert">Expert</option>
-                </select>
+                  options={[
+                    { value: "Beginner", label: "Beginner (All Levels)" },
+                    { value: "Intermediate", label: "Intermediate" },
+                    { value: "Expert", label: "Expert" }
+                  ]}
+                />
               </div>
             </div>
 
@@ -945,7 +1003,10 @@ export default function CreateClassPage() {
                   step="15"
                   value={formData.duration}
                   onChange={handleInputChange}
-                  className="w-full accent-indigo-600 cursor-pointer"
+                  className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md hover:[&::-webkit-slider-thumb]:scale-125 [&::-webkit-slider-thumb]:transition-transform"
+                  style={{
+                    background: `linear-gradient(to right, #4f46e5 ${((formData.duration - 30) / (180 - 30)) * 100}%, #e2e8f0 ${((formData.duration - 30) / (180 - 30)) * 100}%)`
+                  }}
                 />
               </div>
             </div>
@@ -964,7 +1025,10 @@ export default function CreateClassPage() {
                 step="5"
                 value={formData.maxSlots}
                 onChange={handleInputChange}
-                className="w-full accent-indigo-600 cursor-pointer"
+                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md hover:[&::-webkit-slider-thumb]:scale-125 [&::-webkit-slider-thumb]:transition-transform"
+                style={{
+                  background: `linear-gradient(to right, #4f46e5 ${((formData.maxSlots - 5) / (100 - 5)) * 100}%, #e2e8f0 ${((formData.maxSlots - 5) / (100 - 5)) * 100}%)`
+                }}
               />
               <div className={cn(
                 "p-2 rounded-xl text-[10px] font-extrabold uppercase tracking-widest text-center",
