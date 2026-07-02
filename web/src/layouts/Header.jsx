@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Bell, Search, MessageSquare, LogOut } from 'lucide-react';
+import { Search, MessageSquare, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { useRole } from '../lib/RoleContext';
 import { useAuth } from '../hooks/useAuth';
+import NotificationDropdown from '../components/notifications/NotificationDropdown';
 
 export function Header({ title }) {
     const navigate = useNavigate();
@@ -30,8 +31,8 @@ export function Header({ title }) {
     };
 
     return (
-        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-10 px-8 flex items-center justify-between">
-            <div className="flex-1 max-w-md">
+        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-20 px-8 flex items-center justify-between gap-4">
+            <div className="flex-1 min-w-0 max-w-md">
                 {title ? (
                     <h2 className="text-lg font-bold text-slate-900">{title}</h2>
                 ) : (
@@ -46,12 +47,9 @@ export function Header({ title }) {
                 )}
             </div>
 
-            <div className="flex items-center gap-4">
-                <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl relative transition-colors">
-                    <Bell className="size-5" />
-                    <span className="absolute top-2 right-2 size-2 bg-primary rounded-full ring-2 ring-white"></span>
-                </button>
-                <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
+            <div className="flex items-center gap-3 shrink-0">
+                <NotificationDropdown />
+                <button className="flex items-center justify-center size-10 shrink-0 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
                     <MessageSquare className="size-5" />
                 </button>
                 <div className="h-8 w-px bg-slate-200 mx-2"></div>

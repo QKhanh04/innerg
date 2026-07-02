@@ -11,6 +11,7 @@ const PUBLIC_ENDPOINTS = [
     '/auth/bootstrap-company',
     '/auth/forgot-password',
     '/auth/reset-password',
+    '/notifications/vapid-public-key',
   ];
 
   const isPublicEndpoint = (url, method) => {

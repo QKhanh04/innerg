@@ -13,11 +13,13 @@ namespace InnerG.Api.Services.Implementations
     {
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly IPushNotificationService _pushNotificationService;
 
-        public NotificationService(AppDbContext context, IEmailService emailService)
+        public NotificationService(AppDbContext context, IEmailService emailService, IPushNotificationService pushNotificationService)
         {
             _context = context;
             _emailService = emailService;
+            _pushNotificationService = pushNotificationService;
         }
 
         public async Task SendAsync(
@@ -54,6 +56,12 @@ namespace InnerG.Api.Services.Implementations
                 {
                     Console.WriteLine($"[NotificationService] User {userId} has no email or not found.");
                 }
+            }
+
+            if (channel == NotificationChannel.Push || channel == NotificationChannel.Both)
+            {
+                Console.WriteLine($"[NotificationService] Sending push notification to user {userId}");
+                await _pushNotificationService.SendPushAsync(userId, title, body);
             }
         }
 
@@ -107,6 +115,22 @@ namespace InnerG.Api.Services.Implementations
                     catch (Exception ex)
                     {
                         Console.WriteLine($"[NotificationService] Error sending email to {email}: {ex.Message}");
+                    }
+                }
+            }
+
+            if (channel == NotificationChannel.Push || channel == NotificationChannel.Both)
+            {
+                Console.WriteLine($"[NotificationService] Sending push notifications to {distinctIds.Count} users");
+                foreach (var userId in distinctIds)
+                {
+                    try
+                    {
+                        await _pushNotificationService.SendPushAsync(userId, title, body);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[NotificationService] Error sending push to user {userId}: {ex.Message}");
                     }
                 }
             }

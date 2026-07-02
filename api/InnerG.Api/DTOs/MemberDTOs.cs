@@ -86,6 +86,7 @@ namespace InnerG.Api.DTOs
     {
         public string? FullName { get; set; }
         public Guid? DepartmentId { get; set; }
+        public bool RemoveDepartment { get; set; }
         public string? Position { get; set; }
         public string? PhoneInternal { get; set; }
         public string? AvatarUrl { get; set; }
