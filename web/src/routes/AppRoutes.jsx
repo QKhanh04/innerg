@@ -30,6 +30,7 @@ import MyClasses from '../pages/common/MyClasses/MyClasses';
 import CreateClass from '../pages/mentor/CreateClass/CreateClass';
 import Profile from '../pages/common/Profile/Profile';
 import MentorDashboard from '../pages/mentor/MentorDashboard/MentorDashboard';
+import InteractiveViewer from '../pages/common/InteractiveViewer/InteractiveViewer';
 import { useAuth } from '../hooks/useAuth';
 import { getDefaultRouteForUser } from '../utils/authRoute';
 
@@ -164,6 +165,12 @@ const AppRoutes = () => (
             <Route path="/resources" element={
                 <ProtectedRoute allowedRoles={['mentee', 'mentor', 'hr', 'admin']}>
                     <ResourceHub />
+                </ProtectedRoute>
+            } />
+
+            <Route path="/interactive-viewer" element={
+                <ProtectedRoute allowedRoles={['mentee', 'mentor', 'hr', 'admin']}>
+                    <InteractiveViewer />
                 </ProtectedRoute>
             } />
 

@@ -12,6 +12,9 @@ import { useRole } from '../../../lib/RoleContext';
 import { exploreApi } from '../../../api/exploreApi';
 import { feedbackApi } from '../../../api/feedbackApi';
 import { toastService } from '../../../services/toastService';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import FloatingAITutor from './components/FloatingAITutor';
 
 /* ─── Skeleton Loader ─────────────────────────────────────────── */
 function SkeletonLoader() {
@@ -77,7 +80,6 @@ export default function ExploreDetail() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
-
   const [feedbacks, setFeedbacks] = useState([]);
 
   useEffect(() => {
@@ -324,20 +326,24 @@ export default function ExploreDetail() {
                   const isPdf  = res.fileType?.toLowerCase() === '.pdf';
                   const iconBg = isLink ? 'bg-sky-50 text-sky-600' : isPdf ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600';
                   return (
-                    <a key={i} href={res.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3.5 bg-white border border-slate-200 rounded-2xl p-4 hover:border-indigo-300 hover:shadow-md transition-all group"
-                    >
-                      <div className={cn('size-10 rounded-xl flex items-center justify-center shrink-0', iconBg)}>
-                        {isLink ? <Link2 className="size-5" /> : <FileText className="size-5" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{res.title}</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">
-                          {isLink ? 'External Link' : `${res.fileType?.replace('.','') || 'Document'} · ${(res.fileSizeBytes/1048576).toFixed(2)} MB`}
-                        </p>
-                      </div>
-                      <Download className="size-4 text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
-                    </a>
+                    <div key={i} className="flex flex-col gap-2">
+                      <button onClick={() => navigate('/interactive-viewer', { state: { resourceId: res.id, resources: detail.resources, trainingEventId: detail.id } })}
+                        className="flex items-center gap-3.5 bg-white border border-slate-200 rounded-2xl p-4 hover:border-indigo-300 hover:shadow-md transition-all group text-left w-full cursor-pointer"
+                      >
+                        <div className={cn('size-10 rounded-xl flex items-center justify-center shrink-0', iconBg)}>
+                          {isLink ? <Link2 className="size-5" /> : <FileText className="size-5" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">{res.title}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mt-0.5">
+                            {isLink ? 'External Link' : `${res.fileType?.replace('.','') || 'Document'} · ${(res.fileSizeBytes/1048576).toFixed(2)} MB`}
+                          </p>
+                        </div>
+                        <Sparkles className="size-4 text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0 animate-pulse" />
+                      </button>
+
+
+                    </div>
                   );
                 })}
               </div>
@@ -527,6 +533,10 @@ export default function ExploreDetail() {
           </div>
         </motion.aside>
       </div>
+
+      {/* Floating AI Tutor */}
+      <FloatingAITutor trainingEventId={detail.id} resources={detail.resources} />
+
     </div>
   );
 }

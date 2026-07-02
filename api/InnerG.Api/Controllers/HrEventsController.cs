@@ -13,7 +13,7 @@ namespace InnerG.Api.Controllers
     public class HrEventsController : HrControllerBase
     {
         private readonly IHrEventService _service;
-
+`
         public HrEventsController(IHrEventService service) => _service = service;
 
         [HttpPost]

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using InnerG.Api.DTOs;
 using InnerG.Api.Models;
-using InnerG.Api.Models;
 using InnerG.Api.Services.Interfaces;
 using System.Security.Claims;
 
