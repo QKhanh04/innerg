@@ -72,8 +72,28 @@ namespace InnerG.Api.Services.Implementations
 
         private async Task<string> EnsureFileUploadedAsync(Resource resource)
         {
-            if (!string.IsNullOrEmpty(resource.GeminiFileUri)) return resource.GeminiFileUri;
+            // If we have a stored URI, verify it's still alive and accessible with current API key
+            // Gemini URIs expire after 48h, and are tied to the API key that uploaded them
+            if (!string.IsNullOrEmpty(resource.GeminiFileUri))
+            {
+                try
+                {
+                    var checkUrl = $"{resource.GeminiFileUri}?key={_apiKey}";
+                    var checkResponse = await _httpClient.GetAsync(checkUrl);
+                    if (checkResponse.IsSuccessStatusCode)
+                    {
+                        return resource.GeminiFileUri; // URI is valid and accessible
+                    }
+                    // 404 = expired, 403 = wrong API key (e.g. uploaded on local, reading from prod)
+                    Console.WriteLine($"Gemini URI invalid (status {(int)checkResponse.StatusCode}) for resource {resource.Id}, re-uploading...");
+                }
+                catch
+                {
+                    // On any network error, fall through to re-upload
+                }
+            }
 
+            // Upload (or re-upload) the file to Gemini with the current API key
             string fileUri = await UploadFileToGeminiAsync(resource.Url, resource.FileType ?? "application/pdf");
             resource.GeminiFileUri = fileUri;
             await _context.SaveChangesAsync();
