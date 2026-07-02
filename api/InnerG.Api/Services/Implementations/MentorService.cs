@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Identity;
 using InnerG.Api.Models;
 using InnerG.Api.DTOs.Mentor;
@@ -17,15 +18,18 @@ namespace InnerG.Api.Services.Implementations
         private readonly IUnitOfWork _unitOfWork;
         private readonly INotificationService _notificationService;
         private readonly UserManager<AppUser> _userManager;
+        private readonly IServiceScopeFactory _scopeFactory;
 
         public MentorService(
             IUnitOfWork unitOfWork,
             INotificationService notificationService,
-            UserManager<AppUser> userManager)
+            UserManager<AppUser> userManager,
+            IServiceScopeFactory scopeFactory)
         {
             _unitOfWork = unitOfWork;
             _notificationService = notificationService;
             _userManager = userManager;
+            _scopeFactory = scopeFactory;
         }
 
         private async Task<Trainer> GetTrainerByUserIdAsync(Guid userId)
@@ -422,6 +426,8 @@ namespace InnerG.Api.Services.Implementations
 
             await _unitOfWork.Repository<TrainingSession>().AddAsync(session);
 
+            var createdResourceIds = new List<Guid>();
+
             // Create Resources (Attachments & learning materials)
             if (request.Resources != null && request.Resources.Count > 0)
             {
@@ -448,10 +454,34 @@ namespace InnerG.Api.Services.Implementations
                         ModerationStatus = ResourceModerationStatus.PendingReview
                     };
                     await _unitOfWork.Repository<Resource>().AddAsync(resource);
+                    createdResourceIds.Add(resource.Id);
                 }
             }
 
             await _unitOfWork.CommitAsync();
+
+            // Trigger AI Summary Generation in Background
+            if (createdResourceIds.Any())
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var aiService = scope.ServiceProvider.GetRequiredService<IAILearningService>();
+                        foreach (var resId in createdResourceIds)
+                        {
+                            await aiService.GenerateAndSaveSummaryAsync(resId);
+                            // Add a delay to avoid rate limiting from Gemini API
+                            await Task.Delay(3000);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Background AI Summary Failed: {ex.Message}");
+                    }
+                });
+            }
 
             try
             {
@@ -581,6 +611,8 @@ namespace InnerG.Api.Services.Implementations
                 await _unitOfWork.Repository<Resource>().DeleteAsync(res);
             }
 
+            var createdResourceIds = new List<Guid>();
+
             if (request.Resources != null && request.Resources.Count > 0)
             {
                 foreach (var resReq in request.Resources)
@@ -606,10 +638,34 @@ namespace InnerG.Api.Services.Implementations
                         ModerationStatus = ResourceModerationStatus.PendingReview
                     };
                     await _unitOfWork.Repository<Resource>().AddAsync(resource);
+                    createdResourceIds.Add(resource.Id);
                 }
             }
 
             await _unitOfWork.CommitAsync();
+
+            // Trigger AI Summary Generation in Background
+            if (createdResourceIds.Any())
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var aiService = scope.ServiceProvider.GetRequiredService<IAILearningService>();
+                        foreach (var resId in createdResourceIds)
+                        {
+                            await aiService.GenerateAndSaveSummaryAsync(resId);
+                            // Add a delay to avoid rate limiting from Gemini API (Upload & Generate endpoints)
+                            await Task.Delay(3000);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Background AI Summary Failed: {ex.Message}");
+                    }
+                });
+            }
             return true;
         }
 

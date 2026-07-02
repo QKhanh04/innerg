@@ -53,22 +53,35 @@ namespace InnerG.Api.Services.Implementations
             if (file == null || file.Length == 0) return string.Empty;
 
             using var stream = file.OpenReadStream();
-            
-            // Đối với các file không phải ảnh (PDF, DOCX, XLSX), Cloudinary cần lưu dưới dạng Raw
-            var uploadParams = new RawUploadParams
-            {
-                File = new FileDescription(file.FileName, stream)
-            };
-            uploadParams.AddCustomParam("upload_preset", "InnerG");
+            var extension = System.IO.Path.GetExtension(file.FileName).ToLower();
 
-            var uploadResult = await _cloudinary.UploadAsync(uploadParams);
-            
-            if (uploadResult.Error != null)
+            // Nếu là file PDF, upload dưới dạng ImageUploadParams để lách luật khóa Raw Delivery của Cloudinary
+            // Cloudinary hỗ trợ quản lý PDF như một dạng ảnh nhiều trang rất mượt mà.
+            if (extension == ".pdf")
             {
-                throw new Exception(uploadResult.Error.Message);
+                var uploadParams = new ImageUploadParams
+                {
+                    File = new FileDescription(file.FileName, stream)
+                };
+                uploadParams.AddCustomParam("upload_preset", "InnerG");
+
+                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.Error != null) throw new Exception(uploadResult.Error.Message);
+                return uploadResult.SecureUrl.ToString();
             }
+            else
+            {
+                // Đối với các file không phải ảnh/PDF (DOCX, XLSX, PPTX), Cloudinary bắt buộc lưu dưới dạng Raw
+                var uploadParams = new RawUploadParams
+                {
+                    File = new FileDescription(file.FileName, stream)
+                };
+                uploadParams.AddCustomParam("upload_preset", "InnerG");
 
-            return uploadResult.SecureUrl.ToString();
+                var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.Error != null) throw new Exception(uploadResult.Error.Message);
+                return uploadResult.SecureUrl.ToString();
+            }
         }
     }
 }
