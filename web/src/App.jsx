@@ -9,6 +9,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RoleProvider } from './lib/RoleContext';
+import PushNotificationSetup from './components/notifications/PushNotificationSetup';
 
 // Component to setup axios interceptors with auth context
 function AxiosInterceptorSetup() {
@@ -24,12 +25,13 @@ function AxiosInterceptorSetup() {
 const queryClient = new QueryClient();
 function App() {
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={(import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim()}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <RoleProvider>
             <BrowserRouter>
               <AxiosInterceptorSetup />
+              <PushNotificationSetup />
               <Toaster position="top-right" reverseOrder={false} />
               <AppRoutes />
             </BrowserRouter>

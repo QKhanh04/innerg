@@ -225,7 +225,18 @@ namespace InnerG.Api.Services.Implementations
             await EnsureCanModifyUserAsync(user, companyId, currentUserId);
 
             if (!string.IsNullOrWhiteSpace(request.FullName)) user.FullName = request.FullName;
-            if (request.DepartmentId.HasValue) user.DepartmentId = request.DepartmentId.Value;
+            if (request.RemoveDepartment)
+            {
+                user.DepartmentId = null;
+            }
+            else if (request.DepartmentId.HasValue)
+            {
+                var departmentExists = await _context.Departments
+                    .AnyAsync(d => d.Id == request.DepartmentId.Value && d.CompanyId == companyId && d.DeletedAt == null);
+                if (!departmentExists)
+                    throw new BusinessException("INVALID_DEPARTMENT", "Phòng ban không thuộc công ty này.", 400);
+                user.DepartmentId = request.DepartmentId.Value;
+            }
             if (request.Position != null) user.JobTitle = request.Position;
             if (request.PhoneInternal != null) user.PhoneInternal = request.PhoneInternal;
             if (request.AvatarUrl != null) user.AvatarUrl = request.AvatarUrl;
