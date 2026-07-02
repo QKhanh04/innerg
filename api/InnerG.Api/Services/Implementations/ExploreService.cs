@@ -275,7 +275,8 @@ namespace InnerG.Api.Services.Implementations
                 Title = r.Title,
                 Type = r.Type.ToString(),
                 Url = r.Url,
-                FileSizeBytes = r.FileSizeBytes
+                FileSizeBytes = r.FileSizeBytes,
+                AILearningSummary = r.AILearningSummary
             }).ToList();
 
             var sessionsDto = te.Sessions.OrderBy(s => s.StartTime).Select(s => {

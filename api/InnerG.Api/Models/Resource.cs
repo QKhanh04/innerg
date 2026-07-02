@@ -28,6 +28,8 @@ namespace InnerG.Api.Models
         public string Url { get; set; } = string.Empty; // File URL or Link
         public string? FileType { get; set; } // .pdf, .mp4, etc.
         public long? FileSizeBytes { get; set; }
+        public string? GeminiFileUri { get; set; } // URI returned by Gemini File API
+        public string? AILearningSummary { get; set; } // Auto-generated summary by AI
         
         public bool IsPublic { get; set; } = false; // Accessible without enrollment?
         public ResourceModerationStatus ModerationStatus { get; set; } = ResourceModerationStatus.PendingReview;

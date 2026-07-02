@@ -38,10 +38,10 @@ export const getDefaultRouteForUser = (user) => {
   }
 
   if (user.uiRoles?.includes('mentor')) {
-    return '/resources';
+    return '/mentor';
   }
 
-  return '/resources';
+  return '/explore';
 };
 
 export const getDefaultRouteFromRoles = (roles = []) => {
