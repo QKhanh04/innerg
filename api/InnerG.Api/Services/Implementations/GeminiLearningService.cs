@@ -113,9 +113,12 @@ namespace InnerG.Api.Services.Implementations
         {
             try
             {
-                // In a real background task, we might need a separate scope for DbContext,
-                // but since it runs per-request for now or injected scoped, we use the current one.
-                var resource = await _context.Resources.FirstOrDefaultAsync(r => r.Id == resourceId);
+                // Runs from a detached background Task.Run with its own DI scope, so the
+                // HttpContext-derived tenant filter on _context.Resources can no longer be
+                // trusted by the time this executes (it's null/stale once the original
+                // request completes). resourceId is already a unique PK, so bypass the
+                // multi-tenant query filter here instead of relying on ICurrentUserService.
+                var resource = await _context.Resources.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == resourceId);
                 if (resource == null || string.IsNullOrEmpty(resource.Url)) return;
 
                 string fileUri = await EnsureFileUploadedAsync(resource);
@@ -134,7 +137,7 @@ namespace InnerG.Api.Services.Implementations
             {
                 Console.WriteLine($"Failed to generate summary for {resourceId}: {ex.Message}");
                 try {
-                    var resource = await _context.Resources.FirstOrDefaultAsync(r => r.Id == resourceId);
+                    var resource = await _context.Resources.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == resourceId);
                     if (resource != null) {
                         resource.AILearningSummary = $"[DEBUG ERROR] AI Summary Failed: {ex.Message}";
                         await _context.SaveChangesAsync();
