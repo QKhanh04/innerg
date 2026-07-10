@@ -136,6 +136,7 @@ namespace InnerG.Api.DTOs.Hr
         public string FullName { get; set; } = string.Empty;
         public double AvgRating { get; set; }
         public string Proficiency { get; set; } = string.Empty;
+        public bool IsRecommended { get; set; }
     }
 
     // Moderation

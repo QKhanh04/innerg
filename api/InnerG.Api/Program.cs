@@ -235,7 +235,9 @@ builder.Services.AddAuthorization();
    ========================= */
 
 builder.Services.AddScoped<IMemberService, MemberService>();
+builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
 builder.Services.AddScoped<IHrAnalyticsService, HrAnalyticsService>();
 builder.Services.AddScoped<IHrWishlistService, HrWishlistService>();
 builder.Services.AddScoped<IHrModerationService, HrModerationService>();

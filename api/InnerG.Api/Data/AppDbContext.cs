@@ -58,6 +58,7 @@ namespace InnerG.Api.Data
         public DbSet<TrainerInvitation> TrainerInvitations => Set<TrainerInvitation>();
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<NotificationPreference> NotificationPreferences => Set<NotificationPreference>();
+        public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
         public DbSet<WishlistVote> WishlistVotes => Set<WishlistVote>();
         public DbSet<ResourceDepartmentAccess> ResourceDepartmentAccess => Set<ResourceDepartmentAccess>();
         public DbSet<ModerationEscalationReport> ModerationEscalationReports => Set<ModerationEscalationReport>();
