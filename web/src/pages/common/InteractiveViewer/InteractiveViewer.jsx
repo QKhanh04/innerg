@@ -182,23 +182,22 @@ export default function InteractiveViewer() {
                             
                             {/* Tab Content */}
                             <div className="flex-1 overflow-hidden relative bg-white">
-                                {activeTab === 'insight' ? (
-                                    <div className="absolute inset-0 overflow-y-auto p-6">
-                                        <h3 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
-                                            <Sparkles className="size-4 text-indigo-500" />
-                                            Key Takeaways
-                                        </h3>
-                                        <div className="prose prose-sm prose-slate max-w-none text-[13px] leading-relaxed
-                                                    prose-p:m-0 prose-ul:my-1 prose-ul:pl-4 prose-li:my-0.5 prose-li:text-slate-700
-                                                    prose-strong:text-indigo-900 prose-strong:font-bold">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                {activeResource.aiLearningSummary || "AI is currently analyzing this document. Please check back later."}
-                                            </ReactMarkdown>
-                                        </div>
+                                <div className={`absolute inset-0 overflow-y-auto p-6 ${activeTab === 'insight' ? '' : 'hidden'}`}>
+                                    <h3 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+                                        <Sparkles className="size-4 text-indigo-500" />
+                                        Key Takeaways
+                                    </h3>
+                                    <div className="prose prose-sm prose-slate max-w-none text-[13px] leading-relaxed
+                                                prose-p:m-0 prose-ul:my-1 prose-ul:pl-4 prose-li:my-0.5 prose-li:text-slate-700
+                                                prose-strong:text-indigo-900 prose-strong:font-bold">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                            {activeResource.aiLearningSummary || "AI is currently analyzing this document. Please check back later."}
+                                        </ReactMarkdown>
                                     </div>
-                                ) : (
+                                </div>
+                                <div className={`absolute inset-0 ${activeTab === 'chat' ? '' : 'hidden'}`}>
                                     <AIChatbox key={`chat-class-${trainingEventId}`} trainingEventId={trainingEventId} documentTitle={activeResource.title} />
-                                )}
+                                </div>
                             </div>
                         </div>
                     </motion.div>
