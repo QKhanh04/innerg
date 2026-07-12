@@ -181,6 +181,20 @@ function ModerationActionDialog({ config, onClose, onSubmit, isPending }) {
     );
 }
 
+// --- Animation Variants ---
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.05, delayChildren: 0.1 }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
 export default function ModerationPage() {
     const qc = useQueryClient();
     const [contentTab, setContentTab] = useState('events');
@@ -257,10 +271,10 @@ export default function ModerationPage() {
         contentTab === 'report-center'
             ? reportCenterLoading
             : contentTab === 'events'
-            ? eventsLoading
-            : contentTab === 'resources'
-                ? resourcesLoading
-                : escalationsLoading;
+                ? eventsLoading
+                : contentTab === 'resources'
+                    ? resourcesLoading
+                    : escalationsLoading;
 
     const pendingEscalations = escalations.filter((item) => item.status === 'Pending').length;
     const resolvedEscalations = escalations.filter((item) => item.status === 'Resolved').length;
@@ -360,19 +374,45 @@ export default function ModerationPage() {
 
     return (
         <>
-            <div className="space-y-8 animate-in fade-in duration-500">
-                <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-6 py-8 text-white shadow-lg shadow-slate-900/10">
-                    <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/15 blur-3xl" />
-                    <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-primary/10 blur-3xl" />
+            <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="space-y-8 pb-10"
+            >
+                <motion.section variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-8 py-10 text-white shadow-2xl shadow-primary/10 transition-transform duration-500">
+                    <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/20 blur-[60px] animate-pulse" />
+                    <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-teal-400/10 blur-[60px]" />
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDExNSwxMTUsMC4wNSkiLz48L3N2Zz4=')] opacity-20" />
 
-                    <div className="relative space-y-2">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">HR Module</p>
-                        <h1 className="text-3xl font-bold tracking-tight">Content Moderation</h1>
-                        <p className="max-w-3xl text-sm leading-6 text-slate-200">
+                    <div className="relative space-y-3 z-10">
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 backdrop-blur-md"
+                        >
+                            <div className="size-2 rounded-full bg-primary animate-pulse" />
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/90">HR Module</p>
+                        </motion.div>
+                        <motion.h1
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="text-4xl lg:text-5xl font-black tracking-tight drop-shadow-md"
+                        >
+                            Content Moderation
+                        </motion.h1>
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4 }}
+                            className="max-w-3xl text-sm leading-relaxed text-slate-200/90 font-medium"
+                        >
                             Review events and resources, then escalate sensitive issues to system admin with a tracked report history.
-                        </p>
+                        </motion.p>
                     </div>
-                </section>
+                </motion.section>
 
                 <div className="flex flex-wrap gap-2 p-1 bg-slate-100/50 rounded-2xl border border-slate-200 w-fit">
                     {contentTabs.map((tab) => (
@@ -443,7 +483,7 @@ export default function ModerationPage() {
 
                         <div className="space-y-4">
                             {reportCenter.map((item) => (
-                                <div key={`${item.itemType}-${item.itemId || item.targetId}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <motion.div variants={itemVariants} key={`${item.itemType}-${item.itemId || item.targetId}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
                                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                         <div className="space-y-3">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -485,7 +525,7 @@ export default function ModerationPage() {
                                             )}
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
 
                             {!reportCenter.length && (
@@ -502,7 +542,7 @@ export default function ModerationPage() {
                 {!currentLoading && contentTab === 'events' && (
                     <div className="space-y-4">
                         {events.map((eventItem) => (
-                            <div key={eventItem.id} className="group relative bg-white border border-slate-200 rounded-xl p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+                            <motion.div variants={itemVariants} key={eventItem.id} className="group relative bg-white border border-slate-200 rounded-2xl p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
                                 <div className="flex items-start gap-5">
                                     <div className="size-14 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-all duration-300">
                                         <GraduationCap className="size-7" />
@@ -569,7 +609,7 @@ export default function ModerationPage() {
                                         <ChevronRight className="size-5" />
                                     </button>
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
 
                         {!events.length && (
@@ -585,7 +625,7 @@ export default function ModerationPage() {
                 {!currentLoading && contentTab === 'resources' && (
                     <div className="space-y-4">
                         {resources.map((resource) => (
-                            <div key={resource.id} className="group relative rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5">
+                            <motion.div variants={itemVariants} key={resource.id} className="group relative rounded-2xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5">
                                 <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                                     <div className="flex items-start gap-5">
                                         <div className="size-14 rounded-2xl border border-slate-100 bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-all duration-300">
@@ -636,7 +676,7 @@ export default function ModerationPage() {
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
 
                         {!resources.length && (
@@ -671,7 +711,7 @@ export default function ModerationPage() {
 
                         <div className="space-y-4">
                             {escalations.map((item) => (
-                                <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                                <motion.div variants={itemVariants} key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
                                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                         <div className="space-y-3">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -700,7 +740,7 @@ export default function ModerationPage() {
                                             <p className="max-w-3xl text-sm leading-6 text-slate-600">{item.reason}</p>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
 
                             {!escalations.length && (
@@ -713,7 +753,7 @@ export default function ModerationPage() {
                         </div>
                     </div>
                 )}
-            </div>
+            </motion.div>
 
             <AnimatePresence>
                 {selectedEvent && (

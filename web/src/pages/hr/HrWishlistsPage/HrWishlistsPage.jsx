@@ -7,6 +7,21 @@ import { cn } from '../../../lib/utils';
 import ActionDialog from '../../../components/common/ActionDialog';
 import InternalMentorModal from './InternalMentorModal';
 import { Award, Clock, Users, TrendingUp, Search, Info, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- Animation Variants ---
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.05, delayChildren: 0.1 }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
 
 export default function HrWishlistsPage() {
     const queryClient = useQueryClient();
@@ -58,22 +73,52 @@ export default function HrWishlistsPage() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8 pb-10"
+        >
             {/* ── Hero Section ─────────────────────────────────────────────────── */}
-            <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-6 py-8 text-white shadow-lg shadow-slate-900/10">
-                <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/15 blur-3xl" />
-                <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-primary/10 blur-3xl" />
+            <motion.section variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-8 py-10 text-white shadow-2xl shadow-primary/10 transition-transform duration-500">
+                <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/20 blur-[60px] animate-pulse" />
+                <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-teal-400/10 blur-[60px]" />
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDExNSwxMTUsMC4wNSkiLz48L3N2Zz4=')] opacity-20" />
 
-                <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div className="space-y-2">
-                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">HR Module</p>
-                        <h1 className="text-3xl font-bold tracking-tight">Wishlist Management</h1>
-                        <p className="max-w-2xl text-sm leading-6 text-slate-200">
+                <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 z-10">
+                    <div className="space-y-3">
+                        <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 backdrop-blur-md"
+                        >
+                            <div className="size-2 rounded-full bg-primary animate-pulse" />
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/90">HR Module</p>
+                        </motion.div>
+                        <motion.h1
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.3 }}
+                            className="text-4xl lg:text-5xl font-black tracking-tight drop-shadow-md"
+                        >
+                            Wishlist Management
+                        </motion.h1>
+                        <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4 }}
+                            className="max-w-2xl text-sm leading-relaxed text-slate-200/90 font-medium"
+                        >
                             Review and assign trainers for learning proposals. Coordinate internal and external resources effectively.
-                        </p>
+                        </motion.p>
                     </div>
 
-                    <div className="relative w-full md:w-64">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.5 }}
+                        className="relative w-full md:w-64">
                         <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
                             <TrendingUp className="size-4 text-primary" />
                         </div>
@@ -97,30 +142,37 @@ export default function HrWishlistsPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
                         </div>
-                    </div>
+                    </motion.div>
                 </div>
-            </section>
+            </motion.section>
 
             {isLoading ? (
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-                        <div className="h-4 w-48 bg-slate-200 rounded animate-pulse" />
-                    </div>
-                    <div className="p-6 space-y-4">
-                        {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="flex gap-4 items-center animate-pulse">
-                                <div className="h-10 w-10 bg-slate-100 rounded-lg" />
-                                <div className="space-y-2 flex-1">
-                                    <div className="h-4 w-1/3 bg-slate-100 rounded" />
-                                    <div className="h-3 w-1/4 bg-slate-50 rounded" />
+                <AnimatePresence>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm"
+                    >
+                        <div className="p-6 border-b border-slate-50 bg-slate-50/30">
+                            <div className="h-4 w-48 bg-slate-200 rounded animate-pulse" />
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="flex gap-4 items-center animate-pulse">
+                                    <div className="h-10 w-10 bg-slate-100 rounded-lg" />
+                                    <div className="space-y-2 flex-1">
+                                        <div className="h-4 w-1/3 bg-slate-100 rounded" />
+                                        <div className="h-3 w-1/4 bg-slate-50 rounded" />
+                                    </div>
+                                    <div className="h-8 w-24 bg-slate-50 rounded-lg" />
                                 </div>
-                                <div className="h-8 w-24 bg-slate-50 rounded-lg" />
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                </AnimatePresence>
             ) : (
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm transition-all hover:shadow-md">
+                <motion.div variants={itemVariants} className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm transition-all hover:shadow-md">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
@@ -151,9 +203,23 @@ export default function HrWishlistsPage() {
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <motion.tbody
+                                variants={{
+                                    show: { transition: { staggerChildren: 0.05 } }
+                                }}
+                                initial="hidden"
+                                animate="show"
+                                className="divide-y divide-slate-50"
+                            >
                                 {items.map((w) => (
-                                    <tr key={w.id} className="hover:bg-slate-50/30 transition-colors group">
+                                    <motion.tr
+                                        variants={{
+                                            hidden: { opacity: 0, y: 10 },
+                                            show: { opacity: 1, y: 0 }
+                                        }}
+                                        key={w.id}
+                                        className="hover:bg-slate-50/30 transition-colors group"
+                                    >
                                         <td className="px-6 py-5">
                                             <div className="space-y-1">
                                                 <div className="font-bold text-slate-900 group-hover:text-primary transition-colors">{w.skillName}</div>
@@ -275,9 +341,9 @@ export default function HrWishlistsPage() {
                                                 )}
                                             </div>
                                         </td>
-                                    </tr>
+                                    </motion.tr>
                                 ))}
-                            </tbody>
+                            </motion.tbody>
                         </table>
 
                         {!items.length && (
@@ -301,7 +367,7 @@ export default function HrWishlistsPage() {
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
             )}
 
             {findingTrainerFor && (
@@ -326,6 +392,6 @@ export default function HrWishlistsPage() {
                 onClose={() => setRejectDialog(null)}
                 onConfirm={handleRejectConfirm}
             />
-        </div>
+        </motion.div>
     );
 }
