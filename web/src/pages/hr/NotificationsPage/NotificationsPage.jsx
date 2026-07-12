@@ -9,6 +9,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { toastService } from '../../../services/toastService';
 
+// --- Animation Variants ---
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.05, delayChildren: 0.1 }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
 export default function NotificationsPage() {
     const qc = useQueryClient();
     const [activeTab, setActiveTab] = useState('create');
@@ -74,20 +88,46 @@ export default function NotificationsPage() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8 pb-10"
+        >
             {/* ── Hero Section ─────────────────────────────────────────────────── */}
-            <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-6 py-8 text-white shadow-lg shadow-slate-900/10">
-                <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/15 blur-3xl" />
-                <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-primary/10 blur-3xl" />
+            <motion.section variants={itemVariants} className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-[#0F1F3D] via-[#12305A] to-[#0d2b50] px-8 py-10 text-white shadow-2xl shadow-primary/10 transition-transform duration-500">
+                <div className="absolute right-0 top-0 h-48 w-48 translate-x-10 -translate-y-10 rounded-full bg-primary/20 blur-[60px] animate-pulse" />
+                <div className="absolute bottom-0 left-0 h-40 w-40 -translate-x-10 translate-y-10 rounded-full bg-teal-400/10 blur-[60px]" />
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDExNSwxMTUsMC4wNSkiLz48L3N2Zz4=')] opacity-20" />
 
-                <div className="relative space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">HR Module</p>
-                    <h1 className="text-3xl font-bold tracking-tight">Internal Communications</h1>
-                    <p className="max-w-2xl text-sm leading-6 text-slate-200">
+                <div className="relative space-y-3 z-10">
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 backdrop-blur-md"
+                    >
+                        <div className="size-2 rounded-full bg-primary animate-pulse" />
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/90">HR Module</p>
+                    </motion.div>
+                    <motion.h1
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-4xl lg:text-5xl font-black tracking-tight drop-shadow-md"
+                    >
+                        Internal Communications
+                    </motion.h1>
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.4 }}
+                        className="max-w-2xl text-sm leading-relaxed text-slate-200/90 font-medium"
+                    >
                         Keep your team informed and engaged with instant broadcasts and multi-channel notifications.
-                    </p>
+                    </motion.p>
                 </div>
-            </section>
+            </motion.section>
 
             {/* ── Navigation Tabs ─────────────────────────────────────────────── */}
             <div className="flex p-1.5 bg-slate-100/80 backdrop-blur-sm rounded-xl w-fit border border-slate-200/50">
@@ -121,13 +161,14 @@ export default function NotificationsPage() {
                 {activeTab === 'create' ? (
                     <motion.div
                         key="create"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="show"
                         exit={{ opacity: 0, x: 10 }}
                         className="grid grid-cols-1 lg:grid-cols-3 gap-8"
                     >
                         {/* ── Composition Panel ─────────────────────────────────── */}
-                        <div className="lg:col-span-2 space-y-6">
+                        <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
                             <div className="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-8">
                                 <div className="space-y-1">
                                     <h3 className="text-lg font-bold text-slate-900">Message Composition</h3>
@@ -250,10 +291,10 @@ export default function NotificationsPage() {
                                     </button>
                                 </form>
                             </div>
-                        </div>
+                        </motion.div>
 
                         {/* ── Configuration Panel ───────────────────────────────── */}
-                        <div className="space-y-6">
+                        <motion.div variants={itemVariants} className="space-y-6">
                             <div className={cn(
                                 "bg-white rounded-xl border border-slate-200 p-6 shadow-sm overflow-hidden transition-all duration-500",
                                 formData.targetType === 'Department' ? "opacity-100 translate-y-0" : "opacity-40 -translate-y-2 pointer-events-none grayscale"
@@ -321,13 +362,14 @@ export default function NotificationsPage() {
                                     </p>
                                 </div>
                             </div>
-                        </div>
+                        </motion.div>
                     </motion.div>
                 ) : (
                     <motion.div
                         key="history"
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="show"
                         exit={{ opacity: 0, x: -10 }}
                         className="space-y-4"
                     >
@@ -340,7 +382,7 @@ export default function NotificationsPage() {
                         ) : history.length > 0 ? (
                             <div className="grid grid-cols-1 gap-4">
                                 {history.map((item) => (
-                                    <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:border-primary/30 hover:shadow-xl hover:shadow-slate-200/40 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <motion.div variants={itemVariants} key={item.id} className="bg-white rounded-xl border border-slate-200 p-5 hover:border-primary/30 hover:shadow-xl hover:shadow-slate-200/40 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-6">
                                         <div className="flex items-start gap-5 flex-1 min-w-0">
                                             <div className="size-14 rounded-2xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100 text-slate-400 group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20 transition-all duration-300">
                                                 <Bell className="size-7" />
@@ -361,7 +403,7 @@ export default function NotificationsPage() {
                                         <button className="hidden lg:flex size-11 items-center justify-center rounded-xl bg-slate-50 text-slate-400 hover:text-primary hover:bg-primary/10 transition-all border border-slate-100">
                                             <ChevronRight className="size-5" />
                                         </button>
-                                    </div>
+                                    </motion.div>
                                 ))}
                             </div>
                         ) : (
@@ -384,6 +426,6 @@ export default function NotificationsPage() {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     );
 }

@@ -65,7 +65,7 @@ export default function Profile() {
       setAvatarUrl(data.avatarUrl || '');
     } catch (err) {
       console.error('Failed to load profile:', err);
-      toastService.error('Không thể tải thông tin hồ sơ');
+      toastService.error('Failed to load profile information');
     } finally {
       setLoading(false);
     }
@@ -79,7 +79,7 @@ export default function Profile() {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     if (!fullName.trim()) {
-      toastService.warning('Họ và tên không được để trống');
+      toastService.warning('Full name cannot be empty');
       return;
     }
 
@@ -90,11 +90,11 @@ export default function Profile() {
         avatarUrl,
         phoneInternal: phoneInternal.trim() || null
       });
-      toastService.success('Cập nhật hồ sơ cá nhân thành công! 🎉');
+      toastService.success('Profile updated successfully! 🎉');
       fetchProfile();
     } catch (err) {
       console.error('Failed to update profile:', err);
-      toastService.error(err?.response?.data?.message || 'Cập nhật hồ sơ thất bại');
+      toastService.error(err?.response?.data?.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -106,23 +106,23 @@ export default function Profile() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toastService.warning('Chỉ chấp nhận tệp hình ảnh');
+      toastService.warning('Only image files are accepted');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toastService.warning('Kích thước ảnh tối đa là 5MB');
+      toastService.warning('Max image size is 5MB');
       return;
     }
 
     try {
       setUploadingAvatar(true);
-      toastService.success('Đang tải ảnh lên... 📤');
+      toastService.success('Uploading image... 📤');
       const response = await uploadApi.uploadImage(file);
       setAvatarUrl(response.url);
-      toastService.success('Tải ảnh đại diện mới thành công! Bấm Lưu để hoàn tất.');
+      toastService.success('New avatar uploaded! Click Save to confirm.');
     } catch (err) {
       console.error('Avatar upload failed:', err);
-      toastService.error('Không thể upload ảnh đại diện');
+      toastService.error('Failed to upload avatar');
     } finally {
       setUploadingAvatar(false);
     }
@@ -132,15 +132,15 @@ export default function Profile() {
   const handleChangePasswordSubmit = async (e) => {
     e.preventDefault();
     if (!oldPassword || !newPassword || !confirmPassword) {
-      toastService.warning('Vui lòng điền đầy đủ các trường mật khẩu');
+      toastService.warning('Please fill in all password fields');
       return;
     }
     if (newPassword.length < 6) {
-      toastService.warning('Mật khẩu mới phải từ 6 ký tự trở lên');
+      toastService.warning('New password must be at least 6 characters');
       return;
     }
     if (newPassword !== confirmPassword) {
-      toastService.warning('Mật khẩu xác nhận không khớp');
+      toastService.warning('Confirm password does not match');
       return;
     }
 
@@ -150,13 +150,13 @@ export default function Profile() {
         oldPassword,
         newPassword
       });
-      toastService.success('Đổi mật khẩu thành công! 🔐');
+      toastService.success('Password changed successfully! 🔐');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
       console.error('Password change failed:', err);
-      toastService.error(err?.response?.data?.message || 'Mật khẩu cũ không chính xác');
+      toastService.error(err?.response?.data?.message || 'Incorrect old password');
     } finally {
       setChangingPassword(false);
     }
@@ -168,7 +168,7 @@ export default function Profile() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[450px] gap-3">
         <Loader2 className="size-10 text-[#00C896] animate-spin" />
-        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Đang tải thông tin hồ sơ...</span>
+        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Loading profile information...</span>
       </div>
     );
   }
@@ -179,7 +179,7 @@ export default function Profile() {
 
       {/* 1. HERO BANNER (Light Theme Premium Card) */}
       <div className="bg-white border border-slate-200/60 rounded-3xl p-6 md:p-8 shadow-xs flex flex-col md:flex-row items-center justify-between gap-6">
-        
+
         {/* Left Side: Avatar & Info */}
         <div className="flex flex-col md:flex-row items-center gap-5 text-center md:text-left">
           {/* Avatar Container */}
@@ -201,7 +201,7 @@ export default function Profile() {
               )}
             </div>
             {/* Small camera badge at bottom-right of avatar */}
-            <div 
+            <div
               className="absolute -bottom-1 -right-1 size-7 rounded-full flex items-center justify-center shadow-xs border-2 transition-transform group-hover:scale-110"
               style={{ backgroundColor: '#13ecb6', color: '#0F1F3D', borderColor: '#ffffff' }}
             >
@@ -220,7 +220,7 @@ export default function Profile() {
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
               <h1 className="text-lg md:text-xl font-black text-slate-800 tracking-tight">
-                {fullName || 'Chưa thiết lập tên'}
+                {fullName || 'Name not set'}
               </h1>
               {(profileData?.roles || []).map((r, i) => (
                 <span
@@ -235,12 +235,12 @@ export default function Profile() {
 
             <p className="text-slate-500 text-xs font-semibold flex items-center justify-center md:justify-start gap-1.5">
               <Briefcase className="size-3.5 text-slate-400" />
-              {profileData?.jobTitle || 'Chưa cập nhật chức danh'}
+              {profileData?.jobTitle || 'Job title not updated'}
               {profileData?.departmentName && (
                 <>
                   <span className="text-slate-350">•</span>
                   <Building2 className="size-3.5 text-blue-500" />
-                  <span>Phòng {profileData.departmentName}</span>
+                  <span>Dept {profileData.departmentName}</span>
                 </>
               )}
             </p>
@@ -252,7 +252,7 @@ export default function Profile() {
               {phoneInternal && (
                 <span className="flex items-center gap-1.5">
                   <span className="hidden sm:inline text-slate-350">•</span>
-                  <Phone className="size-3.5 text-slate-400" /> Máy lẻ: {phoneInternal}
+                  <Phone className="size-3.5 text-slate-400" /> Ext: {phoneInternal}
                 </span>
               )}
             </div>
@@ -262,17 +262,17 @@ export default function Profile() {
         {/* Right Side: Elegant Stats Bar */}
         <div className="flex items-center justify-center md:justify-end gap-6 w-full md:w-auto border-t border-slate-100 pt-4 md:pt-0 md:border-t-0">
           <div className="text-center min-w-[70px]">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Tích lũy</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Points</p>
             <p className="text-lg font-black text-amber-500">{(profileData?.totalInnerGPoints ?? 0).toLocaleString()}</p>
           </div>
           <div className="h-8 w-px bg-slate-200/80" />
           <div className="text-center min-w-[70px]">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Kỹ năng</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Skills</p>
             <p className="text-lg font-black text-blue-600">{(profileData?.skills || []).length}</p>
           </div>
           <div className="h-8 w-px bg-slate-200/80" />
           <div className="text-center min-w-[70px]">
-            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Huy hiệu</p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Badges</p>
             <p className="text-lg font-black text-[#00b084]">{(profileData?.badges || []).length}</p>
           </div>
         </div>
@@ -282,10 +282,10 @@ export default function Profile() {
       {/* 2. HORIZONTAL TAB NAVIGATION (iOS/Segmented Control style) */}
       <div className="bg-slate-100/80 p-1.5 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar border border-slate-200/50 shadow-2xs">
         {[
-          { id: 'personal', label: 'Thông tin cá nhân', icon: User },
-          { id: 'skills', label: 'Kỹ năng chuyên môn', icon: BookOpen },
-          { id: 'achievements', label: 'Huy hiệu & Thành tích', icon: Award },
-          { id: 'security', label: 'Bảo mật & Thiết bị', icon: Shield },
+          { id: 'personal', label: 'Personal Info', icon: User },
+          { id: 'skills', label: 'Professional Skills', icon: BookOpen },
+          { id: 'achievements', label: 'Badges & Achievements', icon: Award },
+          { id: 'security', label: 'Security & Devices', icon: Shield },
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -322,8 +322,8 @@ export default function Profile() {
             {activeTab === 'personal' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-black text-slate-800">Thông tin cá nhân</h2>
-                  <p className="text-slate-400 text-xs mt-0.5">Cập nhật thông tin liên hệ và định danh của bạn trong hệ thống doanh nghiệp.</p>
+                  <h2 className="text-lg font-black text-slate-800">Personal Info</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">Update your contact information and identity in the enterprise system.</p>
                 </div>
 
                 <form onSubmit={handleUpdateProfile} className="space-y-6">
@@ -332,7 +332,7 @@ export default function Profile() {
                     {/* Full Name */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                        <User className="size-3.5 text-slate-400" /> Họ và tên
+                        <User className="size-3.5 text-slate-400" /> Full Name
                       </label>
                       <div className="relative">
                         <input
@@ -341,7 +341,7 @@ export default function Profile() {
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
                           className="w-full bg-slate-50/50 border border-slate-200 focus:border-[#00C896] focus:bg-white focus:ring-4 focus:ring-[#00C896]/5 text-slate-800 text-xs px-4 py-3 rounded-xl focus:outline-none transition-all font-semibold"
-                          placeholder="Nhập họ và tên..."
+                          placeholder="Enter full name..."
                         />
                       </div>
                     </div>
@@ -349,11 +349,11 @@ export default function Profile() {
                     {/* Phone Internal */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                        <Phone className="size-3.5 text-slate-400" /> Số điện thoại máy lẻ (Internal)
+                        <Phone className="size-3.5 text-slate-400" /> Internal Phone Extension
                       </label>
                       <input
                         type="text"
-                        placeholder="Ví dụ: 808"
+                        placeholder="E.g., 808"
                         value={phoneInternal}
                         onChange={(e) => setPhoneInternal(e.target.value)}
                         className="w-full bg-slate-50/50 border border-slate-200 focus:border-[#00C896] focus:bg-white focus:ring-4 focus:ring-[#00C896]/5 text-slate-800 text-xs px-4 py-3 rounded-xl focus:outline-none transition-all font-semibold"
@@ -364,14 +364,14 @@ export default function Profile() {
                   {/* SYSTEM READONLY INFO GROUP */}
                   <div className="pt-6 border-t border-slate-100">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1">
-                      <Lock className="size-3" /> Thông tin hệ thống (Chỉ đọc)
+                      <Lock className="size-3" /> System Information (Read-only)
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       {/* Email - Read-only */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                          Địa chỉ Email <Lock className="size-3 text-slate-400" />
+                          Email Address <Lock className="size-3 text-slate-400" />
                         </label>
                         <div className="relative">
                           <input
@@ -387,13 +387,13 @@ export default function Profile() {
                       {/* Job Title - Read-only */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                          Chức danh công việc <Lock className="size-3 text-slate-400" />
+                          Job Title <Lock className="size-3 text-slate-400" />
                         </label>
                         <div className="relative">
                           <input
                             type="text"
                             readOnly
-                            value={profileData?.jobTitle || 'Chưa cập nhật'}
+                            value={profileData?.jobTitle || 'Not updated'}
                             className="w-full bg-slate-50/50 border border-slate-200 text-slate-600 text-xs px-4 py-3 pl-10 rounded-xl font-semibold cursor-default outline-none"
                           />
                           <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
@@ -403,13 +403,13 @@ export default function Profile() {
                       {/* Department - Read-only */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                          Phòng ban trực thuộc <Lock className="size-3 text-slate-400" />
+                          Department <Lock className="size-3 text-slate-400" />
                         </label>
                         <div className="relative">
                           <input
                             type="text"
                             readOnly
-                            value={profileData?.departmentName || 'Chưa phân bổ'}
+                            value={profileData?.departmentName || 'Not assigned'}
                             className="w-full bg-slate-50/50 border border-slate-200 text-slate-600 text-xs px-4 py-3 pl-10 rounded-xl font-semibold cursor-default outline-none"
                           />
                           <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
@@ -419,7 +419,7 @@ export default function Profile() {
                       {/* Company Name - Read-only */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                          Công ty quản lý <Lock className="size-3 text-slate-400" />
+                          Company <Lock className="size-3 text-slate-400" />
                         </label>
                         <div className="relative">
                           <input
@@ -441,7 +441,7 @@ export default function Profile() {
                       className="px-6 py-3 rounded-xl bg-[#00C896] hover:bg-[#00b084] text-[#0F1F3D] text-xs font-black cursor-pointer transition-all shadow-md shadow-[#00C896]/10 flex items-center gap-2 hover:translate-y-[-1px] active:translate-y-0"
                     >
                       {saving && <Loader2 className="size-4 animate-spin" />}
-                      Lưu thay đổi
+                      Save changes
                     </button>
                   </div>
                 </form>
@@ -452,8 +452,8 @@ export default function Profile() {
             {activeTab === 'skills' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-black text-slate-800">Kỹ năng chuyên môn</h2>
-                  <p className="text-slate-400 text-xs mt-0.5">Danh sách các kỹ năng chuyên môn của bạn được xác nhận bởi HR hoặc qua hệ thống khóa học.</p>
+                  <h2 className="text-lg font-black text-slate-800">Professional Skills</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">List of your professional skills verified by HR or through the course system.</p>
                 </div>
 
                 {(profileData?.skills || []).length > 0 ? (
@@ -481,8 +481,8 @@ export default function Profile() {
                               </span>
                               <span className="text-[10px] text-slate-400 font-medium">•</span>
                               <span className="text-[9px] text-slate-500 font-bold uppercase">
-                                {skill.source === 'SelfDeclared' ? 'Tự khai báo' :
-                                  skill.source === 'HRVerified' ? 'HR Xác minh ✓' : 'Khóa học hoàn thành'}
+                                {skill.source === 'SelfDeclared' ? 'Self-declared' :
+                                  skill.source === 'HRVerified' ? 'HR Verified ✓' : 'Course Completed'}
                               </span>
                             </div>
                           </div>
@@ -499,9 +499,9 @@ export default function Profile() {
                 ) : (
                   <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/20">
                     <BookOpen className="size-12 text-slate-350 mx-auto mb-3" />
-                    <h4 className="text-sm font-bold text-slate-700">Chưa ghi nhận kỹ năng nào</h4>
+                    <h4 className="text-sm font-bold text-slate-700">No skills recorded yet</h4>
                     <p className="text-slate-400 text-xs max-w-sm mx-auto mt-1 leading-normal">
-                      Kỹ năng của bạn sẽ tự động xuất hiện tại đây khi bạn đăng ký và hoàn thành các buổi học kỹ năng hoặc được quản lý HR xác minh.
+                      Your skills will automatically appear here when you enroll and complete skill sessions or get verified by HR.
                     </p>
                   </div>
                 )}
@@ -512,8 +512,8 @@ export default function Profile() {
             {activeTab === 'achievements' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-black text-slate-800">Huy hiệu & Thành tích</h2>
-                  <p className="text-slate-400 text-xs mt-0.5">Các cột mốc học tập và giảng dạy bạn đã đạt được trên chặng đường cùng InnerG.</p>
+                  <h2 className="text-lg font-black text-slate-800">Badges & Achievements</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">Learning and teaching milestones you have achieved on your journey with InnerG.</p>
                 </div>
 
                 {(profileData?.badges || []).length > 0 ? (
@@ -533,12 +533,12 @@ export default function Profile() {
                           <div className="space-y-1">
                             <h3 className="text-xs font-black text-slate-800 group-hover:text-amber-600 transition-colors">{b.badgeName}</h3>
                             <p className="text-[10px] text-slate-450 leading-relaxed line-clamp-2" title={b.description}>
-                              {b.description || 'Huy hiệu thành viên xuất sắc'}
+                              {b.description || 'Excellent Member Badge'}
                             </p>
                           </div>
 
                           <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider pt-2 border-t border-slate-100 w-full flex items-center justify-center gap-1.5">
-                            <Calendar className="size-3" /> Đạt được {new Date(b.awardedAt).toLocaleDateString('vi-VN')}
+                            <Calendar className="size-3" /> Earned {new Date(b.awardedAt).toLocaleDateString('vi-VN')}
                           </div>
                         </div>
                       );
@@ -547,9 +547,9 @@ export default function Profile() {
                 ) : (
                   <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/20">
                     <Award className="size-12 text-slate-350 mx-auto mb-3" />
-                    <h4 className="text-sm font-bold text-slate-700">Chưa nhận được huy hiệu nào</h4>
+                    <h4 className="text-sm font-bold text-slate-700">No badges received yet</h4>
                     <p className="text-slate-400 text-xs max-w-sm mx-auto mt-1 leading-normal">
-                      Hãy tích cực tham gia các lớp học của công ty, thảo luận và đóng góp tài liệu để nhận được các danh hiệu xuất sắc đầu tiên nhé!
+                      Actively participate in company classes, discuss and contribute documents to earn your first excellence awards!
                     </p>
                   </div>
                 )}
@@ -560,13 +560,13 @@ export default function Profile() {
             {activeTab === 'security' && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-lg font-black text-slate-800">Đổi mật khẩu</h2>
-                  <p className="text-slate-400 text-xs mt-0.5">Đặt lại mật khẩu mới định kỳ để bảo vệ tài khoản của bạn.</p>
+                  <h2 className="text-lg font-black text-slate-800">Change Password</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">Reset your password periodically to protect your account.</p>
                 </div>
 
                 <form onSubmit={handleChangePasswordSubmit} className="space-y-4 max-w-md">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Mật khẩu cũ</label>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Old Password</label>
                     <input
                       type="password"
                       required
@@ -577,7 +577,7 @@ export default function Profile() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Mật khẩu mới</label>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">New Password</label>
                     <input
                       type="password"
                       required
@@ -588,7 +588,7 @@ export default function Profile() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Xác nhận mật khẩu mới</label>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Confirm New Password</label>
                     <input
                       type="password"
                       required
@@ -604,7 +604,7 @@ export default function Profile() {
                     className="px-5 py-3 rounded-xl bg-[#0F1F3D] hover:bg-[#1b2d56] text-white text-xs font-black cursor-pointer transition-all shadow-xs flex items-center gap-2 hover:translate-y-[-1px] active:translate-y-0"
                   >
                     {changingPassword && <Loader2 className="size-4 animate-spin text-[#00C896]" />}
-                    Cập nhật mật khẩu
+                    Update Password
                   </button>
                 </form>
               </div>

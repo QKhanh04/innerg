@@ -18,14 +18,14 @@ export default function InternalMentorModal({ wishlist, onClose }) {
     const assignMutation = useMutation({
         mutationFn: (trainerId) => hrWishlistsApi.assignTrainer(wishlist.id, trainerId),
         onSuccess: () => {
-            toastService.success('Đã gán mentor thành công');
+            toastService.success('Mentor assigned successfully');
             queryClient.invalidateQueries({ queryKey: ['hr', 'wishlists'] });
             onClose();
         },
         onError: (err) => {
             const message = err?.response?.data?.error?.message
                 || err?.response?.data?.message
-                || 'Không thể gán mentor';
+                || 'Failed to assign mentor';
             toastService.error(message);
         },
     });
@@ -126,7 +126,7 @@ export default function InternalMentorModal({ wishlist, onClose }) {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4.5 text-slate-300 group-focus-within:text-primary transition-colors" />
                         <input
                             type="text"
-                            placeholder="Tìm mentor theo tên..."
+                            placeholder="Search mentor by name..."
                             className="w-full h-12 pl-12 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:border-primary/40 focus:bg-white outline-none transition-all shadow-sm"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -144,14 +144,14 @@ export default function InternalMentorModal({ wishlist, onClose }) {
                             <>
                                 {recommended.length > 0 && (
                                     <div className="space-y-2">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary px-1">Gợi ý phù hợp</p>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary px-1">Recommended</p>
                                         {recommended.map(renderTrainer)}
                                     </div>
                                 )}
                                 {others.length > 0 && (
                                     <div className="space-y-2">
                                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">
-                                            {recommended.length > 0 ? 'Tất cả mentor trong công ty' : 'Mentor trong công ty'}
+                                            {recommended.length > 0 ? 'All mentors' : 'Company mentors'}
                                         </p>
                                         {others.map(renderTrainer)}
                                     </div>
@@ -162,12 +162,12 @@ export default function InternalMentorModal({ wishlist, onClose }) {
                                 <Search className="size-8 text-slate-200" />
                                 <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.1em] italic">
                                     {suggestions.length === 0
-                                        ? 'Chưa có mentor nào trong công ty'
-                                        : 'Không tìm thấy mentor phù hợp'}
+                                        ? 'No mentors found in the company'
+                                        : 'No matching mentors found'}
                                 </p>
                                 {suggestions.length === 0 && (
                                     <p className="text-[10px] text-slate-400 text-center max-w-xs">
-                                        Hãy gán vai trò Mentor cho nhân viên trong trang Members trước.
+                                        Please assign the Mentor role to members in the Members page first.
                                     </p>
                                 )}
                             </div>
@@ -180,7 +180,7 @@ export default function InternalMentorModal({ wishlist, onClose }) {
                         <Info className="size-4" />
                     </div>
                     <p className="text-[10px] text-slate-500 font-bold leading-relaxed tracking-tight">
-                        Bạn có thể gán bất kỳ mentor nào trong công ty. Mentor được đánh dấu <span className="text-primary">Phù hợp</span> có kỹ năng liên quan đến chủ đề wishlist.
+                        You can assign any mentor in the company. Mentors marked as <span className="text-primary">Recommended</span> have skills related to the wishlist topic.
                     </p>
                 </div>
             </motion.div>
